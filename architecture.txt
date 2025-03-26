@@ -1,0 +1,219 @@
+lib/
+├── core/
+│   ├── constants/
+│   │   ├── api_constants.dart
+│   │   ├── app_constants.dart
+│   │   └── route_constants.dart
+│   ├── di/
+│   │   └── service_locator.dart
+│   ├── error/
+│   │   ├── exceptions.dart
+│   │   └── failures.dart
+│   ├── network/
+│   │   ├── api_client.dart
+│   │   └── network_info.dart
+│   ├── storage/
+│   │   ├── app_database.dart
+│   │   └── secure_storage.dart
+│   ├── theme/
+│   │   └── app_theme.dart
+│   ├── utils/
+│   │   ├── date_utils.dart
+│   │   └── unit_converter.dart
+│   └── widgets/
+│       ├── app_bar.dart
+│       └── loading_indicator.dart
+├── features/
+│   ├── auth/
+│   │   ├── data/
+│   │   │   ├── datasources/
+│   │   │   │   ├── auth_local_datasource.dart
+│   │   │   │   └── auth_remote_datasource.dart
+│   │   │   ├── models/
+│   │   │   │   └── user_model.dart
+│   │   │   └── repositories/
+│   │   │       └── auth_repository_impl.dart
+│   │   ├── domain/
+│   │   │   ├── entities/
+│   │   │   │   └── user.dart
+│   │   │   ├── repositories/
+│   │   │   │   └── auth_repository.dart
+│   │   │   └── usecases/
+│   │   │       ├── login.dart
+│   │   │       ├── register.dart
+│   │   │       └── reset_password.dart
+│   │   └── presentation/
+│   │       ├── pages/
+│   │       │   ├── login_page.dart
+│   │       │   └── register_page.dart
+│   │       ├── providers/
+│   │       │   └── auth_provider.dart
+│   │       └── widgets/
+│   │           └── auth_form.dart
+│   ├── favorites/
+│   │   ├── data/
+│   │   │   ├── datasources/
+│   │   │   │   ├── favorites_local_datasource.dart
+│   │   │   │   └── favorites_remote_datasource.dart
+│   │   │   ├── models/
+│   │   │   │   └── favorite_station_model.dart
+│   │   │   └── repositories/
+│   │   │       └── favorites_repository_impl.dart
+│   │   ├── domain/
+│   │   │   ├── entities/
+│   │   │   │   └── favorite_station.dart
+│   │   │   ├── repositories/
+│   │   │   │   └── favorites_repository.dart
+│   │   │   └── usecases/
+│   │   │       ├── add_favorite.dart
+│   │   │       ├── get_favorites.dart
+│   │   │       └── remove_favorite.dart
+│   │   └── presentation/
+│   │       ├── pages/
+│   │       │   └── favorites_page.dart
+│   │       ├── providers/
+│   │       │   └── favorites_provider.dart
+│   │       └── widgets/
+│   │           ├── favorite_list.dart
+│   │           └── favorite_list_item.dart
+│   ├── forecast/
+│   │   ├── data/
+│   │   │   ├── datasources/
+│   │   │   │   ├── forecast_local_datasource.dart
+│   │   │   │   └── forecast_remote_datasource.dart
+│   │   │   ├── models/
+│   │   │   │   ├── forecast_model.dart
+│   │   │   │   └── return_period_model.dart
+│   │   │   └── repositories/
+│   │   │       └── forecast_repository_impl.dart
+│   │   ├── domain/
+│   │   │   ├── entities/
+│   │   │   │   ├── forecast.dart
+│   │   │   │   └── return_period.dart
+│   │   │   ├── repositories/
+│   │   │   │   └── forecast_repository.dart
+│   │   │   └── usecases/
+│   │   │       ├── get_forecast.dart
+│   │   │       └── get_return_periods.dart
+│   │   └── presentation/
+│   │       ├── pages/
+│   │       │   └── forecast_page.dart
+│   │       ├── providers/
+│   │       │   └── forecast_provider.dart
+│   │       └── widgets/
+│   │           ├── forecast_calendar.dart
+│   │           ├── hydrograph.dart
+│   │           └── flow_indicator.dart
+│   ├── map/
+│   │   ├── data/
+│   │   │   ├── datasources/
+│   │   │   │   ├── map_local_datasource.dart
+│   │   │   │   └── map_remote_datasource.dart
+│   │   │   ├── models/
+│   │   │   │   └── station_model.dart
+│   │   │   └── repositories/
+│   │   │       └── map_repository_impl.dart
+│   │   ├── domain/
+│   │   │   ├── entities/
+│   │   │   │   └── station.dart
+│   │   │   ├── repositories/
+│   │   │   │   └── map_repository.dart
+│   │   │   └── usecases/
+│   │   │       └── get_stations.dart
+│   │   └── presentation/
+│   │       ├── pages/
+│   │       │   └── map_page.dart
+│   │       ├── providers/
+│   │       │   └── map_provider.dart
+│   │       └── widgets/
+│   │           ├── info_bubble.dart
+│   │           └── station_marker.dart
+│   ├── notifications/
+│   │   ├── data/
+│   │   │   ├── datasources/
+│   │   │   │   └── notifications_datasource.dart
+│   │   │   ├── models/
+│   │   │   │   └── notification_model.dart
+│   │   │   └── repositories/
+│   │   │       └── notifications_repository_impl.dart
+│   │   ├── domain/
+│   │   │   ├── entities/
+│   │   │   │   └── notification.dart
+│   │   │   ├── repositories/
+│   │   │   │   └── notifications_repository.dart
+│   │   │   └── usecases/
+│   │   │       ├── create_notification.dart
+│   │   │       └── get_notifications.dart
+│   │   └── presentation/
+│   │       ├── pages/
+│   │       │   └── notifications_page.dart
+│   │       └── providers/
+│   │           └── notifications_provider.dart
+│   ├── offline/
+│   │   ├── data/
+│   │   │   ├── datasources/
+│   │   │   │   └── offline_datasource.dart
+│   │   │   ├── models/
+│   │   │   │   └── cached_data_model.dart
+│   │   │   └── repositories/
+│   │   │       └── offline_repository_impl.dart
+│   │   ├── domain/
+│   │   │   ├── entities/
+│   │   │   │   └── cached_data.dart
+│   │   │   ├── repositories/
+│   │   │   │   └── offline_repository.dart
+│   │   │   └── usecases/
+│   │   │       ├── cache_forecast.dart
+│   │   │       └── export_data.dart
+│   │   └── presentation/
+│   │       ├── pages/
+│   │       │   └── export_page.dart
+│   │       └── widgets/
+│   │           └── offline_indicator.dart
+│   ├── search/
+│   │   ├── data/
+│   │   │   ├── datasources/
+│   │   │   │   └── cities_datasource.dart
+│   │   │   ├── models/
+│   │   │   │   └── city_model.dart
+│   │   │   └── repositories/
+│   │   │       └── search_repository_impl.dart
+│   │   ├── domain/
+│   │   │   ├── entities/
+│   │   │   │   └── city.dart
+│   │   │   ├── repositories/
+│   │   │   │   └── search_repository.dart
+│   │   │   └── usecases/
+│   │   │       └── search_cities.dart
+│   │   └── presentation/
+│   │       ├── widgets/
+│   │       │   └── search_bar.dart
+│   │       └── providers/
+│   │           └── search_provider.dart
+│   └── settings/
+│       ├── data/
+│       │   ├── datasources/
+│       │   │   ├── settings_local_datasource.dart
+│       │   │   └── settings_remote_datasource.dart
+│       │   ├── models/
+│       │   │   └── user_preferences_model.dart
+│       │   └── repositories/
+│       │       └── settings_repository_impl.dart
+│       ├── domain/
+│       │   ├── entities/
+│       │   │   └── user_preferences.dart
+│       │   ├── repositories/
+│       │   │   └── settings_repository.dart
+│       │   └── usecases/
+│       │       ├── get_preferences.dart
+│       │       └── update_preferences.dart
+│       └── presentation/
+│           ├── pages/
+│           │   ├── about_page.dart
+│           │   ├── edit_account_page.dart
+│           │   ├── flow_units_page.dart
+│           │   └── settings_page.dart
+│           └── providers/
+│               └── settings_provider.dart
+├── app.dart
+└── main.dart

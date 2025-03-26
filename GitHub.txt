@@ -1,0 +1,38 @@
+Summary of Commands:
+1. Ensure you're on the master branch and it's up-to-date
+git checkout master
+git pull origin master
+
+2. Create and switch to the new feature branch
+git checkout -b $FEATURE_BRANCH_NAME
+git push -u origin $FEATURE_BRANCH_NAME
+
+-------------------------------
+
+3. (When you are ready to finish the feature)
+# Switch back to the master branch
+git add .
+git commit -m "descriptive message"
+git push
+git checkout master
+
+4. Pull the latest changes from the remote master
+git pull origin master
+
+5. Merge the feature branch into master with unrelated histories allowed
+git merge $FEATURE_BRANCH_NAME
+
+    git merge $FEATURE_BRANCH_NAME --allow-unrelated-histories
+    5.1 Check for merge conflicts
+    git status | grep -q "Unmerged paths"; then
+    "Merge conflicts detected. Please resolve them manually."
+    "After resolving conflicts, run 'git add <resolved_files>' and 'git commit'."
+  
+6. Push the updated master branch to remote
+git push origin master
+
+7. Optional: Delete the local feature branch
+git branch -d $FEATURE_BRANCH_NAME
+
+8. Optional: Delete the remote feature branch
+git push origin --delete $FEATURE_BRANCH_NAME

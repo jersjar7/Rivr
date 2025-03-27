@@ -8,6 +8,7 @@ class CustomTextField extends StatelessWidget {
   final TextInputType keyboardType;
   final IconData? prefixIcon;
   final Widget? suffixIcon;
+  final String? Function(String?)? validator; // Added validator parameter
 
   const CustomTextField({
     super.key,
@@ -17,16 +18,19 @@ class CustomTextField extends StatelessWidget {
     this.keyboardType = TextInputType.text,
     this.prefixIcon,
     this.suffixIcon,
+    this.validator, // Added validator parameter
   });
 
   @override
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 25.0, vertical: 8.0),
-      child: TextField(
+      child: TextFormField(
+        // Changed from TextField to TextFormField
         controller: controller,
         obscureText: obscureText,
         keyboardType: keyboardType,
+        validator: validator, // Using the validator
         decoration: InputDecoration(
           enabledBorder: OutlineInputBorder(
             borderSide: const BorderSide(color: Colors.white),
@@ -34,6 +38,16 @@ class CustomTextField extends StatelessWidget {
           ),
           focusedBorder: OutlineInputBorder(
             borderSide: const BorderSide(color: Colors.deepPurple),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          errorBorder: OutlineInputBorder(
+            // Added error border styling
+            borderSide: const BorderSide(color: Colors.red),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          focusedErrorBorder: OutlineInputBorder(
+            // Added focused error border
+            borderSide: const BorderSide(color: Colors.red),
             borderRadius: BorderRadius.circular(12),
           ),
           hintText: hintText,

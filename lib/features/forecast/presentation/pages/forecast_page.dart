@@ -1,11 +1,12 @@
 // lib/features/forecast/presentation/pages/forecast_page.dart
-// A page that displays river flow forecasts with different time ranges
+// Integrated version with loading states and error handling
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:rivr/features/forecast/domain/entities/forecast.dart';
+import 'package:rivr/core/network/connection_monitor.dart';
+import 'package:rivr/core/widgets/loading_indicator.dart';
+import 'package:rivr/core/widgets/empty_state.dart';
 import 'package:rivr/features/forecast/domain/entities/forecast_types.dart';
-import 'package:rivr/features/forecast/domain/entities/return_period.dart';
 import 'package:rivr/features/forecast/presentation/providers/forecast_provider.dart';
 import 'package:rivr/features/forecast/presentation/providers/return_period_provider.dart';
 import 'package:rivr/features/forecast/presentation/widgets/flow_status_card.dart';
@@ -98,36 +99,6 @@ class _ForecastPageState extends State<ForecastPage>
 
   @override
   Widget build(BuildContext context) {
-    final forecastProvider = Provider.of<ForecastProvider>(context);
-    final returnPeriodProvider = Provider.of<ReturnPeriodProvider>(context);
-
-    final isLoading = forecastProvider.isLoading(widget.reachId);
-    final hasError = forecastProvider.getErrorFor(widget.reachId) != null;
-    final hasData = forecastProvider.hasForecastsFor(widget.reachId);
-
-    final latestFlow = forecastProvider.getLatestFlowFor(widget.reachId);
-    final returnPeriod =
-        returnPeriodProvider.hasReturnPeriodFor(widget.reachId)
-            ? returnPeriodProvider.getCachedReturnPeriod(widget.reachId)
-            : null;
-
-    final shortRangeForecasts = forecastProvider.getForecastCollection(
-      widget.reachId,
-      ForecastType.shortRange,
-    );
-
-    final mediumRangeForecasts = forecastProvider.getForecastCollection(
-      widget.reachId,
-      ForecastType.mediumRange,
-    );
-
-    final longRangeForecasts = forecastProvider.getForecastCollection(
-      widget.reachId,
-      ForecastType.longRange,
-    );
-
-    final dailyData = forecastProvider.getDailyDataFor(widget.reachId);
-
     return Scaffold(
       appBar: AppBar(
         title: Text('${widget.stationName} Forecast'),
@@ -140,51 +111,109 @@ class _ForecastPageState extends State<ForecastPage>
           ],
         ),
       ),
-      body:
-          _isRefreshing || isLoading
-              ? const Center(child: CircularProgressIndicator())
-              : hasError
-              ? _buildErrorWidget(forecastProvider.getErrorFor(widget.reachId)!)
-              : !hasData
-              ? _buildNoDataWidget()
-              : RefreshIndicator(
-                onRefresh: _handleRefresh,
-                child: TabBarView(
-                  controller: _tabController,
-                  children: [
-                    // Hourly Tab (Short Range)
-                    _buildHourlyTab(
-                      shortRangeForecasts?.forecasts ?? [],
-                      latestFlow,
-                      returnPeriod,
-                    ),
+      body: ConnectionAwareWidget(
+        offlineBuilder:
+            (context, status) => Column(
+              children: [
+                const ConnectionStatusBanner(),
+                Expanded(child: _buildPageContent()),
+              ],
+            ),
+        child: _buildPageContent(),
+      ),
+    );
+  }
 
-                    // Daily Tab (Medium Range)
-                    _buildDailyTab(
-                      mediumRangeForecasts?.forecasts ?? [],
-                      latestFlow,
-                      returnPeriod,
-                      dailyData,
-                    ),
+  Widget _buildPageContent() {
+    final forecastProvider = Provider.of<ForecastProvider>(context);
+    final returnPeriodProvider = Provider.of<ReturnPeriodProvider>(context);
 
-                    // Monthly Tab (Long Range)
-                    _buildMonthlyTab(
-                      longRangeForecasts?.forecasts ?? [],
-                      latestFlow,
-                      returnPeriod,
-                      dailyData,
-                    ),
-                  ],
-                ),
-              ),
+    final isLoading = forecastProvider.isLoading(widget.reachId);
+    final hasError = forecastProvider.getErrorFor(widget.reachId) != null;
+    final hasData = forecastProvider.hasForecastsFor(widget.reachId);
+
+    if (_isRefreshing || isLoading) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const LoadingIndicator(
+              size: 60,
+              withBackground: true,
+              message: 'Loading forecast data...',
+            ),
+            const SizedBox(height: 40),
+            SkeletonForecastCard(),
+            const SizedBox(height: 20),
+            SkeletonHydrograph(),
+          ],
+        ),
+      );
+    }
+
+    if (hasError) {
+      return ErrorStateView(
+        message:
+            forecastProvider.getErrorFor(widget.reachId) ??
+            'An error occurred while loading forecast data',
+        onRetry: _handleRefresh,
+      );
+    }
+
+    if (!hasData) {
+      return NoForecastDataView(
+        stationName: widget.stationName,
+        onRefresh: _handleRefresh,
+      );
+    }
+
+    return RefreshIndicator(
+      onRefresh: _handleRefresh,
+      child: TabBarView(
+        controller: _tabController,
+        children: [
+          // Hourly Tab (Short Range)
+          _buildHourlyTab(forecastProvider, returnPeriodProvider),
+
+          // Daily Tab (Medium Range)
+          _buildDailyTab(forecastProvider, returnPeriodProvider),
+
+          // Monthly Tab (Long Range)
+          _buildMonthlyTab(forecastProvider, returnPeriodProvider),
+        ],
+      ),
     );
   }
 
   Widget _buildHourlyTab(
-    List<Forecast> forecasts,
-    Forecast? latestFlow,
-    ReturnPeriod? returnPeriod,
+    ForecastProvider forecastProvider,
+    ReturnPeriodProvider returnPeriodProvider,
   ) {
+    final latestFlow = forecastProvider.getLatestFlowFor(widget.reachId);
+    final returnPeriod = returnPeriodProvider.getCachedReturnPeriod(
+      widget.reachId,
+    );
+    final shortRangeForecasts = forecastProvider.getForecastCollection(
+      widget.reachId,
+      ForecastType.shortRange,
+    );
+
+    if (shortRangeForecasts == null) {
+      return Center(
+        child: EmptyStateView(
+          title: 'Short range forecast unavailable',
+          message: 'We couldn\'t find hourly forecast data for this station',
+          icon: Icons.waves_outlined,
+          actionButton: OutlinedButton(
+            onPressed: _handleRefresh,
+            child: const Text('Refresh'),
+          ),
+        ),
+      );
+    }
+
+    final forecasts = shortRangeForecasts.forecasts;
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16.0),
       child: Column(
@@ -245,11 +274,35 @@ class _ForecastPageState extends State<ForecastPage>
   }
 
   Widget _buildDailyTab(
-    List<Forecast> forecasts,
-    Forecast? latestFlow,
-    ReturnPeriod? returnPeriod,
-    Map<DateTime, Map<String, double>>? dailyData,
+    ForecastProvider forecastProvider,
+    ReturnPeriodProvider returnPeriodProvider,
   ) {
+    final latestFlow = forecastProvider.getLatestFlowFor(widget.reachId);
+    final returnPeriod = returnPeriodProvider.getCachedReturnPeriod(
+      widget.reachId,
+    );
+    final mediumRangeForecasts = forecastProvider.getForecastCollection(
+      widget.reachId,
+      ForecastType.mediumRange,
+    );
+    final dailyData = forecastProvider.getDailyDataFor(widget.reachId);
+
+    if (mediumRangeForecasts == null) {
+      return Center(
+        child: EmptyStateView(
+          title: 'Medium range forecast unavailable',
+          message: 'We couldn\'t find daily forecast data for this station',
+          icon: Icons.calendar_today_outlined,
+          actionButton: OutlinedButton(
+            onPressed: _handleRefresh,
+            child: const Text('Refresh'),
+          ),
+        ),
+      );
+    }
+
+    final forecasts = mediumRangeForecasts.forecasts;
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16.0),
       child: Column(
@@ -282,8 +335,10 @@ class _ForecastPageState extends State<ForecastPage>
                 height: 300,
                 child:
                     forecasts.isEmpty
-                        ? const Center(
-                          child: Text('No daily forecast data available'),
+                        ? EmptyStateView(
+                          title: 'No daily data',
+                          icon: Icons.bar_chart,
+                          iconSize: 40,
                         )
                         : HydrographFactory.createHydrograph(
                           reachId: widget.reachId,
@@ -311,11 +366,35 @@ class _ForecastPageState extends State<ForecastPage>
   }
 
   Widget _buildMonthlyTab(
-    List<Forecast> forecasts,
-    Forecast? latestFlow,
-    ReturnPeriod? returnPeriod,
-    Map<DateTime, Map<String, double>>? dailyData,
+    ForecastProvider forecastProvider,
+    ReturnPeriodProvider returnPeriodProvider,
   ) {
+    final latestFlow = forecastProvider.getLatestFlowFor(widget.reachId);
+    final returnPeriod = returnPeriodProvider.getCachedReturnPeriod(
+      widget.reachId,
+    );
+    final longRangeForecasts = forecastProvider.getForecastCollection(
+      widget.reachId,
+      ForecastType.longRange,
+    );
+    final dailyData = forecastProvider.getDailyDataFor(widget.reachId);
+
+    if (longRangeForecasts == null) {
+      return Center(
+        child: EmptyStateView(
+          title: 'Long range forecast unavailable',
+          message: 'We couldn\'t find monthly forecast data for this station',
+          icon: Icons.date_range_outlined,
+          actionButton: OutlinedButton(
+            onPressed: _handleRefresh,
+            child: const Text('Refresh'),
+          ),
+        ),
+      );
+    }
+
+    final forecasts = longRangeForecasts.forecasts;
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16.0),
       child: Column(
@@ -337,13 +416,20 @@ class _ForecastPageState extends State<ForecastPage>
           const SizedBox(height: 16),
 
           // Calendar with forecast data
-          LongRangeCalendar(
-            forecasts: forecasts,
-            returnPeriod: returnPeriod,
-            initialMonth: DateTime.now(),
-            longRangeFlows: dailyData,
-            onRefresh: () => _handleRefresh(),
-          ),
+          forecasts.isEmpty
+              ? EmptyStateView(
+                title: 'No long-range data available',
+                message:
+                    'Long-range forecast data is not available for this station',
+                icon: Icons.calendar_month_outlined,
+              )
+              : LongRangeCalendar(
+                forecasts: forecasts,
+                returnPeriod: returnPeriod,
+                initialMonth: DateTime.now(),
+                longRangeFlows: dailyData,
+                onRefresh: () => _handleRefresh(),
+              ),
 
           const SizedBox(height: 24),
 
@@ -355,66 +441,6 @@ class _ForecastPageState extends State<ForecastPage>
 
           const SizedBox(height: 40),
         ],
-      ),
-    );
-  }
-
-  Widget _buildErrorWidget(String errorMessage) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24.0),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.error_outline, size: 48, color: Colors.red),
-            const SizedBox(height: 16),
-            Text(
-              'Unable to load forecast data',
-              style: Theme.of(context).textTheme.titleLarge,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              errorMessage,
-              textAlign: TextAlign.center,
-              style: const TextStyle(color: Colors.grey),
-            ),
-            const SizedBox(height: 24),
-            ElevatedButton(
-              onPressed: _loadForecasts,
-              child: const Text('Try Again'),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildNoDataWidget() {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24.0),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.cloud_off, size: 48, color: Colors.grey),
-            const SizedBox(height: 16),
-            Text(
-              'No forecast data available',
-              style: Theme.of(context).textTheme.titleLarge,
-            ),
-            const SizedBox(height: 8),
-            const Text(
-              'We couldn\'t find forecast data for this location',
-              textAlign: TextAlign.center,
-              style: TextStyle(color: Colors.grey),
-            ),
-            const SizedBox(height: 24),
-            ElevatedButton(
-              onPressed: _loadForecasts,
-              child: const Text('Refresh'),
-            ),
-          ],
-        ),
       ),
     );
   }

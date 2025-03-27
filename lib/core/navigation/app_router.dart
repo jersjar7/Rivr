@@ -2,7 +2,7 @@
 import 'package:flutter/material.dart';
 import '../../features/auth/presentation/pages/auth_page.dart';
 import '../../features/auth/presentation/pages/forgot_password_page.dart';
-import '../../features/favorites_list/presentation/pages/favorites_page.dart';
+import '../../features/favorites/presentation/pages/favorites_page.dart';
 import '../../features/map/presentation/pages/map_page.dart';
 import '../../features/splash/presentation/pages/splash_page.dart';
 import '../../features/forecast/presentation/pages/forecast_page.dart';

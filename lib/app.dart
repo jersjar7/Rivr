@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'core/di/service_locator.dart';
 import 'core/navigation/app_router.dart';
+import 'core/network/connection_monitor.dart';
 import 'features/auth/presentation/providers/auth_provider.dart';
 import 'features/forecast/presentation/providers/forecast_provider.dart';
 import 'features/forecast/presentation/providers/return_period_provider.dart';
@@ -15,6 +16,10 @@ class RivrApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
+        // Add ConnectionMonitor
+        ChangeNotifierProvider(
+          create: (_) => ConnectionMonitor(networkInfo: sl()),
+        ),
         ChangeNotifierProvider(create: (_) => sl<AuthProvider>()),
         ChangeNotifierProvider(create: (_) => sl<ForecastProvider>()),
         ChangeNotifierProxyProvider<ForecastProvider, ReturnPeriodProvider>(
@@ -38,6 +43,12 @@ class RivrApp extends StatelessWidget {
         ),
         initialRoute: '/',
         onGenerateRoute: AppRouter.generateRoute,
+        builder: (context, child) {
+          // Add global connection status banner at the top of the app
+          return Column(
+            children: [const ConnectionStatusBanner(), Expanded(child: child!)],
+          );
+        },
       ),
     );
   }

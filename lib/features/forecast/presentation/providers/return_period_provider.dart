@@ -58,6 +58,10 @@ class ReturnPeriodProvider extends ChangeNotifier {
     return difference.inDays >= 7;
   }
 
+  ReturnPeriod? getCachedReturnPeriod(String reachId) {
+    return _cachedReturnPeriods[reachId];
+  }
+
   // Get return period data for a reach
   Future<ReturnPeriod?> getReturnPeriod(
     String reachId, {
@@ -307,5 +311,14 @@ class ReturnPeriodProvider extends ChangeNotifier {
       return 'Data not available offline';
     }
     return 'An unexpected error occurred';
+  }
+
+  // Update the forecast provider reference
+  void updateForecastProvider(ForecastProvider forecastProvider) {
+    forecastProvider = forecastProvider;
+    // Sync any cached data
+    for (final reachId in _cachedReturnPeriods.keys) {
+      syncWithForecastProvider(reachId);
+    }
   }
 }

@@ -5,6 +5,7 @@ import '../../features/auth/presentation/pages/forgot_password_page.dart';
 import '../../features/favorites_list/presentation/pages/favorites_page.dart';
 import '../../features/map/presentation/pages/map_page.dart';
 import '../../features/splash/presentation/pages/splash_page.dart';
+import '../../features/forecast/presentation/pages/forecast_page.dart';
 
 class AppRouter {
   static Route<dynamic> generateRoute(RouteSettings settings) {
@@ -30,6 +31,15 @@ class AppRouter {
           builder:
               (_) =>
                   MapPage(lat: args?['lat'] ?? 0.0, lon: args?['lon'] ?? 0.0),
+        );
+      case '/forecast':
+        final args = settings.arguments as Map<String, dynamic>;
+        return MaterialPageRoute(
+          builder:
+              (_) => ForecastPage(
+                reachId: args['reachId'],
+                stationName: args['stationName'],
+              ),
         );
       default:
         return MaterialPageRoute(

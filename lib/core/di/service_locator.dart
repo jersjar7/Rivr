@@ -87,6 +87,8 @@ void _registerProviders() {
       getReturnPeriods: sl<GetReturnPeriods>(),
       getFlowCategory: sl<GetFlowCategory>(),
       checkFlowExceedsThreshold: sl<CheckFlowExceedsThreshold>(),
+      forecastProvider:
+          sl<ForecastProvider>(), // This will be replaced by ProxyProvider
     ),
   );
 
@@ -99,6 +101,7 @@ void _registerProviders() {
       getLongRangeForecast: sl<GetLongRangeForecast>(),
       getAllForecasts: sl<GetAllForecasts>(),
       getLatestFlow: sl<GetLatestFlow>(),
+      getReturnPeriods: sl<GetReturnPeriods>(),
     ),
   );
 }

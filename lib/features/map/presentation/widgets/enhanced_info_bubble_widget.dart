@@ -64,6 +64,16 @@ class _EnhancedInfoBubbleState extends State<EnhancedInfoBubble>
     super.dispose();
   }
 
+  void _onGetForecast(int stationId) {
+    Navigator.of(context).pushNamed(
+      '/forecast',
+      arguments: {
+        'reachId': stationId.toString(),
+        'stationName': widget.stationName,
+      },
+    );
+  }
+
   Future<void> _fetchStationData() async {
     // In a real implementation, this would fetch actual return period data
     // and current flow from your API
@@ -287,7 +297,7 @@ class _EnhancedInfoBubbleState extends State<EnhancedInfoBubble>
                         backgroundColor: Colors.blue,
                         foregroundColor: Colors.white,
                       ),
-                      onPressed: () => widget.onGetForecast(widget.stationId),
+                      onPressed: () => _onGetForecast(widget.stationId),
                     ),
                   ),
                 ],

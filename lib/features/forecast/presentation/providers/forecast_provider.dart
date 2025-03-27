@@ -8,9 +8,6 @@ import 'package:rivr/features/forecast/domain/usecases/get_forecast.dart';
 
 class ForecastProvider extends ChangeNotifier {
   final GetForecast _getForecast;
-  final GetShortRangeForecast _getShortRangeForecast;
-  final GetMediumRangeForecast _getMediumRangeForecast;
-  final GetLongRangeForecast _getLongRangeForecast;
   final GetAllForecasts _getAllForecasts;
   final GetLatestFlow _getLatestFlow;
 
@@ -22,9 +19,6 @@ class ForecastProvider extends ChangeNotifier {
     required GetAllForecasts getAllForecasts,
     required GetLatestFlow getLatestFlow,
   }) : _getForecast = getForecast,
-       _getShortRangeForecast = getShortRangeForecast,
-       _getMediumRangeForecast = getMediumRangeForecast,
-       _getLongRangeForecast = getLongRangeForecast,
        _getAllForecasts = getAllForecasts,
        _getLatestFlow = getLatestFlow;
 

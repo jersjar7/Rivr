@@ -15,7 +15,7 @@ class DatabaseHelper {
   static Database? _database;
 
   // Current database version - increment when schema changes
-  static const int _databaseVersion = 2;
+  static const int _databaseVersion = 3;
 
   Future<Database> get database async {
     if (_database != null) return _database!;
@@ -72,22 +72,43 @@ class DatabaseHelper {
         position INTEGER NOT NULL,
         img_number INTEGER,
         dateFavorited TEXT,
-        timeFavorited TEXT
+        timeFavorited TEXT,
+        lastSyncTimestamp INTEGER
       )
     ''');
 
     await db.execute('''
-      CREATE TABLE IF NOT EXISTS CachedForecasts (
+      CREATE TABLE IF NOT EXISTS forecast_cache (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        reachId TEXT NOT NULL,
-        forecastType TEXT NOT NULL,
+        reach_id TEXT NOT NULL,
+        forecast_type TEXT NOT NULL,
         data TEXT NOT NULL,
         timestamp INTEGER NOT NULL,
-        UNIQUE(reachId, forecastType)
+        UNIQUE(reach_id, forecast_type)
       )
     ''');
 
-    // Add any other tables needed for offline functionality
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS return_period_cache (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        reach_id TEXT NOT NULL,
+        data TEXT NOT NULL,
+        timestamp INTEGER NOT NULL,
+        UNIQUE(reach_id)
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS StationDetails (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        stationId INTEGER NOT NULL UNIQUE,
+        name TEXT,
+        lat REAL,
+        lon REAL,
+        lastMeasurement REAL,
+        timestamp INTEGER
+      )
+    ''');
   }
 
   // Handle database migrations
@@ -96,13 +117,13 @@ class DatabaseHelper {
     if (oldVersion < 2) {
       // Example migration from version 1 to 2
       await db.execute('''
-        CREATE TABLE IF NOT EXISTS CachedForecasts (
+        CREATE TABLE IF NOT EXISTS forecast_cache (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
-          reachId TEXT NOT NULL,
-          forecastType TEXT NOT NULL,
+          reach_id TEXT NOT NULL,
+          forecast_type TEXT NOT NULL,
           data TEXT NOT NULL,
           timestamp INTEGER NOT NULL,
-          UNIQUE(reachId, forecastType)
+          UNIQUE(reach_id, forecast_type)
         )
       ''');
 
@@ -112,7 +133,30 @@ class DatabaseHelper {
       );
     }
 
-    // Add future migrations here as needed
+    if (oldVersion < 3) {
+      // Migration from version 2 to 3
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS return_period_cache (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          reach_id TEXT NOT NULL,
+          data TEXT NOT NULL,
+          timestamp INTEGER NOT NULL,
+          UNIQUE(reach_id)
+        )
+      ''');
+
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS StationDetails (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          stationId INTEGER NOT NULL UNIQUE,
+          name TEXT,
+          lat REAL,
+          lon REAL,
+          lastMeasurement REAL,
+          timestamp INTEGER
+        )
+      ''');
+    }
   }
 
   // Clear cache older than a certain threshold
@@ -121,10 +165,62 @@ class DatabaseHelper {
     final threshold =
         DateTime.now().millisecondsSinceEpoch - (maxAgeInHours * 3600 * 1000);
 
-    return await db.delete(
-      'CachedForecasts',
+    // Delete stale forecast cache entries
+    final deletedCount = await db.delete(
+      'forecast_cache',
       where: 'timestamp < ?',
       whereArgs: [threshold],
     );
+
+    // Also clean up return period cache older than 7 days
+    final returnPeriodThreshold =
+        DateTime.now().millisecondsSinceEpoch - (7 * 24 * 3600 * 1000);
+    await db.delete(
+      'return_period_cache',
+      where: 'timestamp < ?',
+      whereArgs: [returnPeriodThreshold],
+    );
+
+    return deletedCount;
+  }
+
+  // Check if tables exist
+  Future<bool> tableExists(String tableName) async {
+    final db = await database;
+    var tableInfo = await db.rawQuery(
+      "SELECT name FROM sqlite_master WHERE type='table' AND name=?",
+      [tableName],
+    );
+    return tableInfo.isNotEmpty;
+  }
+
+  // Ensure all required tables exist
+  Future<void> ensureTablesExist() async {
+    final db = await database;
+
+    if (!await tableExists('forecast_cache')) {
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS forecast_cache (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          reach_id TEXT NOT NULL,
+          forecast_type TEXT NOT NULL,
+          data TEXT NOT NULL,
+          timestamp INTEGER NOT NULL,
+          UNIQUE(reach_id, forecast_type)
+        )
+      ''');
+    }
+
+    if (!await tableExists('return_period_cache')) {
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS return_period_cache (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          reach_id TEXT NOT NULL,
+          data TEXT NOT NULL,
+          timestamp INTEGER NOT NULL,
+          UNIQUE(reach_id)
+        )
+      ''');
+    }
   }
 }

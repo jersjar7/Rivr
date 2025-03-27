@@ -136,7 +136,7 @@ abstract class BaseHydrographState<T extends BaseHydrograph> extends State<T> {
     final spots = generateSpots();
 
     if (spots.isEmpty) {
-      return _buildNoDataView();
+      return buildNoDataView();
     }
 
     // Calculate y-axis bounds
@@ -202,12 +202,12 @@ abstract class BaseHydrographState<T extends BaseHydrograph> extends State<T> {
                   );
                 },
               ),
-              titlesData: _buildTitlesData(),
+              titlesData: buildTitlesData(),
               borderData: FlBorderData(
                 show: true,
                 border: Border.all(color: const Color(0xff37434d)),
               ),
-              lineTouchData: _buildTouchData(),
+              lineTouchData: buildTouchData(),
               minX: getMinX(),
               maxX: getMaxX(),
               minY: minY,
@@ -220,11 +220,11 @@ abstract class BaseHydrographState<T extends BaseHydrograph> extends State<T> {
   }
 
   // Implement default touch data behavior - can be overridden
-  LineTouchData _buildTouchData() {
+  LineTouchData buildTouchData() {
     return LineTouchData(
       enabled: true,
       touchTooltipData: LineTouchTooltipData(
-        getTooltipColor: (spot) => Colors.blueGrey.withOpacity(0.8),
+        getTooltipColor: (spot) => Colors.blueGrey.withValues(alpha: 0.8),
         tooltipRoundedRadius: 8,
         getTooltipItems: (List<LineBarSpot> lineBarsSpot) {
           return lineBarsSpot.map((spot) {
@@ -233,7 +233,7 @@ abstract class BaseHydrographState<T extends BaseHydrograph> extends State<T> {
               const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
               children: [
                 TextSpan(
-                  text: '\n${_getTooltipDateText(spot)}',
+                  text: '\n${getTooltipDateText(spot)}',
                   style: const TextStyle(
                     color: Colors.white70,
                     fontWeight: FontWeight.normal,
@@ -267,10 +267,10 @@ abstract class BaseHydrographState<T extends BaseHydrograph> extends State<T> {
   }
 
   // Implement default titles data - can be overridden
-  FlTitlesData _buildTitlesData() {
+  FlTitlesData buildTitlesData() {
     return FlTitlesData(
       topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-      bottomTitles: _buildBottomTitles(),
+      bottomTitles: buildBottomTitles(),
       leftTitles: AxisTitles(
         axisNameWidget: const Text(
           'ft³/s',
@@ -300,17 +300,17 @@ abstract class BaseHydrographState<T extends BaseHydrograph> extends State<T> {
   }
 
   // To be implemented by subclasses
-  AxisTitles _buildBottomTitles() {
+  AxisTitles buildBottomTitles() {
     return const AxisTitles(sideTitles: SideTitles(showTitles: false));
   }
 
   // To be implemented by subclasses
-  String _getTooltipDateText(LineBarSpot spot) {
+  String getTooltipDateText(LineBarSpot spot) {
     return 'Date/time not available';
   }
 
   // No data view
-  Widget _buildNoDataView() {
+  Widget buildNoDataView() {
     return Scaffold(
       appBar: AppBar(title: Text(widget.title)),
       body: const Center(

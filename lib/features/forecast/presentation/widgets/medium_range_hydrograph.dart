@@ -4,7 +4,6 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:rivr/features/forecast/domain/entities/forecast.dart';
-import 'package:rivr/features/forecast/domain/entities/return_period.dart';
 import 'package:rivr/features/forecast/presentation/widgets/hydrograph/base_hydrograph.dart';
 
 class MediumRangeHydrograph extends BaseHydrograph {
@@ -17,7 +16,7 @@ class MediumRangeHydrograph extends BaseHydrograph {
     required this.forecasts,
     this.dailyStats,
     super.returnPeriod,
-  }) : super(title: '9-Day Forecast');
+  }) : super(title: 'Daily Forecast (10-Day)');
 
   @override
   MediumRangeHydrographState createState() => MediumRangeHydrographState();
@@ -25,140 +24,98 @@ class MediumRangeHydrograph extends BaseHydrograph {
 
 class MediumRangeHydrographState
     extends BaseHydrographState<MediumRangeHydrograph> {
-  // Track day-based indices for better x-axis alignment
-  late final Map<DateTime, int> _dayIndices = {};
-  late final List<DateTime> _uniqueDays = [];
-
-  // Range band spots for min/max flow
-  List<FlSpot> _minSpots = [];
-  List<FlSpot> _maxSpots = [];
+  // Cache for normalized timestamps (in days)
+  late final Map<DateTime, double> _normalizedTimeMap = {};
+  late final DateTime _baseTime;
 
   @override
   void initState() {
     super.initState();
+    // Sort forecasts by time
+    final sortedForecasts = List<Forecast>.from(widget.forecasts)
+      ..sort((a, b) => a.validDateTime.compareTo(b.validDateTime));
 
-    // Group forecasts by day to calculate daily stats
-    final Map<DateTime, List<Forecast>> forecastsByDay = {};
+    // Use the first valid time as the base time for x-axis normalization
+    _baseTime =
+        sortedForecasts.isNotEmpty
+            ? sortedForecasts.first.validDateTime
+            : DateTime.now();
 
-    for (var forecast in widget.forecasts) {
-      final date = DateTime(
-        forecast.validDateTime.year,
-        forecast.validDateTime.month,
-        forecast.validDateTime.day,
-      );
-
-      forecastsByDay.putIfAbsent(date, () => []).add(forecast);
+    // Pre-calculate normalized times (in days) for better performance
+    for (var forecast in sortedForecasts) {
+      final days = forecast.validDateTime.difference(_baseTime).inHours / 24;
+      _normalizedTimeMap[forecast.validDateTime] = days;
     }
-
-    // Sort days chronologically
-    _uniqueDays.addAll(forecastsByDay.keys);
-    _uniqueDays.sort();
-
-    // Assign indices to days
-    for (int i = 0; i < _uniqueDays.length; i++) {
-      _dayIndices[_uniqueDays[i]] = i;
-    }
-
-    // Process daily statistics
-    _processRangeBands();
-  }
-
-  void _processRangeBands() {
-    _minSpots = [];
-    _maxSpots = [];
-
-    // If daily stats are provided directly, use them
-    if (widget.dailyStats != null) {
-      final stats = widget.dailyStats!;
-      for (var date in stats.keys) {
-        final dayIndex = _getDayIndex(date);
-        if (stats[date]!.containsKey('min')) {
-          _minSpots.add(FlSpot(dayIndex.toDouble(), stats[date]!['min']!));
-        }
-        if (stats[date]!.containsKey('max')) {
-          _maxSpots.add(FlSpot(dayIndex.toDouble(), stats[date]!['max']!));
-        }
-      }
-      return;
-    }
-
-    // Otherwise calculate from raw forecasts
-    final Map<int, double> dayMinFlow = {};
-    final Map<int, double> dayMaxFlow = {};
-
-    for (var forecast in widget.forecasts) {
-      final day = DateTime(
-        forecast.validDateTime.year,
-        forecast.validDateTime.month,
-        forecast.validDateTime.day,
-      );
-
-      final dayIndex = _getDayIndex(day);
-
-      // Update min/max flows
-      if (!dayMinFlow.containsKey(dayIndex) ||
-          forecast.flow < dayMinFlow[dayIndex]!) {
-        dayMinFlow[dayIndex] = forecast.flow;
-      }
-
-      if (!dayMaxFlow.containsKey(dayIndex) ||
-          forecast.flow > dayMaxFlow[dayIndex]!) {
-        dayMaxFlow[dayIndex] = forecast.flow;
-      }
-    }
-
-    // Create spots
-    for (var index in dayMinFlow.keys) {
-      _minSpots.add(FlSpot(index.toDouble(), dayMinFlow[index]!));
-    }
-
-    for (var index in dayMaxFlow.keys) {
-      _maxSpots.add(FlSpot(index.toDouble(), dayMaxFlow[index]!));
-    }
-
-    // Sort spots by x value
-    _minSpots.sort((a, b) => a.x.compareTo(b.x));
-    _maxSpots.sort((a, b) => a.x.compareTo(b.x));
-  }
-
-  int _getDayIndex(DateTime date) {
-    final day = DateTime(date.year, date.month, date.day);
-    return _dayIndices[day] ?? 0;
-  }
-
-  DateTime? _getDateFromIndex(int index) {
-    if (index < 0 || index >= _uniqueDays.length) {
-      return null;
-    }
-    return _uniqueDays[index];
   }
 
   @override
   List<FlSpot> generateSpots() {
-    // For medium range, we use max flow for the main line
     final List<FlSpot> spots = [];
 
-    // Add a spot for each day using max flow
-    for (var i = 0; i < _maxSpots.length; i++) {
-      spots.add(_maxSpots[i]);
+    // First add regular forecast spots
+    for (var forecast in widget.forecasts) {
+      // Get normalized days from base time
+      final xValue = _normalizedTimeMap[forecast.validDateTime] ?? 0.0;
+      spots.add(FlSpot(xValue, forecast.flow));
     }
+
+    // Add spots from dailyStats if available
+    if (widget.dailyStats != null && widget.dailyStats!.isNotEmpty) {
+      for (var entry in widget.dailyStats!.entries) {
+        final date = entry.key;
+        final stats = entry.value;
+
+        // Use 'mean' or 'avg' flow value if available
+        final flow = stats['mean'] ?? stats['avg'] ?? stats['flow'];
+
+        if (flow != null) {
+          final days = date.difference(_baseTime).inHours / 24;
+          spots.add(FlSpot(days, flow));
+        }
+      }
+    }
+
+    // Sort spots by x-value
+    spots.sort((a, b) => a.x.compareTo(b.x));
 
     return spots;
   }
 
+  // Find forecast at specific normalized time (x-value)
+  Forecast? _getForecastAtX(double x) {
+    // Find closest forecast to the given x value
+    Forecast? closest;
+    double minDifference = double.infinity;
+
+    for (var forecast in widget.forecasts) {
+      final normalizedTime = _normalizedTimeMap[forecast.validDateTime] ?? 0.0;
+      final difference = (normalizedTime - x).abs();
+
+      if (difference < minDifference) {
+        minDifference = difference;
+        closest = forecast;
+      }
+    }
+
+    return closest;
+  }
+
   @override
   double getMinY() {
+    // Start from zero for a clearer representation
     return 0.0;
   }
 
   @override
   double getMaxY() {
-    if (_maxSpots.isEmpty) return 100.0;
+    if (widget.forecasts.isEmpty) return 100.0;
 
-    // Find max flow from spots and add 20% padding
-    double maxFlow = _maxSpots.map((s) => s.y).reduce((a, b) => a > b ? a : b);
+    // Find max flow and add 20% for padding
+    double maxFlow = widget.forecasts
+        .map((f) => f.flow)
+        .reduce((a, b) => a > b ? a : b);
 
-    // Consider return period thresholds
+    // Also consider return period thresholds if available
     if (widget.returnPeriod != null) {
       for (final year in [2, 5, 10, 25, 50, 100]) {
         final threshold = widget.returnPeriod!.getFlowForYear(year);
@@ -178,30 +135,63 @@ class MediumRangeHydrographState
 
   @override
   double getMaxX() {
-    if (_uniqueDays.isEmpty) return 9.0; // Default 9 days
-    return (_uniqueDays.length - 1).toDouble();
+    if (widget.forecasts.isEmpty) return 10.0; // Default 10 days
+
+    // Get maximum normalized time
+    double maxX = widget.forecasts
+        .map((f) => _normalizedTimeMap[f.validDateTime] ?? 0.0)
+        .reduce((a, b) => a > b ? a : b);
+
+    return maxX;
+  }
+
+  String _getTooltipDateText(LineBarSpot spot) {
+    final forecast = _getForecastAtX(spot.x);
+    if (forecast != null) {
+      return DateFormat('EEE, MMM d').format(forecast.validDateTime);
+    }
+
+    // Fallback if forecast not found
+    final time = _baseTime.add(Duration(hours: (spot.x * 24).toInt()));
+    return DateFormat('EEE, MMM d').format(time);
   }
 
   @override
-  String _getTooltipDateText(LineBarSpot spot) {
-    final date = _getDateFromIndex(spot.x.toInt());
-    if (date == null) return 'Unknown date';
+  AxisTitles buildBottomTitles() {
+    return AxisTitles(
+      sideTitles: SideTitles(
+        showTitles: true,
+        reservedSize: 40,
+        interval: 1, // Show every day
+        getTitlesWidget: (value, meta) {
+          // Convert back to datetime
+          final datetime = _baseTime.add(Duration(hours: (value * 24).toInt()));
 
-    // Get the min flow for this day
-    double? minFlow;
-    for (var s in _minSpots) {
-      if (s.x == spot.x) {
-        minFlow = s.y;
-        break;
-      }
-    }
+          // Format based on day
+          String dayText;
+          if (value == 0) {
+            dayText = 'Today';
+          } else if (value == 1) {
+            dayText = 'Tmrw';
+          } else {
+            // Show day of week and date
+            dayText = DateFormat('E\nM/d').format(datetime);
+          }
 
-    final dateText = DateFormat('EEE, MMM d').format(date);
-    if (minFlow != null) {
-      return '$dateText\nRange: ${flowFormatter.format(minFlow)} - ${flowFormatter.format(spot.y)} ft³/s';
-    }
-
-    return dateText;
+          return Padding(
+            padding: const EdgeInsets.only(top: 8.0),
+            child: Text(
+              dayText,
+              style: const TextStyle(
+                fontSize: 12,
+                color: Colors.black87,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          );
+        },
+      ),
+    );
   }
 
   @override
@@ -209,7 +199,31 @@ class MediumRangeHydrographState
     final spots = generateSpots();
 
     if (spots.isEmpty) {
-      return _buildNoDataView();
+      return Scaffold(
+        appBar: AppBar(title: Text(widget.title)),
+        body: const Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.show_chart, size: 48, color: Colors.grey),
+              SizedBox(height: 16),
+              Text(
+                'No data available to display',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.grey,
+                ),
+              ),
+              SizedBox(height: 8),
+              Text(
+                'Try again later or select a different time range',
+                style: TextStyle(color: Colors.grey),
+              ),
+            ],
+          ),
+        ),
+      );
     }
 
     // Calculate y-axis bounds
@@ -239,18 +253,6 @@ class MediumRangeHydrographState
           child: LineChart(
             LineChartData(
               lineBarsData: [
-                // Min flow line (dashed)
-                if (_minSpots.isNotEmpty)
-                  LineChartBarData(
-                    spots: _minSpots,
-                    isCurved: true,
-                    barWidth: 2,
-                    isStrokeCapRound: true,
-                    color: gradientColors[0].withOpacity(0.6),
-                    dotData: const FlDotData(show: false),
-                    dashArray: [5, 5], // Create a dashed line
-                  ),
-                // Max flow line
                 LineChartBarData(
                   spots: spots,
                   isCurved: true,
@@ -287,12 +289,126 @@ class MediumRangeHydrographState
                   );
                 },
               ),
-              titlesData: _buildTitlesData(),
+              titlesData: FlTitlesData(
+                topTitles: const AxisTitles(
+                  sideTitles: SideTitles(showTitles: false),
+                ),
+                bottomTitles: buildBottomTitles(),
+                leftTitles: AxisTitles(
+                  axisNameWidget: const Text(
+                    'ft³/s',
+                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                  ),
+                  axisNameSize: 30,
+                  sideTitles: SideTitles(
+                    showTitles: true,
+                    reservedSize: getReservedSizeForYAxis(getMaxY()),
+                    getTitlesWidget: (value, meta) {
+                      if (value == getMaxY() || value < 0) {
+                        return Container();
+                      }
+                      return Padding(
+                        padding: const EdgeInsets.only(right: 5),
+                        child: Text(
+                          value.toStringAsFixed(0),
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: Colors.black,
+                          ),
+                          textAlign: TextAlign.right,
+                        ),
+                      );
+                    },
+                  ),
+                ),
+                rightTitles: const AxisTitles(
+                  sideTitles: SideTitles(showTitles: false),
+                ),
+              ),
               borderData: FlBorderData(
                 show: true,
                 border: Border.all(color: const Color(0xff37434d)),
               ),
-              lineTouchData: _buildTouchData(),
+              lineTouchData: LineTouchData(
+                enabled: true,
+                touchTooltipData: LineTouchTooltipData(
+                  getTooltipColor:
+                      (spot) => Colors.blueGrey.withValues(alpha: 0.8),
+                  tooltipRoundedRadius: 8,
+                  getTooltipItems: (List<LineBarSpot> lineBarsSpot) {
+                    return lineBarsSpot.map((spot) {
+                      final forecast = _getForecastAtX(spot.x);
+                      String timeInfo = _getTooltipDateText(spot);
+
+                      // Add relative time (e.g. "2 days from now")
+                      if (forecast != null) {
+                        final now = DateTime.now();
+                        final difference = forecast.validDateTime.difference(
+                          now,
+                        );
+
+                        if (difference.inDays > 0) {
+                          final days = difference.inDays;
+                          timeInfo += '\n${days}d from now';
+                        } else if (difference.inDays < 0) {
+                          final days = -difference.inDays;
+                          timeInfo += '\n${days}d ago';
+                        } else {
+                          // Less than a day difference
+                          final hours = difference.inHours;
+                          if (hours > 0) {
+                            timeInfo += '\nLater today';
+                          } else if (hours < 0) {
+                            timeInfo += '\nEarlier today';
+                          } else {
+                            timeInfo += '\nNow';
+                          }
+                        }
+                      }
+
+                      return LineTooltipItem(
+                        '${flowFormatter.format(spot.y)} ft³/s',
+                        const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        children: [
+                          TextSpan(
+                            text: '\n$timeInfo',
+                            style: const TextStyle(
+                              color: Colors.white70,
+                              fontWeight: FontWeight.normal,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      );
+                    }).toList();
+                  },
+                ),
+                getTouchedSpotIndicator: (barData, spotIndexes) {
+                  return spotIndexes.map((spotIndex) {
+                    return TouchedSpotIndicatorData(
+                      FlLine(
+                        color: Colors.white,
+                        strokeWidth: 2,
+                        dashArray: [3, 3],
+                      ),
+                      FlDotData(
+                        show: true,
+                        getDotPainter: (spot, percent, barData, index) {
+                          return FlDotCirclePainter(
+                            radius: 6,
+                            color: gradientColors[0],
+                            strokeWidth: 2,
+                            strokeColor: Colors.white,
+                          );
+                        },
+                      ),
+                    );
+                  }).toList();
+                },
+              ),
               minX: getMinX(),
               maxX: getMaxX(),
               minY: minY,
@@ -301,122 +417,6 @@ class MediumRangeHydrographState
           ),
         ),
       ),
-    );
-  }
-
-  @override
-  AxisTitles _buildBottomTitles() {
-    return AxisTitles(
-      sideTitles: SideTitles(
-        showTitles: true,
-        reservedSize: 50,
-        getTitlesWidget: (value, meta) {
-          final index = value.toInt();
-          final date = _getDateFromIndex(index);
-          if (date == null) return const SizedBox.shrink();
-
-          // Format based on index
-          String dateText;
-          if (index == 0) {
-            // Check if first day is today
-            final today = DateTime.now();
-            if (date.year == today.year &&
-                date.month == today.month &&
-                date.day == today.day) {
-              dateText = 'Today';
-            } else {
-              dateText = DateFormat('MMM d').format(date);
-            }
-          } else {
-            dateText = DateFormat('MMM d').format(date);
-          }
-
-          return Transform.rotate(
-            angle: -45 * 3.14159 / 180,
-            child: Padding(
-              padding: const EdgeInsets.only(top: 20, right: 15),
-              child: Text(
-                dateText,
-                style: const TextStyle(
-                  fontSize: 12.5,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-          );
-        },
-      ),
-    );
-  }
-
-  @override
-  LineTouchData _buildTouchData() {
-    // Create a custom tooltip that shows min-max range
-    return LineTouchData(
-      enabled: true,
-      touchTooltipData: LineTouchTooltipData(
-        tooltipBgColor: Colors.blueGrey.withOpacity(0.8),
-        tooltipRoundedRadius: 8,
-        getTooltipItems: (List<LineBarSpot> lineBarsSpot) {
-          return lineBarsSpot.map((spot) {
-            // Find min value for this day
-            double? minValue;
-            for (var s in _minSpots) {
-              if (s.x == spot.x) {
-                minValue = s.y;
-                break;
-              }
-            }
-
-            String flowText;
-            if (minValue != null && minValue != spot.y) {
-              flowText =
-                  'Range: ${flowFormatter.format(minValue)} - ${flowFormatter.format(spot.y)} ft³/s';
-            } else {
-              flowText = '${flowFormatter.format(spot.y)} ft³/s';
-            }
-
-            final date = _getDateFromIndex(spot.x.toInt());
-            String dateText = 'Unknown date';
-            if (date != null) {
-              dateText = DateFormat('EEE, MMM d').format(date);
-            }
-
-            return LineTooltipItem(
-              flowText,
-              const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-              children: [
-                TextSpan(
-                  text: '\n$dateText',
-                  style: const TextStyle(
-                    color: Colors.white70,
-                    fontWeight: FontWeight.normal,
-                    fontSize: 12,
-                  ),
-                ),
-              ],
-            );
-          }).toList();
-        },
-      ),
-      getTouchedSpotIndicator: (barData, spotIndexes) {
-        return spotIndexes.map((spotIndex) {
-          return TouchedSpotIndicatorData(
-            FlLine(color: Colors.white, strokeWidth: 2, dashArray: [3, 3]),
-            FlDotData(
-              show: true,
-              getDotPainter: (spot, percent, barData, index) {
-                return FlDotCirclePainter(
-                  radius: 6,
-                  color: gradientColors[0],
-                  strokeWidth: 2,
-                  strokeColor: Colors.white,
-                );
-              },
-            ),
-          );
-        }).toList();
-      },
     );
   }
 }

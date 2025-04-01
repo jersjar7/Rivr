@@ -1,5 +1,5 @@
 // lib/features/auth/presentation/pages/login_page.dart
-// Updated with loading indicators and error handling
+// Inside the _LoginPageState class, update the validation methods
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -9,6 +9,7 @@ import '../../../../core/widgets/custom_button.dart';
 import '../../../../core/widgets/loading_indicator.dart';
 import '../../../../core/network/connection_monitor.dart';
 import '../../../../core/widgets/empty_state.dart';
+import '../../../../core/validators/password_validator.dart'; // Add this import
 
 class LoginPage extends StatefulWidget {
   final VoidCallback onRegisterTap;
@@ -16,10 +17,10 @@ class LoginPage extends StatefulWidget {
   const LoginPage({super.key, required this.onRegisterTap});
 
   @override
-  _LoginPageState createState() => _LoginPageState();
+  LoginPageState createState() => LoginPageState();
 }
 
-class _LoginPageState extends State<LoginPage> {
+class LoginPageState extends State<LoginPage> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _obscureText = true;
@@ -44,11 +45,9 @@ class _LoginPageState extends State<LoginPage> {
     return null;
   }
 
+  // Updated password validation using the PasswordValidator
   String? _validatePassword(String? value) {
-    if (value == null || value.isEmpty) {
-      return 'Please enter your password';
-    }
-    return null;
+    return PasswordValidator.validateForLogin(value);
   }
 
   Future<void> _login() async {
@@ -121,7 +120,7 @@ class _LoginPageState extends State<LoginPage> {
                   children: [
                     const ConnectionStatusBanner(),
                     const SizedBox(height: 20),
-                    Image.asset('assets/img/rivr.png', height: 200),
+                    Image.asset('assets/images/rivr_logo.png', height: 200),
                     const SizedBox(height: 30),
                     NetworkErrorView(
                       isPermanentlyOffline: !status.isConnected,
@@ -139,7 +138,7 @@ class _LoginPageState extends State<LoginPage> {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Image.asset('assets/img/rivr.png', height: 200),
+                    Image.asset('assets/images/rivr_logo.png', height: 200),
                     const SizedBox(height: 20),
 
                     const Text(
@@ -207,7 +206,7 @@ class _LoginPageState extends State<LoginPage> {
                         child: Container(
                           padding: const EdgeInsets.all(10),
                           decoration: BoxDecoration(
-                            color: Colors.red.withOpacity(0.1),
+                            color: Colors.red.withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(10),
                             border: Border.all(color: Colors.red.shade200),
                           ),

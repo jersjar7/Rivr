@@ -1,4 +1,5 @@
 // lib/core/widgets/custom_text_field.dart
+
 import 'package:flutter/material.dart';
 
 class CustomTextField extends StatelessWidget {
@@ -9,6 +10,7 @@ class CustomTextField extends StatelessWidget {
   final IconData? prefixIcon;
   final Widget? suffixIcon;
   final String? Function(String?)? validator; // Added validator parameter
+  final void Function(String)? onChanged; // Added onChanged parameter
 
   const CustomTextField({
     super.key,
@@ -18,7 +20,8 @@ class CustomTextField extends StatelessWidget {
     this.keyboardType = TextInputType.text,
     this.prefixIcon,
     this.suffixIcon,
-    this.validator, // Added validator parameter
+    this.validator,
+    this.onChanged,
   });
 
   @override
@@ -31,6 +34,7 @@ class CustomTextField extends StatelessWidget {
         obscureText: obscureText,
         keyboardType: keyboardType,
         validator: validator, // Using the validator
+        onChanged: onChanged,
         decoration: InputDecoration(
           enabledBorder: OutlineInputBorder(
             borderSide: const BorderSide(color: Colors.white),

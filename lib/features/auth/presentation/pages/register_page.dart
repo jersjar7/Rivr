@@ -1,7 +1,4 @@
 // lib/features/auth/presentation/pages/register_page.dart
-// Updated with loading indicators and error handling
-
-import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -10,6 +7,7 @@ import '../../../../core/widgets/custom_text_field.dart';
 import '../../../../core/widgets/custom_button.dart';
 import '../../../../core/widgets/loading_indicator.dart';
 import '../../../../core/network/connection_monitor.dart';
+import '../../../../core/validators/password_validator.dart'; // Add this import
 
 class RegisterPage extends StatefulWidget {
   final VoidCallback onLoginTap;
@@ -17,10 +15,10 @@ class RegisterPage extends StatefulWidget {
   const RegisterPage({super.key, required this.onLoginTap});
 
   @override
-  _RegisterPageState createState() => _RegisterPageState();
+  RegisterPageState createState() => RegisterPageState();
 }
 
-class _RegisterPageState extends State<RegisterPage> {
+class RegisterPageState extends State<RegisterPage> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
@@ -53,24 +51,17 @@ class _RegisterPageState extends State<RegisterPage> {
     return null;
   }
 
+  // Updated to use the PasswordValidator
   String? _validatePassword(String? value) {
-    if (value == null || value.isEmpty) {
-      return 'Please enter a password';
-    }
-    if (value.length < 6) {
-      return 'Password must be at least 6 characters';
-    }
-    return null;
+    return PasswordValidator.validate(value);
   }
 
+  // Updated to use the PasswordValidator for confirmation
   String? _validateConfirmPassword(String? value) {
-    if (value == null || value.isEmpty) {
-      return 'Please confirm your password';
-    }
-    if (value != _passwordController.text) {
-      return 'Passwords do not match';
-    }
-    return null;
+    return PasswordValidator.validateConfirmPassword(
+      value,
+      _passwordController.text,
+    );
   }
 
   String? _validateName(String? value) {
@@ -152,7 +143,7 @@ class _RegisterPageState extends State<RegisterPage> {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Image.asset('assets/img/rivr.png', height: 150),
+                    Image.asset('assets/images/rivr_logo.png', height: 150),
                     const SizedBox(height: 10),
 
                     const Text(
@@ -209,6 +200,18 @@ class _RegisterPageState extends State<RegisterPage> {
                             _obscureText = !_obscureText;
                           });
                         },
+                      ),
+                      onChanged: (value) {
+                        // Force rebuild to update password strength indicator
+                        setState(() {});
+                      },
+                    ),
+
+                    // Add password strength indicator
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 25.0),
+                      child: PasswordValidator.buildStrengthIndicator(
+                        _passwordController.text,
                       ),
                     ),
 

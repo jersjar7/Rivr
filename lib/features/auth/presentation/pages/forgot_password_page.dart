@@ -2,11 +2,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
-import '../../../../core/widgets/custom_text_field.dart';
-import '../../../../core/widgets/custom_button.dart';
-import '../../../../core/widgets/loading_indicator.dart';
+import '../../../../core/widgets/live_validation_field.dart';
+import '../../../../core/widgets/managed_async_button.dart';
+import '../../../../core/widgets/enhanced_error_display.dart';
 import '../../../../core/network/connection_monitor.dart';
-import '../../../../core/widgets/empty_state.dart';
 
 class ForgotPasswordPage extends StatefulWidget {
   const ForgotPasswordPage({super.key});
@@ -18,7 +17,6 @@ class ForgotPasswordPage extends StatefulWidget {
 class ForgotPasswordPageState extends State<ForgotPasswordPage> {
   final _emailController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
-  bool _isSubmitting = false;
   bool _emailSent = false;
 
   @override
@@ -27,7 +25,7 @@ class ForgotPasswordPageState extends State<ForgotPasswordPage> {
     super.dispose();
   }
 
-  // Improved email validation
+  // Email validation
   String? _validateEmail(String? value) {
     if (value == null || value.isEmpty) {
       return 'Please enter your email';
@@ -66,11 +64,8 @@ class ForgotPasswordPageState extends State<ForgotPasswordPage> {
       return;
     }
 
-    setState(() {
-      _isSubmitting = true;
-    });
-
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    authProvider.clearMessages();
 
     final success = await authProvider.sendPasswordResetEmail(
       _emailController.text.trim(),
@@ -78,9 +73,13 @@ class ForgotPasswordPageState extends State<ForgotPasswordPage> {
 
     if (mounted) {
       setState(() {
-        _isSubmitting = false;
         _emailSent = success;
       });
+
+      // Scroll to top to show success state
+      if (success) {
+        // Optional: Add scroll controller to scroll to the top
+      }
     }
   }
 
@@ -104,7 +103,7 @@ class ForgotPasswordPageState extends State<ForgotPasswordPage> {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Image.asset('assets/images/rivr_logo.png', height: 200),
+                    Image.asset('assets/img/rivr.png', height: 180),
                     const SizedBox(height: 20),
 
                     const Text(
@@ -132,57 +131,37 @@ class ForgotPasswordPageState extends State<ForgotPasswordPage> {
                     else
                       Column(
                         children: [
-                          CustomTextField(
+                          LiveValidationField(
                             controller: _emailController,
                             hintText: 'Email',
                             keyboardType: TextInputType.emailAddress,
                             prefixIcon: Icons.email,
                             validator: _validateEmail,
+                            onChanged: (_) {
+                              // Clear auth provider errors when user types
+                              if (authProvider.errorMessage.isNotEmpty) {
+                                authProvider.clearMessages();
+                              }
+                            },
                           ),
 
                           if (authProvider.errorMessage.isNotEmpty)
-                            Padding(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 25.0,
-                              ),
-                              child: Container(
-                                padding: const EdgeInsets.all(10),
-                                decoration: BoxDecoration(
-                                  color: Colors.red.withValues(alpha: 0.1),
-                                  borderRadius: BorderRadius.circular(10),
-                                  border: Border.all(
-                                    color: Colors.red.shade200,
-                                  ),
-                                ),
-                                child: Row(
-                                  children: [
-                                    const Icon(
-                                      Icons.error_outline,
-                                      color: Colors.red,
-                                    ),
-                                    const SizedBox(width: 8),
-                                    Expanded(
-                                      child: Text(
-                                        authProvider.errorMessage,
-                                        style: const TextStyle(
-                                          color: Colors.red,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
+                            EnhancedErrorDisplay(
+                              message: authProvider.errorMessage,
+                              recoverySuggestion:
+                                  "Double-check your email address or try another email if you have multiple accounts.",
                             ),
 
                           if (authProvider.successMessage.isNotEmpty)
                             Padding(
                               padding: const EdgeInsets.symmetric(
                                 horizontal: 25.0,
+                                vertical: 8.0,
                               ),
                               child: Container(
-                                padding: const EdgeInsets.all(10),
+                                padding: const EdgeInsets.all(12),
                                 decoration: BoxDecoration(
-                                  color: Colors.green.withValues(alpha: 0.1),
+                                  color: Colors.green.withOpacity(0.1),
                                   borderRadius: BorderRadius.circular(10),
                                   border: Border.all(
                                     color: Colors.green.shade200,
@@ -211,16 +190,16 @@ class ForgotPasswordPageState extends State<ForgotPasswordPage> {
                           const SizedBox(height: 20),
 
                           // Submit button with loading state
-                          _isSubmitting
-                              ? const LoadingIndicator(
-                                message: 'Sending reset link...',
-                                withBackground: true,
-                              )
-                              : CustomButton(
-                                text: 'Send Reset Link',
-                                isLoading: authProvider.isLoading,
-                                onPressed: _sendResetLink,
-                              ),
+                          ManagedAsyncButton(
+                            text: 'Send Reset Link',
+                            loadingText: 'Sending...',
+                            isLoading: authProvider.isLoading,
+                            onPressed: _sendResetLink,
+                            icon: const Icon(
+                              Icons.email_outlined,
+                              color: Colors.white,
+                            ),
+                          ),
                         ],
                       ),
                   ],
@@ -234,21 +213,74 @@ class ForgotPasswordPageState extends State<ForgotPasswordPage> {
   }
 
   Widget _buildSuccessState() {
-    return EmptyStateView(
-      title: 'Reset Link Sent',
-      message:
-          'Check your email for a password reset link. Make sure to check your spam folder if you don\'t see it in your inbox.',
-      icon: Icons.check_circle_outline,
-      iconColor: Colors.green,
-      actionButton: ElevatedButton(
-        onPressed: () {
-          Navigator.pop(context);
-        },
-        style: ElevatedButton.styleFrom(
-          backgroundColor: const Color(0xFF2B5876),
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-        ),
-        child: const Text('Back to Login'),
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 25.0),
+      child: Column(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.green.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: Colors.green),
+            ),
+            child: Column(
+              children: [
+                const Icon(
+                  Icons.check_circle_outline,
+                  color: Colors.green,
+                  size: 64,
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  'Password Reset Email Sent',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.green,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'We have sent a password reset link to your email address. Please check your inbox (and spam folder) to reset your password.',
+                  style: TextStyle(fontSize: 14, color: Colors.black87),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'Email: ${_emailController.text}',
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 24),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF2B5876),
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            child: const Text('Back to Login'),
+          ),
+          const SizedBox(height: 12),
+          TextButton.icon(
+            onPressed: () {
+              setState(() {
+                _emailSent = false;
+              });
+            },
+            icon: const Icon(Icons.refresh, size: 16),
+            label: const Text('Try another email'),
+          ),
+        ],
       ),
     );
   }

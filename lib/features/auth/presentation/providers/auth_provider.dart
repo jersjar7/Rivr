@@ -58,11 +58,12 @@ class AuthProvider with ChangeNotifier {
     notifyListeners();
   }
 
-  Future<bool> login(String email, String password) async {
+  // Updated to return the User object on success instead of just a boolean
+  Future<User?> login(String email, String password) async {
     if (email.isEmpty || password.isEmpty) {
       _errorMessage = 'Please fill in all fields';
       notifyListeners();
-      return false;
+      return null;
     }
 
     _isLoading = true;
@@ -77,7 +78,7 @@ class AuthProvider with ChangeNotifier {
         _isLoading = false;
         _errorMessage = failure.message;
         notifyListeners();
-        return false;
+        return null;
       },
       (user) async {
         _currentUser = user;
@@ -87,12 +88,13 @@ class AuthProvider with ChangeNotifier {
         await _secureStorage.write('userId', user.id);
 
         notifyListeners();
-        return true;
+        return user; // Return the user object on success
       },
     );
   }
 
-  Future<bool> register(
+  // Updated to return the User object on success instead of just a boolean
+  Future<User?> register(
     String email,
     String password,
     String firstName,
@@ -105,7 +107,7 @@ class AuthProvider with ChangeNotifier {
         lastName.isEmpty) {
       _errorMessage = 'Please fill in all required fields';
       notifyListeners();
-      return false;
+      return null;
     }
 
     _isLoading = true;
@@ -126,7 +128,7 @@ class AuthProvider with ChangeNotifier {
         _isLoading = false;
         _errorMessage = failure.message;
         notifyListeners();
-        return false;
+        return null;
       },
       (user) async {
         _currentUser = user;
@@ -136,7 +138,7 @@ class AuthProvider with ChangeNotifier {
         await _secureStorage.write('userId', user.id);
 
         notifyListeners();
-        return true;
+        return user; // Return the user object on success
       },
     );
   }
@@ -193,5 +195,14 @@ class AuthProvider with ChangeNotifier {
         notifyListeners();
       },
     );
+  }
+
+  Future<void> refreshCurrentUser() async {
+    final result = await _getCurrentUser();
+    result.fold((failure) {
+      _currentUser = null;
+      _errorMessage = failure.message;
+    }, (user) => _currentUser = user);
+    notifyListeners();
   }
 }

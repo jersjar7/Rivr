@@ -99,7 +99,7 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Image.asset('assets/images/rivr_logo.png', height: 200),
+                    Image.asset('assets/img/rivr.png', height: 200),
                     const SizedBox(height: 20),
 
                     const Text(

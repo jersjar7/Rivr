@@ -18,9 +18,14 @@ class _SplashPageState extends State<SplashPage> {
   }
 
   Future<void> _checkAuth() async {
-    await Future.delayed(const Duration(seconds: 2));
+    // Remove fixed delay and use proper auth check instead
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+
+    // First, trigger a refresh of the current user
+    await authProvider.refreshCurrentUser();
+
     if (mounted) {
-      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      // Now check if authenticated and navigate accordingly
       if (authProvider.isAuthenticated) {
         Navigator.of(context).pushReplacementNamed('/favorites');
       } else {
@@ -37,7 +42,7 @@ class _SplashPageState extends State<SplashPage> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Image.asset('assets/images/rivr_logo.png', height: 250),
+            Image.asset('assets/img/rivr.png', height: 250),
             const SizedBox(height: 30),
             const CircularProgressIndicator(
               valueColor: AlwaysStoppedAnimation<Color>(Colors.white),

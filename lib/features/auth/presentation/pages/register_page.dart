@@ -1,6 +1,8 @@
 // lib/features/auth/presentation/pages/register_page.dart
 // Updated with loading indicators and error handling
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
@@ -106,7 +108,7 @@ class _RegisterPageState extends State<RegisterPage> {
 
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
 
-    final success = await authProvider.register(
+    final user = await authProvider.register(
       _emailController.text.trim(),
       _passwordController.text.trim(),
       _firstNameController.text.trim(),
@@ -119,14 +121,18 @@ class _RegisterPageState extends State<RegisterPage> {
         _submitting = false;
       });
 
-      if (success) {
+      if (user != null) {
         // Show success message
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Registration successful! Logging you in...'),
             backgroundColor: Colors.green,
+            duration: Duration(seconds: 1),
           ),
         );
+
+        // Navigate to favorites page
+        Navigator.of(context).pushReplacementNamed('/favorites');
       }
     }
   }
@@ -146,7 +152,7 @@ class _RegisterPageState extends State<RegisterPage> {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Image.asset('assets/images/rivr_logo.png', height: 150),
+                    Image.asset('assets/img/rivr.png', height: 150),
                     const SizedBox(height: 10),
 
                     const Text(

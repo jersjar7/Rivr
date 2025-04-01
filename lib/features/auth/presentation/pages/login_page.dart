@@ -79,7 +79,7 @@ class _LoginPageState extends State<LoginPage> {
 
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
 
-    final success = await authProvider.login(
+    final user = await authProvider.login(
       _emailController.text.trim(),
       _passwordController.text.trim(),
     );
@@ -89,14 +89,18 @@ class _LoginPageState extends State<LoginPage> {
         _submitting = false;
       });
 
-      if (success) {
+      if (user != null) {
         // Show success message
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Login successful!'),
             backgroundColor: Colors.green,
+            duration: Duration(seconds: 1),
           ),
         );
+
+        // Navigate to favorites page
+        Navigator.of(context).pushReplacementNamed('/favorites');
       }
     }
   }
@@ -117,7 +121,7 @@ class _LoginPageState extends State<LoginPage> {
                   children: [
                     const ConnectionStatusBanner(),
                     const SizedBox(height: 20),
-                    Image.asset('assets/images/rivr_logo.png', height: 200),
+                    Image.asset('assets/img/rivr.png', height: 200),
                     const SizedBox(height: 30),
                     NetworkErrorView(
                       isPermanentlyOffline: !status.isConnected,
@@ -135,7 +139,7 @@ class _LoginPageState extends State<LoginPage> {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Image.asset('assets/images/rivr_logo.png', height: 200),
+                    Image.asset('assets/img/rivr.png', height: 200),
                     const SizedBox(height: 20),
 
                     const Text(

@@ -143,7 +143,7 @@ class RegisterPageState extends State<RegisterPage> {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Image.asset('assets/images/rivr_logo.png', height: 150),
+                    Image.asset('assets/img/rivr.png', height: 150),
                     const SizedBox(height: 10),
 
                     const Text(
@@ -229,7 +229,7 @@ class RegisterPageState extends State<RegisterPage> {
                         child: Container(
                           padding: const EdgeInsets.all(10),
                           decoration: BoxDecoration(
-                            color: Colors.red.withOpacity(0.1),
+                            color: Colors.red.withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(10),
                             border: Border.all(color: Colors.red.shade200),
                           ),

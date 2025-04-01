@@ -120,7 +120,7 @@ class LoginPageState extends State<LoginPage> {
                   children: [
                     const ConnectionStatusBanner(),
                     const SizedBox(height: 20),
-                    Image.asset('assets/images/rivr_logo.png', height: 200),
+                    Image.asset('assets/img/rivr.png', height: 200),
                     const SizedBox(height: 30),
                     NetworkErrorView(
                       isPermanentlyOffline: !status.isConnected,
@@ -138,7 +138,7 @@ class LoginPageState extends State<LoginPage> {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Image.asset('assets/images/rivr_logo.png', height: 200),
+                    Image.asset('assets/img/rivr.png', height: 200),
                     const SizedBox(height: 20),
 
                     const Text(

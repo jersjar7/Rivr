@@ -6,7 +6,9 @@ import '../../domain/usecases/register.dart';
 import '../../domain/usecases/get_current_user.dart';
 import '../../domain/usecases/send_password_reset_email.dart';
 import '../../domain/usecases/sign_out.dart';
-import '../../../../core/storage/secure_storage.dart';
+import '../../domain/usecases/update_user_profile.dart'; // Add this import
+import '../../data/datasources/auth_storage_service.dart';
+import '../../../../core/error/firebase_error_mapper.dart';
 
 class AuthProvider with ChangeNotifier {
   final Login _login;
@@ -14,12 +16,14 @@ class AuthProvider with ChangeNotifier {
   final GetCurrentUser _getCurrentUser;
   final SendPasswordResetEmail _sendPasswordResetEmail;
   final SignOut _signOut;
-  final SecureStorage _secureStorage;
+  final AuthStorageService _authStorage;
+  final UpdateUserProfile _updateUserProfile; // Add this field
 
   User? _currentUser;
   bool _isLoading = false;
   String _errorMessage = '';
   String _successMessage = '';
+  bool _isInitialized = false;
 
   AuthProvider({
     required Login login,
@@ -27,15 +31,18 @@ class AuthProvider with ChangeNotifier {
     required GetCurrentUser getCurrentUser,
     required SendPasswordResetEmail sendPasswordResetEmail,
     required SignOut signOut,
-    required SecureStorage secureStorage,
+    required AuthStorageService authStorage,
+    required UpdateUserProfile updateUserProfile, // Add this parameter
   }) : _login = login,
        _register = register,
        _getCurrentUser = getCurrentUser,
        _sendPasswordResetEmail = sendPasswordResetEmail,
        _signOut = signOut,
-       _secureStorage = secureStorage {
-    // Check if user is logged in on initialization
-    _checkCurrentUser();
+       _authStorage = authStorage,
+       _updateUserProfile = updateUserProfile {
+    // Initialize the field
+    // Initialize provider
+    _initialize();
   }
 
   User? get currentUser => _currentUser;
@@ -43,13 +50,34 @@ class AuthProvider with ChangeNotifier {
   String get errorMessage => _errorMessage;
   String get successMessage => _successMessage;
   bool get isAuthenticated => _currentUser != null;
+  bool get isInitialized => _isInitialized;
 
-  Future<void> _checkCurrentUser() async {
+  /// Initialize authentication state
+  Future<void> _initialize() async {
+    await refreshCurrentUser();
+    _isInitialized = true;
+    notifyListeners();
+  }
+
+  /// Refresh current user data from repository
+  Future<void> refreshCurrentUser() async {
+    // First check secure storage for stored auth data
+    final hasStoredAuth = await _authStorage.hasAuthData();
+
+    if (!hasStoredAuth) {
+      _currentUser = null;
+      notifyListeners();
+      return;
+    }
+
+    // If auth data exists, verify with repository
     final result = await _getCurrentUser();
-    result.fold(
-      (failure) => _currentUser = null,
-      (user) => _currentUser = user,
-    );
+    result.fold((failure) {
+      _currentUser = null;
+      // Clear invalid auth data if we get a failure
+      _authStorage.clearAuthData();
+    }, (user) => _currentUser = user);
+
     notifyListeners();
   }
 
@@ -58,7 +86,12 @@ class AuthProvider with ChangeNotifier {
     notifyListeners();
   }
 
-  // Updated to return the User object on success instead of just a boolean
+  void clearMessages() {
+    _errorMessage = '';
+    _successMessage = '';
+    notifyListeners();
+  }
+
   Future<User?> login(String email, String password) async {
     if (email.isEmpty || password.isEmpty) {
       _errorMessage = 'Please fill in all fields';
@@ -77,6 +110,16 @@ class AuthProvider with ChangeNotifier {
       (failure) {
         _isLoading = false;
         _errorMessage = failure.message;
+
+        // Add recovery suggestions for common auth errors
+        if (failure.message.contains('password')) {
+          _errorMessage +=
+              '\n${FirebaseErrorMapper.getRecoverySuggestion('wrong-password') ?? ''}';
+        } else if (failure.message.contains('No account found')) {
+          _errorMessage +=
+              '\n${FirebaseErrorMapper.getRecoverySuggestion('user-not-found') ?? ''}';
+        }
+
         notifyListeners();
         return null;
       },
@@ -84,16 +127,16 @@ class AuthProvider with ChangeNotifier {
         _currentUser = user;
         _isLoading = false;
 
-        // Store user ID in secure storage
-        await _secureStorage.write('userId', user.id);
+        // Save auth data to secure storage
+        await _authStorage.saveAuthData(userId: user.id, email: user.email);
 
+        _successMessage = 'Login successful';
         notifyListeners();
-        return user; // Return the user object on success
+        return user;
       },
     );
   }
 
-  // Updated to return the User object on success instead of just a boolean
   Future<User?> register(
     String email,
     String password,
@@ -134,11 +177,12 @@ class AuthProvider with ChangeNotifier {
         _currentUser = user;
         _isLoading = false;
 
-        // Store user ID in secure storage
-        await _secureStorage.write('userId', user.id);
+        // Save auth data to secure storage
+        await _authStorage.saveAuthData(userId: user.id, email: user.email);
 
+        _successMessage = 'Registration successful';
         notifyListeners();
-        return user; // Return the user object on success
+        return user;
       },
     );
   }
@@ -189,20 +233,103 @@ class AuthProvider with ChangeNotifier {
         _currentUser = null;
         _isLoading = false;
 
-        // Clear secure storage
-        await _secureStorage.deleteAll();
+        // Clear auth data from secure storage
+        await _authStorage.clearAuthData();
 
         notifyListeners();
       },
     );
   }
 
-  Future<void> refreshCurrentUser() async {
-    final result = await _getCurrentUser();
-    result.fold((failure) {
-      _currentUser = null;
-      _errorMessage = failure.message;
-    }, (user) => _currentUser = user);
+  /// Check if the stored session is still valid
+  Future<bool> validateSession() async {
+    if (_currentUser == null) {
+      return false;
+    }
+
+    // Check last login time to enforce session timeout if needed
+    final lastLogin = await _authStorage.getLastLogin();
+    if (lastLogin != null) {
+      final sessionAge = DateTime.now().difference(lastLogin);
+      // If last login was more than 30 days ago, invalidate session
+      if (sessionAge.inDays > 30) {
+        await logout();
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+  /// Update user profile information
+  Future<bool> updateUserProfile({
+    String? firstName,
+    String? lastName,
+    String? profession,
+  }) async {
+    if (_currentUser == null) {
+      _errorMessage = 'You must be logged in to update your profile';
+      notifyListeners();
+      return false;
+    }
+
+    _isLoading = true;
+    _errorMessage = '';
+    _successMessage = '';
     notifyListeners();
+
+    // Use the injected UpdateUserProfile use case
+    final result = await _updateUserProfile(
+      _currentUser!.id,
+      firstName: firstName,
+      lastName: lastName,
+      profession: profession,
+    );
+
+    return result.fold(
+      (failure) {
+        _isLoading = false;
+        _errorMessage = failure.message;
+        notifyListeners();
+        return false;
+      },
+      (updatedUser) {
+        _currentUser = updatedUser;
+        _isLoading = false;
+        _successMessage = 'Profile updated successfully';
+        notifyListeners();
+        return true;
+      },
+    );
+  }
+
+  /// Force refresh the user profile data from server
+  Future<bool> refreshUserProfile() async {
+    if (_currentUser == null) {
+      return false;
+    }
+
+    _isLoading = true;
+    notifyListeners();
+
+    final result = await _getCurrentUser();
+
+    return result.fold(
+      (failure) {
+        _isLoading = false;
+        _errorMessage = failure.message;
+        notifyListeners();
+        return false;
+      },
+      (user) {
+        _isLoading = false;
+        if (user != null) {
+          _currentUser = user;
+          notifyListeners();
+          return true;
+        }
+        return false;
+      },
+    );
   }
 }

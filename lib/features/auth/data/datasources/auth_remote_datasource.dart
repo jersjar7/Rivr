@@ -2,6 +2,7 @@
 import 'package:firebase_auth/firebase_auth.dart' as firebase;
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../../../core/error/exceptions.dart';
+import '../../../../core/error/firebase_error_mapper.dart';
 import '../models/user_model.dart';
 
 abstract class AuthRemoteDataSource {
@@ -43,9 +44,26 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
         throw AuthException(message: 'User not found');
       }
 
+      // Fetch additional user data from Firestore
+      final userData = await _getUserDataFromFirestore(
+        userCredential.user!.uid,
+      );
+
+      if (userData != null) {
+        return UserModel(
+          id: userCredential.user!.uid,
+          email: userCredential.user!.email ?? '',
+          firstName: userData['first_name'],
+          lastName: userData['last_name'],
+          profession: userData['profession'],
+        );
+      }
+
       return UserModel.fromFirebase(userCredential.user!);
     } on firebase.FirebaseAuthException catch (e) {
-      throw AuthException(message: e.message ?? 'Authentication failed');
+      throw AuthException(message: FirebaseErrorMapper.mapAuthError(e));
+    } catch (e) {
+      throw AuthException(message: 'Authentication failed: ${e.toString()}');
     }
   }
 
@@ -81,11 +99,15 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
         'last_name': lastName,
         'email': email,
         'profession': profession,
+        'created_at': FieldValue.serverTimestamp(),
+        'last_login': FieldValue.serverTimestamp(),
       });
 
       return user;
     } on firebase.FirebaseAuthException catch (e) {
-      throw AuthException(message: e.message ?? 'Registration failed');
+      throw AuthException(message: FirebaseErrorMapper.mapAuthError(e));
+    } catch (e) {
+      throw AuthException(message: 'Registration failed: ${e.toString()}');
     }
   }
 
@@ -94,8 +116,10 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     try {
       await firebaseAuth.sendPasswordResetEmail(email: email);
     } on firebase.FirebaseAuthException catch (e) {
+      throw AuthException(message: FirebaseErrorMapper.mapAuthError(e));
+    } catch (e) {
       throw AuthException(
-        message: e.message ?? 'Failed to send password reset email',
+        message: 'Failed to send password reset email: ${e.toString()}',
       );
     }
   }
@@ -105,7 +129,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     try {
       await firebaseAuth.signOut();
     } catch (e) {
-      throw AuthException(message: 'Failed to sign out');
+      throw AuthException(message: 'Failed to sign out: ${e.toString()}');
     }
   }
 
@@ -123,11 +147,14 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
 
     try {
       // Get additional user data from Firestore
-      final userDoc =
-          await firestore.collection('users').doc(firebaseUser.uid).get();
+      final userData = await _getUserDataFromFirestore(firebaseUser.uid);
 
-      if (userDoc.exists && userDoc.data() != null) {
-        final userData = userDoc.data()!;
+      if (userData != null) {
+        // Update last_seen timestamp
+        await firestore.collection('users').doc(firebaseUser.uid).update({
+          'last_seen': FieldValue.serverTimestamp(),
+        });
+
         return UserModel(
           id: firebaseUser.uid,
           email: firebaseUser.email ?? '',
@@ -140,7 +167,20 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
         return UserModel.fromFirebase(firebaseUser);
       }
     } catch (e) {
-      throw ServerException(message: 'Failed to get user data');
+      throw ServerException(
+        message: 'Failed to get user data: ${e.toString()}',
+      );
     }
+  }
+
+  // Helper method to get user data from Firestore
+  Future<Map<String, dynamic>?> _getUserDataFromFirestore(String uid) async {
+    final userDoc = await firestore.collection('users').doc(uid).get();
+
+    if (userDoc.exists && userDoc.data() != null) {
+      return userDoc.data()!;
+    }
+
+    return null;
   }
 }

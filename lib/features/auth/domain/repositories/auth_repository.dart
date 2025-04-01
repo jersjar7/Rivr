@@ -8,6 +8,7 @@ abstract class AuthRepository {
     String email,
     String password,
   );
+
   Future<Either<Failure, User>> registerWithEmailAndPassword(
     String email,
     String password,
@@ -15,8 +16,20 @@ abstract class AuthRepository {
     String lastName,
     String profession,
   );
+
   Future<Either<Failure, void>> sendPasswordResetEmail(String email);
+
   Future<Either<Failure, void>> signOut();
+
   Future<Either<Failure, bool>> isSignedIn();
+
   Future<Either<Failure, User?>> getCurrentUser();
+
+  // New method to update user profile data
+  Future<Either<Failure, User>> updateUserProfile(
+    String userId, {
+    String? firstName,
+    String? lastName,
+    String? profession,
+  });
 }

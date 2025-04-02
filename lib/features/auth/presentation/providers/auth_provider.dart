@@ -6,9 +6,10 @@ import '../../domain/usecases/register.dart';
 import '../../domain/usecases/get_current_user.dart';
 import '../../domain/usecases/send_password_reset_email.dart';
 import '../../domain/usecases/sign_out.dart';
-import '../../domain/usecases/update_user_profile.dart'; // Add this import
+import '../../domain/usecases/update_user_profile.dart';
 import '../../data/datasources/auth_storage_service.dart';
 import '../../../../core/error/firebase_error_mapper.dart';
+import '../../data/datasources/biometric_auth_service.dart';
 
 class AuthProvider with ChangeNotifier {
   final Login _login;
@@ -18,6 +19,7 @@ class AuthProvider with ChangeNotifier {
   final SignOut _signOut;
   final AuthStorageService _authStorage;
   final UpdateUserProfile _updateUserProfile; // Add this field
+  final BiometricAuthService _biometricAuthService;
 
   User? _currentUser;
   bool _isLoading = false;
@@ -33,13 +35,15 @@ class AuthProvider with ChangeNotifier {
     required SignOut signOut,
     required AuthStorageService authStorage,
     required UpdateUserProfile updateUserProfile, // Add this parameter
+    required BiometricAuthService biometricAuthService,
   }) : _login = login,
        _register = register,
        _getCurrentUser = getCurrentUser,
        _sendPasswordResetEmail = sendPasswordResetEmail,
        _signOut = signOut,
        _authStorage = authStorage,
-       _updateUserProfile = updateUserProfile {
+       _updateUserProfile = updateUserProfile,
+       _biometricAuthService = biometricAuthService {
     // Initialize the field
     // Initialize provider
     _initialize();
@@ -51,6 +55,11 @@ class AuthProvider with ChangeNotifier {
   String get successMessage => _successMessage;
   bool get isAuthenticated => _currentUser != null;
   bool get isInitialized => _isInitialized;
+  // getters for biometric auth
+  Future<bool> get isBiometricAvailable =>
+      _biometricAuthService.isBiometricAvailable();
+  Future<bool> get isBiometricEnabled =>
+      _biometricAuthService.isBiometricEnabled();
 
   /// Initialize authentication state
   Future<void> _initialize() async {
@@ -90,6 +99,94 @@ class AuthProvider with ChangeNotifier {
     _errorMessage = '';
     _successMessage = '';
     notifyListeners();
+  }
+
+  // Add methods for biometric auth
+  Future<bool> enableBiometric() async {
+    if (_currentUser == null) return false;
+    return await _biometricAuthService.enableBiometric(
+      _currentUser!.id,
+      _currentUser!.email,
+    );
+  }
+
+  Future<void> disableBiometric() async {
+    await _biometricAuthService.disableBiometric();
+  }
+
+  // Add biometric login method
+  Future<User?> loginWithBiometric() async {
+    if (!await _biometricAuthService.isBiometricAvailable()) {
+      _errorMessage = 'Biometric authentication not available on this device';
+      notifyListeners();
+      return null;
+    }
+
+    if (!await _biometricAuthService.isBiometricEnabled()) {
+      _errorMessage =
+          'Biometric login not enabled. Please enable it in settings.';
+      notifyListeners();
+      return null;
+    }
+
+    _isLoading = true;
+    _errorMessage = '';
+    _successMessage = '';
+    notifyListeners();
+
+    try {
+      final authenticated = await _biometricAuthService.authenticate(
+        'Login to Rivr using biometric authentication',
+      );
+
+      if (!authenticated) {
+        _isLoading = false;
+        _errorMessage = 'Biometric authentication failed';
+        notifyListeners();
+        return null;
+      }
+
+      // Get stored credentials
+      final credentials = await _biometricAuthService.getBiometricCredentials();
+      if (credentials == null) {
+        _isLoading = false;
+        _errorMessage =
+            'No biometric credentials found. Please set up biometric login again.';
+        notifyListeners();
+        return null;
+      }
+
+      // Get user with the stored userId
+      final result = await _getCurrentUser();
+
+      return result.fold(
+        (failure) {
+          _isLoading = false;
+          _errorMessage = 'Failed to get user account: ${failure.message}';
+          notifyListeners();
+          return null;
+        },
+        (user) async {
+          if (user == null) {
+            _isLoading = false;
+            _errorMessage = 'User account not found';
+            notifyListeners();
+            return null;
+          }
+
+          _currentUser = user;
+          _isLoading = false;
+          _successMessage = 'Login successful';
+          notifyListeners();
+          return user;
+        },
+      );
+    } catch (e) {
+      _isLoading = false;
+      _errorMessage = 'Biometric authentication error: ${e.toString()}';
+      notifyListeners();
+      return null;
+    }
   }
 
   Future<User?> login(String email, String password) async {
@@ -235,6 +332,8 @@ class AuthProvider with ChangeNotifier {
 
         // Clear auth data from secure storage
         await _authStorage.clearAuthData();
+        // Optionally disable biometrics on logout
+        // await _biometricAuthService.disableBiometric();
 
         notifyListeners();
       },

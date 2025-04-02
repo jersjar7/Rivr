@@ -8,6 +8,7 @@ import '../../../../core/widgets/enhanced_error_display.dart';
 import '../../../../core/network/connection_monitor.dart';
 import '../../../../core/widgets/empty_state.dart';
 import '../../../../core/validators/password_validator.dart';
+import '../../../../core/theme/app_theme.dart';
 
 class LoginPage extends StatefulWidget {
   final VoidCallback onRegisterTap;
@@ -26,17 +27,27 @@ class LoginPageState extends State<LoginPage> {
   bool _obscureText = true;
   final _formKey = GlobalKey<FormState>();
   bool attempted = false; // Track if login was attempted
+  bool _showBiometricButton = false; // Flag to show biometric button
 
   @override
   void initState() {
     super.initState();
 
-    // Pre-fill fields in debug mode
-    // assert(() {
-    //   _emailController.text = 'test@example.com';
-    //   _passwordController.text = 'Password123!';
-    //   return true;
-    // }());
+    // Check for biometric availability
+    _checkBiometricAvailability();
+  }
+
+  Future<void> _checkBiometricAvailability() async {
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+
+    final isBiometricAvailable = await authProvider.isBiometricAvailable;
+    final isBiometricEnabled = await authProvider.isBiometricEnabled;
+
+    if (mounted) {
+      setState(() {
+        _showBiometricButton = isBiometricAvailable && isBiometricEnabled;
+      });
+    }
   }
 
   @override
@@ -97,6 +108,26 @@ class LoginPageState extends State<LoginPage> {
       _emailController.text.trim(),
       _passwordController.text.trim(),
     );
+
+    if (user != null && mounted) {
+      // Show success message
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Login successful!'),
+          backgroundColor: Colors.green,
+          duration: Duration(seconds: 1),
+        ),
+      );
+
+      // Navigate to favorites page
+      Navigator.of(context).pushReplacementNamed('/favorites');
+    }
+  }
+
+  Future<void> _loginWithBiometric() async {
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+
+    final user = await authProvider.loginWithBiometric();
 
     if (user != null && mounted) {
       // Show success message
@@ -247,6 +278,23 @@ class LoginPageState extends State<LoginPage> {
                       icon: const Icon(Icons.login, color: Colors.white),
                     ),
 
+                    // Biometric login button (shown only if available and enabled)
+                    if (_showBiometricButton) ...[
+                      const SizedBox(height: 16),
+                      TextButton.icon(
+                        onPressed: _loginWithBiometric,
+                        icon: const Icon(Icons.fingerprint, size: 24),
+                        label: const Text('Sign in with biometrics'),
+                        style: TextButton.styleFrom(
+                          foregroundColor: AppColors.primaryColor,
+                          padding: const EdgeInsets.symmetric(
+                            vertical: 12,
+                            horizontal: 24,
+                          ),
+                        ),
+                      ),
+                    ],
+
                     const SizedBox(height: 30),
 
                     Row(
@@ -265,6 +313,19 @@ class LoginPageState extends State<LoginPage> {
                         ),
                       ],
                     ),
+
+                    // Option to setup biometric authentication
+                    if (!_showBiometricButton) ...[
+                      const SizedBox(height: 16),
+                      TextButton(
+                        onPressed: () {
+                          Navigator.of(
+                            context,
+                          ).pushNamed('/biometric-settings');
+                        },
+                        child: const Text('Set up biometric login'),
+                      ),
+                    ],
                   ],
                 ),
               ),

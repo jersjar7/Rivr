@@ -30,6 +30,7 @@ import 'package:rivr/features/favorites/presentation/providers/favorites_provide
 import 'package:rivr/features/map/presentation/providers/map_provider.dart';
 import 'package:rivr/features/map/domain/repositories/map_stations_repository.dart';
 import 'package:rivr/features/map/data/repositories_impl/map_stations_repository_impl.dart';
+import 'package:rivr/features/auth/data/datasources/biometric_auth_service.dart';
 
 final sl = GetIt.instance;
 
@@ -53,6 +54,11 @@ Future<void> setupServiceLocator() async {
   _registerMapDependencies();
   registerForecastDependencies(sl); // Forecast dependencies
   _registerProviders(); // Register all providers
+
+  // Biometric Authentication
+  sl.registerLazySingleton<BiometricAuthService>(
+    () => BiometricAuthService(secureStorage: sl()),
+  );
 }
 
 void _registerAuthDependencies() {
@@ -107,6 +113,7 @@ void _registerProviders() {
       signOut: sl(),
       authStorage: sl(),
       updateUserProfile: sl(),
+      biometricAuthService: sl(),
     ),
   );
 

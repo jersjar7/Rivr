@@ -6,6 +6,7 @@ import '../../features/favorites/presentation/pages/favorites_page.dart';
 import '../../features/map/presentation/pages/map_page.dart';
 import '../../features/splash/presentation/pages/splash_page.dart';
 import '../../features/forecast/presentation/pages/forecast_page.dart';
+import '../../features/settings/presentation/pages/biometric_settings_page.dart';
 
 class AppRouter {
   static Route<dynamic> generateRoute(RouteSettings settings) {
@@ -14,6 +15,8 @@ class AppRouter {
         return MaterialPageRoute(builder: (_) => const SplashPage());
       case '/auth':
         return MaterialPageRoute(builder: (_) => const AuthPage());
+      case '/biometric-settings':
+        return MaterialPageRoute(builder: (_) => const BiometricSettingsPage());
       case '/forgot-password':
         return MaterialPageRoute(builder: (_) => const ForgotPasswordPage());
       case '/favorites':

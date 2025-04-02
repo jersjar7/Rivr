@@ -27,7 +27,7 @@ class _SplashPageState extends State<SplashPage> {
     if (mounted) {
       // Now check if authenticated and navigate accordingly
       if (authProvider.isAuthenticated) {
-        Navigator.of(context).pushReplacementNamed('/favorites');
+        Navigator.of(context).pushReplacementNamed('/map');
       } else {
         Navigator.of(context).pushReplacementNamed('/auth');
       }

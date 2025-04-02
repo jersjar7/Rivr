@@ -118,7 +118,7 @@ class RegisterPageState extends State<RegisterPage> {
       );
 
       // Navigate to favorites page
-      Navigator.of(context).pushReplacementNamed('/favorites');
+      Navigator.of(context).pushReplacementNamed('/map');
     }
   }
 

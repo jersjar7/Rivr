@@ -120,7 +120,7 @@ class LoginPageState extends State<LoginPage> {
       );
 
       // Navigate to favorites page
-      Navigator.of(context).pushReplacementNamed('/favorites');
+      Navigator.of(context).pushReplacementNamed('/map');
     }
   }
 
@@ -140,7 +140,7 @@ class LoginPageState extends State<LoginPage> {
       );
 
       // Navigate to favorites page
-      Navigator.of(context).pushReplacementNamed('/favorites');
+      Navigator.of(context).pushReplacementNamed('/map');
     }
   }
 

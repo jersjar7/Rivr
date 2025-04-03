@@ -85,14 +85,20 @@ class UserProfileService {
 
   /// Syncs the user's last activity
   Future<void> syncUserActivity(String userId) async {
+    print("USER PROFILE SERVICE: syncUserActivity called for user $userId");
     try {
+      print("USER PROFILE SERVICE: Updating Firestore document");
       await _firestore.collection('users').doc(userId).update({
         'last_activity': FieldValue.serverTimestamp(),
       });
+      print("USER PROFILE SERVICE: Firestore update completed successfully");
     } catch (e) {
       // Silent fail - non-critical operation
-      print('Failed to sync user activity: ${e.toString()}');
+      print(
+        "USER PROFILE SERVICE: Failed to sync user activity: ${e.toString()}",
+      );
     }
+    print("USER PROFILE SERVICE: syncUserActivity completed");
   }
 
   /// Sets up the user profile when created for the first time

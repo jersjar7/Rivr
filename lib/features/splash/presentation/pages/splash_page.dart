@@ -15,20 +15,54 @@ class _SplashPageState extends State<SplashPage> {
   void initState() {
     super.initState();
     _checkAuth();
+
+    // Add a timeout as a backup
+    Future.delayed(const Duration(seconds: 7), () {
+      if (mounted && ModalRoute.of(context)?.isCurrent == true) {
+        print("SPLASH: Timeout reached, forcing navigation to auth page");
+        Navigator.of(context).pushReplacementNamed('/auth');
+      }
+    });
   }
 
   Future<void> _checkAuth() async {
-    // Remove fixed delay and use proper auth check instead
+    print("SPLASH: Starting authentication check");
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
 
-    // First, trigger a refresh of the current user
-    await authProvider.refreshCurrentUser();
+    try {
+      print("SPLASH: About to refresh current user");
+      // Use a timeout to prevent getting stuck
+      await authProvider.refreshCurrentUser().timeout(
+        const Duration(seconds: 5),
+        onTimeout: () {
+          print("SPLASH: refreshCurrentUser timed out");
+          // If timeout occurs, just continue to auth page
+          return;
+        },
+      );
 
-    if (mounted) {
-      // Now check if authenticated and navigate accordingly
-      if (authProvider.isAuthenticated) {
-        Navigator.of(context).pushReplacementNamed('/map');
-      } else {
+      print(
+        "SPLASH: User refresh completed, isAuthenticated=${authProvider.isAuthenticated}",
+      );
+
+      if (mounted) {
+        print("SPLASH: Component is still mounted, proceeding with navigation");
+        // Now check if authenticated and navigate accordingly
+        if (authProvider.isAuthenticated) {
+          print("SPLASH: User is authenticated, navigating to map");
+          Navigator.of(
+            context,
+          ).pushReplacementNamed('/map', arguments: {'lat': 0.0, 'lon': 0.0});
+        } else {
+          print("SPLASH: User is not authenticated, navigating to auth");
+          Navigator.of(context).pushReplacementNamed('/auth');
+        }
+        print("SPLASH: Navigation called");
+      }
+    } catch (e) {
+      print("SPLASH: Exception during auth check: $e");
+      if (mounted) {
+        // If any error occurs, just go to the auth page
         Navigator.of(context).pushReplacementNamed('/auth');
       }
     }

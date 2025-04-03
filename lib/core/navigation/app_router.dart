@@ -1,5 +1,6 @@
 // lib/core/navigation/app_router.dart
 import 'package:flutter/material.dart';
+import 'package:rivr/features/map/presentation/providers/map_provider.dart';
 import '../../features/auth/presentation/pages/auth_page.dart';
 import '../../features/auth/presentation/pages/forgot_password_page.dart';
 import '../../features/favorites/presentation/pages/favorites_page.dart';
@@ -7,6 +8,8 @@ import '../../features/map/presentation/pages/map_page.dart';
 import '../../features/splash/presentation/pages/splash_page.dart';
 import '../../features/forecast/presentation/pages/forecast_page.dart';
 import '../../features/settings/presentation/pages/biometric_settings_page.dart';
+import 'package:provider/provider.dart';
+import '../di/service_locator.dart';
 
 class AppRouter {
   static Route<dynamic> generateRoute(RouteSettings settings) {
@@ -32,8 +35,13 @@ class AppRouter {
         final args = settings.arguments as Map<String, dynamic>?;
         return MaterialPageRoute(
           builder:
-              (_) =>
-                  MapPage(lat: args?['lat'] ?? 0.0, lon: args?['lon'] ?? 0.0),
+              (context) => ChangeNotifierProvider<MapProvider>(
+                create: (context) => sl<MapProvider>(),
+                child: MapPage(
+                  lat: args?['lat'] ?? 0.0,
+                  lon: args?['lon'] ?? 0.0,
+                ),
+              ),
         );
       case '/forecast':
         final args = settings.arguments as Map<String, dynamic>;

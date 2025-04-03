@@ -10,6 +10,8 @@ import '../../domain/usecases/update_user_profile.dart';
 import '../../data/datasources/auth_storage_service.dart';
 import '../../../../core/error/firebase_error_mapper.dart';
 import '../../data/datasources/biometric_auth_service.dart';
+import 'package:dartz/dartz.dart';
+import '../../../../core/error/failures.dart';
 
 class AuthProvider with ChangeNotifier {
   final Login _login;
@@ -70,24 +72,56 @@ class AuthProvider with ChangeNotifier {
 
   /// Refresh current user data from repository
   Future<void> refreshCurrentUser() async {
+    print("AUTH PROVIDER: refreshCurrentUser called");
     // First check secure storage for stored auth data
     final hasStoredAuth = await _authStorage.hasAuthData();
+    print("AUTH PROVIDER: hasStoredAuth=$hasStoredAuth");
 
     if (!hasStoredAuth) {
+      print("AUTH PROVIDER: No stored auth, setting user to null");
       _currentUser = null;
       notifyListeners();
       return;
     }
 
-    // If auth data exists, verify with repository
-    final result = await _getCurrentUser();
-    result.fold((failure) {
+    print("AUTH PROVIDER: Stored auth found, checking with repository");
+
+    // Add timeout protection
+    try {
+      // Use a timeout to prevent getting stuck
+      final result = await _getCurrentUser().timeout(
+        const Duration(seconds: 3),
+        onTimeout: () {
+          print("AUTH PROVIDER: Repository call timed out");
+          // Return a failure on timeout
+          return Left(AuthFailure(message: 'Repository check timed out'));
+        },
+      );
+
+      print("AUTH PROVIDER: Repository returned a result");
+
+      result.fold(
+        (failure) {
+          print(
+            "AUTH PROVIDER: Failed to get current user: ${failure.message}",
+          );
+          _currentUser = null;
+          // Clear invalid auth data if we get a failure
+          _authStorage.clearAuthData();
+        },
+        (user) {
+          print("AUTH PROVIDER: Got user from repository: ${user?.id}");
+          _currentUser = user;
+        },
+      );
+    } catch (e) {
+      print("AUTH PROVIDER: Exception during repository check: $e");
       _currentUser = null;
-      // Clear invalid auth data if we get a failure
-      _authStorage.clearAuthData();
-    }, (user) => _currentUser = user);
+      await _authStorage.clearAuthData();
+    }
 
     notifyListeners();
+    print("AUTH PROVIDER: refreshCurrentUser completed");
   }
 
   void setError(String message) {
@@ -103,11 +137,29 @@ class AuthProvider with ChangeNotifier {
 
   // Add methods for biometric auth
   Future<bool> enableBiometric() async {
-    if (_currentUser == null) return false;
-    return await _biometricAuthService.enableBiometric(
-      _currentUser!.id,
-      _currentUser!.email,
-    );
+    print("AUTH PROVIDER: Enabling biometric authentication");
+    if (_currentUser == null) {
+      print("AUTH PROVIDER: No current user, can't enable biometrics");
+      return false;
+    }
+
+    try {
+      final result = await _biometricAuthService
+          .enableBiometric(_currentUser!.id, _currentUser!.email)
+          .timeout(
+            const Duration(seconds: 30), // Biometric setup can take time
+            onTimeout: () {
+              print("AUTH PROVIDER: Biometric setup timed out");
+              return false;
+            },
+          );
+
+      print("AUTH PROVIDER: Biometric setup result: $result");
+      return result;
+    } catch (e) {
+      print("AUTH PROVIDER: Error enabling biometrics: $e");
+      return false;
+    }
   }
 
   Future<void> disableBiometric() async {
@@ -190,48 +242,70 @@ class AuthProvider with ChangeNotifier {
   }
 
   Future<User?> login(String email, String password) async {
+    print("AUTH PROVIDER: login started");
     if (email.isEmpty || password.isEmpty) {
+      print("AUTH PROVIDER: Empty fields detected");
       _errorMessage = 'Please fill in all fields';
       notifyListeners();
       return null;
     }
 
+    print("AUTH PROVIDER: Setting loading state");
     _isLoading = true;
     _errorMessage = '';
     _successMessage = '';
     notifyListeners();
 
-    final result = await _login(email, password);
+    print("AUTH PROVIDER: Calling _login use case");
+    try {
+      final result = await _login(email, password);
+      print("AUTH PROVIDER: _login use case returned a result");
 
-    return result.fold(
-      (failure) {
-        _isLoading = false;
-        _errorMessage = failure.message;
+      return result.fold(
+        (failure) {
+          print("AUTH PROVIDER: login failure: ${failure.message}");
+          _isLoading = false;
+          _errorMessage = failure.message;
 
-        // Add recovery suggestions for common auth errors
-        if (failure.message.contains('password')) {
-          _errorMessage +=
-              '\n${FirebaseErrorMapper.getRecoverySuggestion('wrong-password') ?? ''}';
-        } else if (failure.message.contains('No account found')) {
-          _errorMessage +=
-              '\n${FirebaseErrorMapper.getRecoverySuggestion('user-not-found') ?? ''}';
-        }
+          // Add recovery suggestions for common auth errors
+          if (failure.message.contains('password')) {
+            _errorMessage +=
+                '\n${FirebaseErrorMapper.getRecoverySuggestion('wrong-password') ?? ''}';
+          } else if (failure.message.contains('No account found')) {
+            _errorMessage +=
+                '\n${FirebaseErrorMapper.getRecoverySuggestion('user-not-found') ?? ''}';
+          }
 
-        notifyListeners();
-        return null;
-      },
-      (user) async {
-        _currentUser = user;
-        _isLoading = false;
+          notifyListeners();
+          return null;
+        },
+        (user) async {
+          print("AUTH PROVIDER: login success, got user with id: ${user.id}");
+          _currentUser = user;
+          _isLoading = false;
 
-        // Save auth data to secure storage
-        await _authStorage.saveAuthData(userId: user.id, email: user.email);
+          // Save auth data to secure storage
+          print("AUTH PROVIDER: Saving auth data to storage");
+          try {
+            await _authStorage.saveAuthData(userId: user.id, email: user.email);
+            print("AUTH PROVIDER: Auth data saved successfully");
+          } catch (e) {
+            print("AUTH PROVIDER: Error saving auth data: $e");
+          }
 
-        _successMessage = 'Login successful';
-        notifyListeners();
-        return user;
-      },
-    );
+          _successMessage = 'Login successful';
+          notifyListeners();
+          print("AUTH PROVIDER: login method completed successfully");
+          return user;
+        },
+      );
+    } catch (e) {
+      print("AUTH PROVIDER: Unexpected error in login: $e");
+      _isLoading = false;
+      _errorMessage = 'An unexpected error occurred: $e';
+      notifyListeners();
+      return null;
+    }
   }
 
   Future<User?> register(
@@ -241,51 +315,85 @@ class AuthProvider with ChangeNotifier {
     String lastName,
     String profession,
   ) async {
+    print("AUTH PROVIDER: register started");
     if (email.isEmpty ||
         password.isEmpty ||
         firstName.isEmpty ||
         lastName.isEmpty) {
+      print("AUTH PROVIDER: Empty required fields detected");
       _errorMessage = 'Please fill in all required fields';
       notifyListeners();
       return null;
     }
 
+    print("AUTH PROVIDER: Setting loading state");
     _isLoading = true;
     _errorMessage = '';
     _successMessage = '';
     notifyListeners();
 
-    final result = await _register(
-      email,
-      password,
-      firstName,
-      lastName,
-      profession,
-    );
+    print("AUTH PROVIDER: Calling _register use case");
+    try {
+      // Add timeout to prevent hanging
+      final result = await _register(
+        email,
+        password,
+        firstName,
+        lastName,
+        profession,
+      ).timeout(
+        const Duration(seconds: 10),
+        onTimeout: () {
+          print("AUTH PROVIDER: register use case timed out");
+          return Left(AuthFailure(message: 'Registration timed out'));
+        },
+      );
 
-    return result.fold(
-      (failure) {
-        _isLoading = false;
-        _errorMessage = failure.message;
-        notifyListeners();
-        return null;
-      },
-      (user) async {
-        _currentUser = user;
-        _isLoading = false;
+      print("AUTH PROVIDER: _register use case returned a result");
 
-        // Save auth data to secure storage
-        await _authStorage.saveAuthData(userId: user.id, email: user.email);
+      return result.fold(
+        (failure) {
+          print("AUTH PROVIDER: register failure: ${failure.message}");
+          _isLoading = false;
+          _errorMessage = failure.message;
+          notifyListeners();
+          return null;
+        },
+        (user) async {
+          print(
+            "AUTH PROVIDER: register success, got user with id: ${user.id}",
+          );
+          _currentUser = user;
+          _isLoading = false;
 
-        _successMessage = 'Registration successful';
-        notifyListeners();
-        return user;
-      },
-    );
+          // Save auth data to secure storage
+          print("AUTH PROVIDER: Saving auth data to storage");
+          try {
+            await _authStorage.saveAuthData(userId: user.id, email: user.email);
+            print("AUTH PROVIDER: Auth data saved successfully");
+          } catch (e) {
+            print("AUTH PROVIDER: Error saving auth data: $e");
+          }
+
+          _successMessage = 'Registration successful';
+          notifyListeners();
+          print("AUTH PROVIDER: register method completed successfully");
+          return user;
+        },
+      );
+    } catch (e) {
+      print("AUTH PROVIDER: Unexpected error in register: $e");
+      _isLoading = false;
+      _errorMessage = 'An unexpected error occurred: $e';
+      notifyListeners();
+      return null;
+    }
   }
 
   Future<bool> sendPasswordResetEmail(String email) async {
+    print("AUTH PROVIDER: Attempting to send password reset email");
     if (email.isEmpty) {
+      print("AUTH PROVIDER: Email is empty");
       _errorMessage = 'Please enter your email';
       notifyListeners();
       return false;
@@ -296,68 +404,131 @@ class AuthProvider with ChangeNotifier {
     _successMessage = '';
     notifyListeners();
 
-    final result = await _sendPasswordResetEmail(email);
+    try {
+      final result = await _sendPasswordResetEmail(email).timeout(
+        const Duration(seconds: 15),
+        onTimeout: () {
+          print("AUTH PROVIDER: Password reset email request timed out");
+          return Left(
+            AuthFailure(message: 'Request timed out. Please try again later.'),
+          );
+        },
+      );
 
-    return result.fold(
-      (failure) {
-        _isLoading = false;
-        _errorMessage = failure.message;
-        notifyListeners();
-        return false;
-      },
-      (_) {
-        _isLoading = false;
-        _successMessage = 'Password reset link sent to your email';
-        notifyListeners();
-        return true;
-      },
-    );
+      return result.fold(
+        (failure) {
+          print(
+            "AUTH PROVIDER: Password reset email failure: ${failure.message}",
+          );
+          _isLoading = false;
+          _errorMessage = failure.message;
+          notifyListeners();
+          return false;
+        },
+        (_) {
+          print("AUTH PROVIDER: Password reset email sent successfully");
+          _isLoading = false;
+          _successMessage = 'Password reset link sent to your email';
+          notifyListeners();
+          return true;
+        },
+      );
+    } catch (e) {
+      print("AUTH PROVIDER: Unexpected error sending password reset email: $e");
+      _isLoading = false;
+      _errorMessage = 'An unexpected error occurred: $e';
+      notifyListeners();
+      return false;
+    }
   }
 
   Future<void> logout() async {
+    print("AUTH PROVIDER: Logout initiated");
     _isLoading = true;
     notifyListeners();
 
-    final result = await _signOut();
+    try {
+      final result = await _signOut().timeout(
+        const Duration(seconds: 8),
+        onTimeout: () {
+          print("AUTH PROVIDER: Logout timed out, treating as success");
+          return const Right(null); // Treat timeout as success
+        },
+      );
 
-    result.fold(
-      (failure) {
-        _isLoading = false;
-        _errorMessage = failure.message;
-        notifyListeners();
-      },
-      (_) async {
-        _currentUser = null;
-        _isLoading = false;
+      result.fold(
+        (failure) {
+          print("AUTH PROVIDER: Logout failure: ${failure.message}");
+          _isLoading = false;
+          _errorMessage = failure.message;
+          notifyListeners();
+        },
+        (_) async {
+          print("AUTH PROVIDER: Logout successful, clearing local data");
+          _currentUser = null;
+          _isLoading = false;
 
-        // Clear auth data from secure storage
+          // Clear auth data from secure storage
+          try {
+            await _authStorage.clearAuthData();
+            print("AUTH PROVIDER: Auth data cleared successfully");
+          } catch (e) {
+            print("AUTH PROVIDER: Error clearing auth data: $e");
+          }
+
+          notifyListeners();
+          print("AUTH PROVIDER: Logout process completed");
+        },
+      );
+    } catch (e) {
+      print("AUTH PROVIDER: Unexpected error during logout: $e");
+      // Even on error, still clear local data for better UX
+      _currentUser = null;
+      _isLoading = false;
+      try {
         await _authStorage.clearAuthData();
-        // Optionally disable biometrics on logout
-        // await _biometricAuthService.disableBiometric();
-
-        notifyListeners();
-      },
-    );
+      } catch (_) {}
+      notifyListeners();
+    }
   }
 
   /// Check if the stored session is still valid
   Future<bool> validateSession() async {
+    print("AUTH PROVIDER: Validating session");
     if (_currentUser == null) {
+      print("AUTH PROVIDER: No current user, session invalid");
       return false;
     }
 
-    // Check last login time to enforce session timeout if needed
-    final lastLogin = await _authStorage.getLastLogin();
-    if (lastLogin != null) {
-      final sessionAge = DateTime.now().difference(lastLogin);
-      // If last login was more than 30 days ago, invalidate session
-      if (sessionAge.inDays > 30) {
-        await logout();
-        return false;
-      }
-    }
+    try {
+      // Check last login time to enforce session timeout if needed
+      final lastLogin = await _authStorage.getLastLogin().timeout(
+        const Duration(seconds: 3),
+        onTimeout: () {
+          print("AUTH PROVIDER: getLastLogin timed out");
+          return null; // If we can't get last login, assume session is valid
+        },
+      );
 
-    return true;
+      if (lastLogin != null) {
+        final sessionAge = DateTime.now().difference(lastLogin);
+        print("AUTH PROVIDER: Session age: ${sessionAge.inDays} days");
+
+        // If last login was more than 30 days ago, invalidate session
+        if (sessionAge.inDays > 30) {
+          print("AUTH PROVIDER: Session expired (> 30 days), logging out");
+          await logout();
+          return false;
+        }
+      }
+
+      print("AUTH PROVIDER: Session valid");
+      return true;
+    } catch (e) {
+      print("AUTH PROVIDER: Error validating session: $e");
+      // On any error, assume session is valid for better UX
+      return true;
+    }
   }
 
   /// Update user profile information

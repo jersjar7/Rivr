@@ -76,18 +76,22 @@ class LoginPageState extends State<LoginPage> {
   }
 
   Future<void> _login() async {
+    print("LOGIN: Starting login process");
     // Clear previous error messages
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
     authProvider.clearMessages();
 
+    print("LOGIN: Cleared messages, setting attempted state");
     setState(() {
       attempted = true;
     });
 
     // Run validation manually first
     if (!_formKey.currentState!.validate()) {
+      print("LOGIN: Form validation failed, returning");
       return;
     }
+    print("LOGIN: Form validation successful");
 
     // Check network connection
     final connectionMonitor = Provider.of<ConnectionMonitor>(
@@ -95,6 +99,7 @@ class LoginPageState extends State<LoginPage> {
       listen: false,
     );
     if (!connectionMonitor.isConnected) {
+      print("LOGIN: Network connection check failed");
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('No internet connection. Please check your network.'),
@@ -103,13 +108,19 @@ class LoginPageState extends State<LoginPage> {
       );
       return;
     }
+    print("LOGIN: Network connection check passed");
 
+    print("LOGIN: Calling authProvider.login");
     final user = await authProvider.login(
       _emailController.text.trim(),
       _passwordController.text.trim(),
     );
+    print(
+      "LOGIN: authProvider.login returned, user is ${user != null ? 'not null' : 'null'}",
+    );
 
     if (user != null && mounted) {
+      print("LOGIN: User not null and component still mounted");
       // Show success message
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -118,9 +129,24 @@ class LoginPageState extends State<LoginPage> {
           duration: Duration(seconds: 1),
         ),
       );
+      print("LOGIN: SnackBar shown, about to navigate");
 
-      // Navigate to favorites page
-      Navigator.of(context).pushReplacementNamed('/map');
+      // Try with explicit arguments for the map
+      print("LOGIN: Attempting navigation with explicit route arguments");
+      Navigator.of(context).pushNamedAndRemoveUntil(
+        '/map',
+        (route) => false,
+        arguments: {'lat': 0.0, 'lon': 0.0},
+      );
+      print("LOGIN: Navigation called - this may not show if navigation works");
+    } else {
+      print("LOGIN: User is null or component unmounted");
+      if (user == null) {
+        print("LOGIN: User is null from authProvider.login");
+      }
+      if (!mounted) {
+        print("LOGIN: Component is not mounted");
+      }
     }
   }
 

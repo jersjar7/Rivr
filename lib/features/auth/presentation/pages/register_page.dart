@@ -72,17 +72,22 @@ class RegisterPageState extends State<RegisterPage> {
   }
 
   Future<void> _register() async {
+    print("REGISTER: Starting registration process");
     // Clear previous error messages
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
     authProvider.clearMessages();
 
+    print("REGISTER: Cleared messages, setting attempted state");
     setState(() {
       attempted = true;
     });
 
+    // Run validation manually first
     if (!_formKey.currentState!.validate()) {
+      print("REGISTER: Form validation failed, returning");
       return;
     }
+    print("REGISTER: Form validation successful");
 
     // Check network connection
     final connectionMonitor = Provider.of<ConnectionMonitor>(
@@ -90,6 +95,7 @@ class RegisterPageState extends State<RegisterPage> {
       listen: false,
     );
     if (!connectionMonitor.isConnected) {
+      print("REGISTER: Network connection check failed");
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('No internet connection. Please check your network.'),
@@ -98,27 +104,60 @@ class RegisterPageState extends State<RegisterPage> {
       );
       return;
     }
+    print("REGISTER: Network connection check passed");
 
-    final user = await authProvider.register(
-      _emailController.text.trim(),
-      _passwordController.text.trim(),
-      _firstNameController.text.trim(),
-      _lastNameController.text.trim(),
-      _professionController.text.trim(),
-    );
-
-    if (user != null && mounted) {
-      // Show success message
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Registration successful! Logging you in...'),
-          backgroundColor: Colors.green,
-          duration: Duration(seconds: 1),
-        ),
+    print("REGISTER: Calling authProvider.register");
+    try {
+      final user = await authProvider.register(
+        _emailController.text.trim(),
+        _passwordController.text.trim(),
+        _firstNameController.text.trim(),
+        _lastNameController.text.trim(),
+        _professionController.text.trim(),
+      );
+      print(
+        "REGISTER: authProvider.register returned, user is ${user != null ? 'not null' : 'null'}",
       );
 
-      // Navigate to favorites page
-      Navigator.of(context).pushReplacementNamed('/map');
+      if (user != null && mounted) {
+        print("REGISTER: User not null and component still mounted");
+        // Show success message
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Registration successful! Logging you in...'),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 1),
+          ),
+        );
+        print("REGISTER: SnackBar shown, about to navigate");
+
+        // Try with explicit arguments for the map
+        print("REGISTER: Attempting navigation with explicit route arguments");
+        Navigator.of(context).pushNamedAndRemoveUntil(
+          '/map',
+          (route) => false,
+          arguments: {'lat': 0.0, 'lon': 0.0},
+        );
+        print(
+          "REGISTER: Navigation called - this may not show if navigation works",
+        );
+      } else {
+        print("REGISTER: User is null or component unmounted");
+        if (user == null) {
+          print("REGISTER: User is null from authProvider.register");
+        }
+        if (!mounted) {
+          print("REGISTER: Component is not mounted");
+        }
+      }
+    } catch (e) {
+      print("REGISTER: Exception during registration: $e");
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Registration error: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
     }
   }
 

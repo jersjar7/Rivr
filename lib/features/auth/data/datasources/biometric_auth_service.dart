@@ -60,17 +60,32 @@ class BiometricAuthService {
 
   // Authenticate using biometrics
   Future<bool> authenticate(String reason) async {
+    print("BIOMETRIC: Starting authentication with reason: $reason");
     try {
-      return await _localAuth.authenticate(
-        localizedReason: reason,
-        options: const AuthenticationOptions(stickyAuth: true),
-      );
+      final result = await _localAuth
+          .authenticate(
+            localizedReason: reason,
+            options: const AuthenticationOptions(stickyAuth: true),
+          )
+          .timeout(
+            const Duration(
+              seconds: 30,
+            ), // Biometric auth can take time for user interaction
+            onTimeout: () {
+              print("BIOMETRIC: Authentication timed out");
+              return false;
+            },
+          );
+
+      print("BIOMETRIC: Authentication result: $result");
+      return result;
     } catch (e) {
+      print("BIOMETRIC: Authentication error: $e");
       if (e is PlatformException) {
         if (e.code == auth_error.notAvailable) {
-          print('Biometric not available');
+          print('BIOMETRIC: Biometric not available');
         } else if (e.code == auth_error.notEnrolled) {
-          print('Biometric not enrolled');
+          print('BIOMETRIC: Biometric not enrolled');
         }
       }
       return false;

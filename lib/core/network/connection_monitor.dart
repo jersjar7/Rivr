@@ -32,6 +32,9 @@ class ConnectionMonitor extends ChangeNotifier {
   Timer? _reconnectTimer;
   int _reconnectAttempts = 0;
 
+  // New field to track if we've just gone from offline to online
+  bool _justReconnected = false;
+
   ConnectionMonitor({
     required NetworkInfo networkInfo,
     Connectivity? connectivity,
@@ -43,6 +46,8 @@ class ConnectionMonitor extends ChangeNotifier {
   ConnectionStatus get status => _status;
   bool get isConnected => _status.isConnected;
   bool get isPermanentlyOffline => _isPermanentlyOffline;
+  // New getter to check if we just reconnected
+  bool get justReconnected => _justReconnected;
 
   void _initialize() async {
     // Check initial connection
@@ -84,6 +89,9 @@ class ConnectionMonitor extends ChangeNotifier {
   }
 
   void _updateStatus(ConnectionStatus newStatus) {
+    // Check if we're going from offline to online
+    _justReconnected = !_status.isConnected && newStatus.isConnected;
+
     // Only notify if state changed
     if (newStatus.isConnected != _status.isConnected) {
       _status = newStatus;
@@ -94,10 +102,20 @@ class ConnectionMonitor extends ChangeNotifier {
         _reconnectAttempts = 0;
         _isPermanentlyOffline = false;
         _reconnectTimer?.cancel();
+
+        // Schedule resetting of the justReconnected flag after a short delay
+        // This gives app components time to react to the reconnection
+        Future.delayed(const Duration(seconds: 5), () {
+          _justReconnected = false;
+          notifyListeners();
+        });
       } else {
         // Start reconnect timer
         _scheduleReconnect();
       }
+    } else {
+      // Update the status without notifying if only timestamp or results changed
+      _status = newStatus;
     }
   }
 
@@ -138,6 +156,12 @@ class ConnectionMonitor extends ChangeNotifier {
     _checkConnection();
   }
 
+  // Force a connection check and process callbacks if needed
+  Future<void> checkConnectionAndProcess() async {
+    await _checkConnection();
+    return;
+  }
+
   @override
   void dispose() {
     _subscription?.cancel();
@@ -146,34 +170,63 @@ class ConnectionMonitor extends ChangeNotifier {
   }
 }
 
-class ConnectionAwareWidget extends StatelessWidget {
+class ConnectionAwareWidget extends StatefulWidget {
   final Widget child;
   final Widget Function(BuildContext, ConnectionStatus)? offlineBuilder;
   final bool showOfflineBanner;
+  final VoidCallback? onReconnect;
 
   const ConnectionAwareWidget({
     super.key,
     required this.child,
     this.offlineBuilder,
     this.showOfflineBanner = true,
+    this.onReconnect,
   });
+
+  @override
+  State<ConnectionAwareWidget> createState() => _ConnectionAwareWidgetState();
+}
+
+class _ConnectionAwareWidgetState extends State<ConnectionAwareWidget> {
+  @override
+  void initState() {
+    super.initState();
+    // Listen for reconnection events
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final connectionMonitor = Provider.of<ConnectionMonitor>(
+        context,
+        listen: false,
+      );
+      if (connectionMonitor.justReconnected && widget.onReconnect != null) {
+        widget.onReconnect!();
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     return Consumer<ConnectionMonitor>(
       builder: (context, monitor, _) {
-        if (monitor.isConnected) {
-          return child;
+        // If we've just reconnected and have a callback, execute it
+        if (monitor.justReconnected && widget.onReconnect != null) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            widget.onReconnect!();
+          });
         }
 
-        if (offlineBuilder != null) {
-          return offlineBuilder!(context, monitor.status);
+        if (monitor.isConnected) {
+          return widget.child;
+        }
+
+        if (widget.offlineBuilder != null) {
+          return widget.offlineBuilder!(context, monitor.status);
         }
 
         // Default offline UI
         return Column(
           children: [
-            if (showOfflineBanner)
+            if (widget.showOfflineBanner)
               Container(
                 width: double.infinity,
                 color: Colors.red.shade800,
@@ -213,7 +266,7 @@ class ConnectionAwareWidget extends StatelessWidget {
                   ],
                 ),
               ),
-            Expanded(child: child),
+            Expanded(child: widget.child),
           ],
         );
       },

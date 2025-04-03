@@ -1,6 +1,7 @@
 // lib/features/auth/presentation/pages/login_page.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../providers/auth_provider.dart';
 import '../../../../core/widgets/live_validation_field.dart';
 import '../../../../core/widgets/managed_async_button.dart';
@@ -28,6 +29,10 @@ class LoginPageState extends State<LoginPage> {
   final _formKey = GlobalKey<FormState>();
   bool attempted = false; // Track if login was attempted
   bool _showBiometricButton = false; // Flag to show biometric button
+  bool _isBiometricLoading =
+      false; // For biometric authentication loading state
+  Map<String, dynamic>?
+  _pendingLoginAttempt; // For storing login attempt during offline
 
   @override
   void initState() {
@@ -35,6 +40,23 @@ class LoginPageState extends State<LoginPage> {
 
     // Check for biometric availability
     _checkBiometricAvailability();
+
+    // Load saved email if available
+    _loadSavedEmail();
+
+    // Check if we need to process a pending login attempt
+    _checkPendingLoginAttempt();
+
+    // Set up connection monitor callback
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final connectionMonitor = Provider.of<ConnectionMonitor>(
+        context,
+        listen: false,
+      );
+      if (connectionMonitor.justReconnected) {
+        _processPendingLoginAttempt();
+      }
+    });
   }
 
   Future<void> _checkBiometricAvailability() async {
@@ -47,6 +69,95 @@ class LoginPageState extends State<LoginPage> {
       setState(() {
         _showBiometricButton = isBiometricAvailable && isBiometricEnabled;
       });
+    }
+  }
+
+  Future<void> _loadSavedEmail() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final savedEmail = prefs.getString('last_login_email');
+
+      if (savedEmail != null && savedEmail.isNotEmpty && mounted) {
+        setState(() {
+          _emailController.text = savedEmail;
+        });
+      }
+    } catch (e) {
+      // Silently fail - this is a non-critical feature
+      print('Error loading saved email: $e');
+    }
+  }
+
+  Future<void> _saveEmail(String email) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('last_login_email', email);
+    } catch (e) {
+      // Silently fail - this is a non-critical feature
+      print('Error saving email: $e');
+    }
+  }
+
+  Future<void> _checkPendingLoginAttempt() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final hasPendingLogin = prefs.getBool('has_pending_login') ?? false;
+
+      if (hasPendingLogin) {
+        final email = prefs.getString('pending_login_email') ?? '';
+        final password = prefs.getString('pending_login_password') ?? '';
+
+        if (email.isNotEmpty && password.isNotEmpty) {
+          _pendingLoginAttempt = {'email': email, 'password': password};
+
+          // Clear the stored pending login
+          await prefs.remove('has_pending_login');
+          await prefs.remove('pending_login_email');
+          await prefs.remove('pending_login_password');
+        }
+      }
+    } catch (e) {
+      print('Error checking pending login: $e');
+    }
+  }
+
+  Future<void> _processPendingLoginAttempt() async {
+    if (_pendingLoginAttempt == null) return;
+
+    final email = _pendingLoginAttempt!['email'] as String;
+    final password = _pendingLoginAttempt!['password'] as String;
+
+    // Retry the login
+    _emailController.text = email;
+    _passwordController.text = password;
+
+    // Show a snackbar to inform the user
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Retrying previous login attempt...'),
+        duration: Duration(seconds: 2),
+      ),
+    );
+
+    // Clear pending attempt
+    _pendingLoginAttempt = null;
+
+    // Execute login after a short delay
+    Future.delayed(const Duration(seconds: 1), () {
+      if (mounted) {
+        _login();
+      }
+    });
+  }
+
+  void _storePendingLoginAttempt(String email, String password) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('has_pending_login', true);
+      await prefs.setString('pending_login_email', email);
+      await prefs.setString('pending_login_password', password);
+    } catch (e) {
+      print('Error storing pending login: $e');
     }
   }
 
@@ -93,6 +204,12 @@ class LoginPageState extends State<LoginPage> {
     }
     print("LOGIN: Form validation successful");
 
+    // Save email for future logins
+    final email = _emailController.text.trim();
+    final password = _passwordController.text.trim();
+
+    await _saveEmail(email);
+
     // Check network connection
     final connectionMonitor = Provider.of<ConnectionMonitor>(
       context,
@@ -100,10 +217,17 @@ class LoginPageState extends State<LoginPage> {
     );
     if (!connectionMonitor.isConnected) {
       print("LOGIN: Network connection check failed");
+
+      // Store login attempt to retry when connection is available
+      _storePendingLoginAttempt(email, password);
+
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('No internet connection. Please check your network.'),
-          backgroundColor: Colors.red,
+          content: Text(
+            'No internet connection. Your login will be retried when connection is restored.',
+          ),
+          backgroundColor: Colors.orange,
+          duration: Duration(seconds: 4),
         ),
       );
       return;
@@ -111,10 +235,7 @@ class LoginPageState extends State<LoginPage> {
     print("LOGIN: Network connection check passed");
 
     print("LOGIN: Calling authProvider.login");
-    final user = await authProvider.login(
-      _emailController.text.trim(),
-      _passwordController.text.trim(),
-    );
+    final user = await authProvider.login(email, password);
     print(
       "LOGIN: authProvider.login returned, user is ${user != null ? 'not null' : 'null'}",
     );
@@ -153,21 +274,74 @@ class LoginPageState extends State<LoginPage> {
   Future<void> _loginWithBiometric() async {
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
 
-    final user = await authProvider.loginWithBiometric();
+    // Set biometric loading state
+    setState(() {
+      _isBiometricLoading = true;
+    });
 
-    if (user != null && mounted) {
-      // Show success message
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Login successful!'),
-          backgroundColor: Colors.green,
-          duration: Duration(seconds: 1),
-        ),
-      );
+    try {
+      final user = await authProvider.loginWithBiometric();
 
-      // Navigate to favorites page
-      Navigator.of(context).pushReplacementNamed('/map');
+      if (mounted) {
+        setState(() {
+          _isBiometricLoading = false;
+        });
+      }
+
+      if (user != null && mounted) {
+        // Show success message
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Login successful!'),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 1),
+          ),
+        );
+
+        // Navigate to favorites page
+        Navigator.of(context).pushReplacementNamed('/map');
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isBiometricLoading = false;
+        });
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Biometric authentication failed: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
+  }
+
+  // Enhanced method to get detailed recovery suggestions based on error message
+  String? _getDetailedRecoverySuggestion(String errorMessage) {
+    final lowerCaseError = errorMessage.toLowerCase();
+
+    if (lowerCaseError.contains('wrong password') ||
+        lowerCaseError.contains('invalid password')) {
+      return 'Double-check your password. If you\'ve forgotten it, use the "Forgot Password" option below.';
+    } else if (lowerCaseError.contains('user not found') ||
+        lowerCaseError.contains('no user record')) {
+      return 'This email isn\'t registered. Check for typos or register for a new account.';
+    } else if (lowerCaseError.contains('too many attempts') ||
+        lowerCaseError.contains('too many requests')) {
+      return 'Too many login attempts. Please wait about 15 minutes before trying again.';
+    } else if (lowerCaseError.contains('network') ||
+        lowerCaseError.contains('connection')) {
+      return 'Check your internet connection and try again. We\'ll retry automatically when connection is restored.';
+    } else if (lowerCaseError.contains('disabled')) {
+      return 'This account has been disabled. Please contact support for assistance.';
+    } else if (lowerCaseError.contains('expired') ||
+        lowerCaseError.contains('timeout')) {
+      return 'Your login request timed out. Please try again with a better connection.';
+    }
+
+    // Use the standard recovery suggestions as fallback
+    return ErrorRecoverySuggestions.getForAuthError(errorMessage);
   }
 
   @override
@@ -178,6 +352,7 @@ class LoginPageState extends State<LoginPage> {
     return Scaffold(
       backgroundColor: Colors.grey[300],
       body: ConnectionAwareWidget(
+        onReconnect: _processPendingLoginAttempt,
         offlineBuilder:
             (context, status) => SafeArea(
               child: Center(
@@ -192,6 +367,16 @@ class LoginPageState extends State<LoginPage> {
                       isPermanentlyOffline: !status.isConnected,
                       onRetry: () => connectionMonitor.resetOfflineStatus(),
                     ),
+                    // Show this if we have a pending login attempt
+                    if (_pendingLoginAttempt != null)
+                      Padding(
+                        padding: const EdgeInsets.all(16.0),
+                        child: Text(
+                          'We\'ll try to sign you in automatically when connection is restored.',
+                          style: TextStyle(color: Colors.orange.shade800),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
                   ],
                 ),
               ),
@@ -282,14 +467,13 @@ class LoginPageState extends State<LoginPage> {
                     ),
                     const SizedBox(height: 20),
 
-                    // Enhanced error display with recovery suggestions
+                    // Enhanced error display with more detailed recovery suggestions
                     if (authProvider.errorMessage.isNotEmpty)
                       EnhancedErrorDisplay(
                         message: authProvider.errorMessage,
-                        recoverySuggestion:
-                            ErrorRecoverySuggestions.getForAuthError(
-                              authProvider.errorMessage,
-                            ),
+                        recoverySuggestion: _getDetailedRecoverySuggestion(
+                          authProvider.errorMessage,
+                        ),
                         collapsible: true,
                       ),
 
@@ -304,21 +488,46 @@ class LoginPageState extends State<LoginPage> {
                       icon: const Icon(Icons.login, color: Colors.white),
                     ),
 
-                    // Biometric login button (shown only if available and enabled)
+                    // Biometric login button with loading state
                     if (_showBiometricButton) ...[
                       const SizedBox(height: 16),
-                      TextButton.icon(
-                        onPressed: _loginWithBiometric,
-                        icon: const Icon(Icons.fingerprint, size: 24),
-                        label: const Text('Sign in with biometrics'),
-                        style: TextButton.styleFrom(
-                          foregroundColor: AppColors.primaryColor,
-                          padding: const EdgeInsets.symmetric(
-                            vertical: 12,
-                            horizontal: 24,
+                      _isBiometricLoading
+                          ? Container(
+                            padding: const EdgeInsets.symmetric(vertical: 10),
+                            child: Column(
+                              children: [
+                                SizedBox(
+                                  width: 24,
+                                  height: 24,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    valueColor: AlwaysStoppedAnimation<Color>(
+                                      AppColors.primaryColor,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(height: 10),
+                                Text(
+                                  'Verifying biometric...',
+                                  style: TextStyle(
+                                    color: AppColors.primaryColor,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          )
+                          : TextButton.icon(
+                            onPressed: _loginWithBiometric,
+                            icon: const Icon(Icons.fingerprint, size: 24),
+                            label: const Text('Sign in with biometrics'),
+                            style: TextButton.styleFrom(
+                              foregroundColor: AppColors.primaryColor,
+                              padding: const EdgeInsets.symmetric(
+                                vertical: 12,
+                                horizontal: 24,
+                              ),
+                            ),
                           ),
-                        ),
-                      ),
                     ],
 
                     const SizedBox(height: 30),

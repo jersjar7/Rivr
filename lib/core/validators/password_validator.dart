@@ -29,19 +29,19 @@ class PasswordValidator {
       return 'Password must be at least $minLength characters long';
     }
 
-    if (requireUppercase && !_containsUppercase(password)) {
+    if (requireUppercase && !containsUppercase(password)) {
       return 'Password must contain at least one uppercase letter';
     }
 
-    if (requireLowercase && !_containsLowercase(password)) {
+    if (requireLowercase && !containsLowercase(password)) {
       return 'Password must contain at least one lowercase letter';
     }
 
-    if (requireNumber && !_containsNumber(password)) {
+    if (requireNumber && !containsNumber(password)) {
       return 'Password must contain at least one number';
     }
 
-    if (requireSpecialChar && !_containsSpecialChar(password)) {
+    if (requireSpecialChar && !containsSpecialChar(password)) {
       return 'Password must contain at least one special character';
     }
 
@@ -91,10 +91,10 @@ class PasswordValidator {
     if (password.length >= 12) score++;
 
     // Add points for character variety
-    if (_containsUppercase(password)) score++;
-    if (_containsLowercase(password)) score++;
-    if (_containsNumber(password)) score++;
-    if (_containsSpecialChar(password)) score++;
+    if (containsUppercase(password)) score++;
+    if (containsLowercase(password)) score++;
+    if (containsNumber(password)) score++;
+    if (containsSpecialChar(password)) score++;
 
     // Convert score to strength
     if (score <= 2) return PasswordStrength.weak;
@@ -146,19 +146,19 @@ class PasswordValidator {
         if (requireUppercase)
           _buildRequirementItem(
             'Contains uppercase letter',
-            _containsUppercase(password),
+            containsUppercase(password),
           ),
         if (requireLowercase)
           _buildRequirementItem(
             'Contains lowercase letter',
-            _containsLowercase(password),
+            containsLowercase(password),
           ),
         if (requireNumber)
-          _buildRequirementItem('Contains number', _containsNumber(password)),
+          _buildRequirementItem('Contains number', containsNumber(password)),
         if (requireSpecialChar)
           _buildRequirementItem(
             'Contains special character',
-            _containsSpecialChar(password),
+            containsSpecialChar(password),
           ),
       ],
     );
@@ -188,20 +188,20 @@ class PasswordValidator {
     );
   }
 
-  // Helper methods for checking password criteria
-  static bool _containsUppercase(String password) {
+  // Helper methods for checking password criteria - Now made public
+  static bool containsUppercase(String password) {
     return password.contains(RegExp(r'[A-Z]'));
   }
 
-  static bool _containsLowercase(String password) {
+  static bool containsLowercase(String password) {
     return password.contains(RegExp(r'[a-z]'));
   }
 
-  static bool _containsNumber(String password) {
+  static bool containsNumber(String password) {
     return password.contains(RegExp(r'[0-9]'));
   }
 
-  static bool _containsSpecialChar(String password) {
+  static bool containsSpecialChar(String password) {
     return password.contains(RegExp(r'[!@#$%^&*(),.?":{}|<>]'));
   }
 }

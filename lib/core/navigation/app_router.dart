@@ -7,7 +7,7 @@ import '../../features/auth/presentation/pages/auth_page.dart';
 import '../../features/auth/presentation/pages/forgot_password_page.dart';
 import '../../features/favorites/presentation/pages/favorites_page.dart';
 import '../../features/map/presentation/pages/map_page.dart';
-import '../../features/map/presentation/providers/clustered_map_provider.dart';
+import '../../features/map/presentation/providers/enhanced_clustered_map_provider.dart';
 import '../../features/map/presentation/providers/map_provider.dart';
 import '../../features/map/presentation/providers/station_provider.dart';
 import '../../features/splash/presentation/pages/splash_page.dart';

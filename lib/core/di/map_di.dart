@@ -3,7 +3,7 @@
 import 'package:get_it/get_it.dart';
 import 'package:http/http.dart' as http;
 
-import '../../features/map/data/datasources/clustered_map_datasource.dart';
+import '../../features/map/data/datasources/enhanced_clustered_map_datasource.dart';
 import '../../features/map/data/datasources/map_station_local_datasource.dart';
 import '../../features/map/data/datasources/mapbox_remote_datasource.dart';
 import '../../features/map/data/repositories_impl/clustered_map_repository_impl.dart';
@@ -20,7 +20,7 @@ import '../../features/map/domain/usecases/initialize_clustering.dart';
 import '../../features/map/domain/usecases/search_location.dart';
 import '../../features/map/domain/usecases/setup_cluster_tap_handling.dart';
 import '../../features/map/domain/usecases/update_cluster_data.dart';
-import '../../features/map/presentation/providers/clustered_map_provider.dart';
+import '../../features/map/presentation/providers/enhanced_clustered_map_provider.dart';
 import '../../features/map/presentation/providers/map_provider.dart';
 import '../../features/map/presentation/providers/station_provider.dart';
 import '../network/network_info.dart';

@@ -266,23 +266,37 @@ class MapProvider with ChangeNotifier {
     }
   }
 
-  // Change map style
+  // Change map style with explicit error handling
   void changeMapStyle(String style, VoidCallback onStyleChanged) {
+    print("MAP PROVIDER: Changing style to $style");
     _currentStyle = style;
     notifyListeners();
 
     if (_mapboxMap == null) return;
 
-    // Load the new style
-    _mapboxMap!.loadStyleURI(style).then((_) {
-      // Re-enable terrain if 3D mode is on
-      if (_is3DMode) {
-        _enableTerrain();
-      }
+    try {
+      // Load the new style with explicit error handling
+      _mapboxMap!
+          .loadStyleURI(style)
+          .then((_) {
+            print("MAP PROVIDER: Style changed successfully");
 
-      // Call the callback to notify that the style has changed
-      onStyleChanged();
-    });
+            // Re-enable terrain if 3D mode is on
+            if (_is3DMode) {
+              _enableTerrain();
+            }
+
+            // Call the callback to notify that the style has changed
+            onStyleChanged();
+          })
+          .catchError((error) {
+            print("MAP PROVIDER: Error changing style: $error");
+            _setError('Failed to change map style: $error');
+          });
+    } catch (e) {
+      print("MAP PROVIDER: Exception changing style: $e");
+      _setError('Failed to change map style: $e');
+    }
   }
 
   // Zoom in

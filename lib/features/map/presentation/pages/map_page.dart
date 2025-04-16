@@ -136,6 +136,10 @@ class _MapPageState extends State<MapPage> {
     return Consumer<MapProvider>(
       builder: (context, mapProvider, child) {
         print("MAP PAGE: Building map with style: ${mapProvider.currentStyle}");
+        print(
+          "MAP PAGE: Using token: ${MapConstants.accessToken.substring(0, 5)}...",
+        );
+
         try {
           // Use a UniqueKey to ensure the MapWidget is recreated
           return MapWidget(

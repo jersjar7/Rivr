@@ -9,6 +9,8 @@ class MapConstants {
     final token = dotenv.env['MAPBOX_ACCESS_TOKEN'] ?? '';
     if (token.isEmpty) {
       print("WARNING: Mapbox token is empty! Check your .env files.");
+      // For development, you might want to hardcode a fallback token here
+      // return "sk.eyJ1IjoiamVy..."; // Fallback for dev only
     }
     return token;
   }
@@ -63,9 +65,16 @@ class MapConstants {
   // Add this method to log the token status
   static void logTokenStatus() {
     final token = accessToken;
+    final tokenLength = token.length;
+    final maskedToken =
+        token.isNotEmpty
+            ? '${token.substring(0, 5)}...${token.substring(token.length - 5)}'
+            : 'EMPTY';
+
     print(
-      "MAP CONSTANTS: Mapbox access token ${token.isEmpty ? 'NOT FOUND' : 'found with length ${token.length}'}",
+      "MAP CONSTANTS: Mapbox access token = $maskedToken (length: $tokenLength)",
     );
+
     if (token.isEmpty) {
       print(
         "MAP CONSTANTS: WARNING - Empty Mapbox access token will cause map tiles not to display",

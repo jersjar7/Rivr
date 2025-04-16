@@ -43,3 +43,11 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Add Mapbox configuration files with API keys
+**/android/app/src/main/AndroidManifest.xml
+**/ios/Runner/Info.plist
+
+# Add templates that should be tracked
+!**/android/app/src/main/AndroidManifest.xml.template
+!**/ios/Runner/Info.plist.template

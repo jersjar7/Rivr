@@ -3,7 +3,7 @@
 <plist version="1.0">
 <dict>
 	<key>MBXAccessToken</key>
-	<string>sk.eyJ1IjoiamVyc29uZGV2cyIsImEiOiJjbTkyYXpueTQwOXRzMmxvaGdoMTg2eWN1In0.qzghyzkAlVXDNiOBG1-HVQ</string>
+	<string>MAPBOX_ACCESS_TOKENQ</string>
 	<key>NSFaceIDUsageDescription</key>
     <string>Enable Face ID for quick and secure login to your Rivr account</string>
 	<key>CFBundleDevelopmentRegion</key>

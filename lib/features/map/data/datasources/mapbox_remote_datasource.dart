@@ -57,14 +57,22 @@ class MapboxRemoteDataSourceImpl implements MapboxRemoteDataSource {
   Future<String> getAccessToken() async {
     try {
       final token = dotenv.env['MAPBOX_ACCESS_TOKEN'] ?? '';
+      print("MAPBOX DATASOURCE: Getting access token from env variables");
+      print(
+        "MAPBOX DATASOURCE: Token ${token.isEmpty ? 'NOT FOUND' : 'found with length ${token.length}'}",
+      );
+
       if (token.isEmpty) {
+        print(
+          "MAPBOX DATASOURCE: Available env variables: ${dotenv.env.keys.join(', ')}",
+        );
         throw ServerException(
           message: 'Mapbox access token not found in environment variables',
         );
       }
       return token;
     } catch (e) {
-      print('Error getting access token: $e');
+      print('MAPBOX DATASOURCE: Error getting access token: $e');
       throw ServerException(message: 'Failed to get Mapbox access token: $e');
     }
   }

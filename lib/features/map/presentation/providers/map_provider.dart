@@ -60,8 +60,12 @@ class MapProvider with ChangeNotifier {
 
   // Called when the map is created
   void onMapCreated(MapboxMap mapboxMap) {
+    print("MAP PROVIDER: Map created, initializing map");
     _mapboxMap = mapboxMap;
     _isMapInitialized = true;
+
+    // Log the current style
+    print("MAP PROVIDER: Using map style: $_currentStyle");
 
     // Create point annotation manager
     _createAnnotationManager();
@@ -74,6 +78,7 @@ class MapProvider with ChangeNotifier {
     // Initial update of the visible region
     updateVisibleRegion();
 
+    print("MAP PROVIDER: Map initialization complete");
     notifyListeners();
   }
 

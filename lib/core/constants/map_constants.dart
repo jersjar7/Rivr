@@ -53,4 +53,17 @@ class MapConstants {
   // Animation durations
   static const int mapAnimationDurationMs = 2000;
   static const int mapAnimationDelayMs = 0;
+
+  // Add this method to log the token status
+  static void logTokenStatus() {
+    final token = accessToken;
+    print(
+      "MAP CONSTANTS: Mapbox access token ${token.isEmpty ? 'NOT FOUND' : 'found with length ${token.length}'}",
+    );
+    if (token.isEmpty) {
+      print(
+        "MAP CONSTANTS: WARNING - Empty Mapbox access token will cause map tiles not to display",
+      );
+    }
+  }
 }

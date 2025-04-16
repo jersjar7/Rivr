@@ -12,7 +12,15 @@ Future<void> main() async {
 
   // Load environment variables
   final env = const String.fromEnvironment('ENV', defaultValue: 'development');
-  await dotenv.load(fileName: '.env.$env');
+  print("MAIN: Loading environment variables from .env.$env");
+
+  try {
+    await dotenv.load(fileName: '.env.$env');
+    print("MAIN: Environment variables loaded successfully");
+    print("MAIN: Available keys: ${dotenv.env.keys.join(', ')}");
+  } catch (e) {
+    print("MAIN: Error loading environment variables: $e");
+  }
 
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   await setupServiceLocator();

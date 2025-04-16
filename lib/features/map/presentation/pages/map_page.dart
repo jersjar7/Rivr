@@ -34,6 +34,9 @@ class _MapPageState extends State<MapPage> {
   void initState() {
     super.initState();
 
+    // Log token status
+    MapConstants.logTokenStatus();
+
     // Initialize center point from given coordinates or default
     if (widget.lat != 0.0 && widget.lon != 0.0) {
       _initialCenter = Point(coordinates: Position(widget.lon, widget.lat));
@@ -120,19 +123,40 @@ class _MapPageState extends State<MapPage> {
   Widget _buildMap() {
     return Consumer<MapProvider>(
       builder: (context, mapProvider, child) {
-        return MapWidget(
-          key: const ValueKey('mapWidget'),
-          onMapCreated: _onMapCreated,
-          cameraOptions: CameraOptions(
-            center: _initialCenter ?? MapConstants.defaultCenter,
-            zoom: MapConstants.defaultZoom,
-            pitch: mapProvider.is3DMode ? MapConstants.defaultTilt : 0.0,
-            bearing: 0,
-          ),
-          styleUri: mapProvider.currentStyle,
-          // Add this parameter for camera change events
-          onCameraChangeListener: _handleCameraChanged,
-        );
+        print("MAP PAGE: Building map with style: ${mapProvider.currentStyle}");
+        try {
+          return MapWidget(
+            key: const ValueKey('mapWidget'),
+            onMapCreated: _onMapCreated,
+            cameraOptions: CameraOptions(
+              center: _initialCenter ?? MapConstants.defaultCenter,
+              zoom: MapConstants.defaultZoom,
+              pitch: mapProvider.is3DMode ? MapConstants.defaultTilt : 0.0,
+              bearing: 0,
+            ),
+            styleUri: mapProvider.currentStyle,
+            onCameraChangeListener: _handleCameraChanged,
+          );
+        } catch (e) {
+          print("MAP PAGE: Exception building map: $e");
+          return Container(
+            color: Colors.grey[300],
+            child: Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.map, size: 64, color: Colors.red),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Error loading map: $e',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(color: Colors.red),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
       },
     );
   }

@@ -47,6 +47,7 @@ class AppRouter {
                   ),
                 ],
                 child: MapPage(
+                  key: UniqueKey(),
                   lat: args?['lat'] ?? 0.0,
                   lon: args?['lon'] ?? 0.0,
                 ),

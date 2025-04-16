@@ -29,6 +29,7 @@ class _MapPageState extends State<MapPage> {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   StationMarkerManager? _markerManager;
   Point? _initialCenter;
+  bool _isMapCreated = false;
 
   @override
   void initState() {
@@ -41,6 +42,17 @@ class _MapPageState extends State<MapPage> {
     if (widget.lat != 0.0 && widget.lon != 0.0) {
       _initialCenter = Point(coordinates: Position(widget.lon, widget.lat));
     }
+    print("MAP PAGE: initState completed");
+  }
+
+  @override
+  void dispose() {
+    print("MAP PAGE: dispose called");
+    // Clear any references to the map
+    final mapProvider = Provider.of<MapProvider>(context, listen: false);
+    mapProvider.disposeMap();
+    _markerManager = null;
+    super.dispose();
   }
 
   @override
@@ -125,8 +137,9 @@ class _MapPageState extends State<MapPage> {
       builder: (context, mapProvider, child) {
         print("MAP PAGE: Building map with style: ${mapProvider.currentStyle}");
         try {
+          // Use a UniqueKey to ensure the MapWidget is recreated
           return MapWidget(
-            key: const ValueKey('mapWidget'),
+            key: UniqueKey(),
             onMapCreated: _onMapCreated,
             cameraOptions: CameraOptions(
               center: _initialCenter ?? MapConstants.defaultCenter,
@@ -251,22 +264,40 @@ class _MapPageState extends State<MapPage> {
   }
 
   void _onMapCreated(MapboxMap mapboxMap) {
+    print(
+      "MAP PAGE: onMapCreated called, mapboxMap ${mapboxMap != null ? 'is not null' : 'is null'}",
+    );
+
+    if (_isMapCreated) {
+      print("MAP PAGE: Map already created, skipping initialization");
+      return;
+    }
+
+    _isMapCreated = true;
+
     final mapProvider = Provider.of<MapProvider>(context, listen: false);
     final stationProvider = Provider.of<StationProvider>(
       context,
       listen: false,
     );
 
-    // Initialize map in the provider
-    mapProvider.onMapCreated(mapboxMap);
+    try {
+      // Initialize map in the provider
+      mapProvider.onMapCreated(mapboxMap);
+      print("MAP PAGE: mapProvider.onMapCreated completed successfully");
 
-    // Listen for station changes to update markers
-    stationProvider.addListener(() {
-      _updateMarkers(stationProvider.stations);
-    });
+      // Listen for station changes to update markers
+      stationProvider.addListener(() {
+        _updateMarkers(stationProvider.stations);
+      });
+      print("MAP PAGE: stationProvider listener added");
 
-    // Load initial sample stations
-    stationProvider.loadSampleStations();
+      // Load initial sample stations
+      stationProvider.loadSampleStations();
+      print("MAP PAGE: stationProvider.loadSampleStations called");
+    } catch (e) {
+      print("MAP PAGE: Error in onMapCreated: $e");
+    }
   }
 
   // Implement the camera change handler

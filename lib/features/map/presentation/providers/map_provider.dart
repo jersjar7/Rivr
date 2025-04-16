@@ -327,4 +327,12 @@ class MapProvider with ChangeNotifier {
     _errorMessage = null;
     notifyListeners();
   }
+
+  void disposeMap() {
+    print("MAP PROVIDER: disposeMap called");
+    _mapboxMap = null;
+    _pointAnnotationManager = null;
+    _isMapInitialized = false;
+    notifyListeners();
+  }
 }

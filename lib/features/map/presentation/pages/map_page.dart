@@ -25,15 +25,18 @@ class MapPage extends StatefulWidget {
   State<MapPage> createState() => _MapPageState();
 }
 
-class _MapPageState extends State<MapPage> {
+class _MapPageState extends State<MapPage> with WidgetsBindingObserver {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   StationMarkerManager? _markerManager;
   Point? _initialCenter;
   bool _isMapCreated = false;
+  Key _mapKey = UniqueKey(); // Add a unique key for the map widget
+  bool _isResetting = false;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this); // Add observer for app lifecycle
 
     // Log token status
     MapConstants.logTokenStatus();
@@ -43,16 +46,6 @@ class _MapPageState extends State<MapPage> {
       _initialCenter = Point(coordinates: Position(widget.lon, widget.lat));
     }
     print("MAP PAGE: initState completed");
-  }
-
-  @override
-  void dispose() {
-    print("MAP PAGE: dispose called");
-    // Clear any references to the map
-    final mapProvider = Provider.of<MapProvider>(context, listen: false);
-    mapProvider.disposeMap();
-    _markerManager = null;
-    super.dispose();
   }
 
   @override
@@ -68,6 +61,60 @@ class _MapPageState extends State<MapPage> {
       );
       _markerManager = StationMarkerManager(mapProvider, stationProvider);
     }
+  }
+
+  @override
+  void didUpdateWidget(MapPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+
+    // If lat/lon changes significantly, recreate the map
+    if ((oldWidget.lat != widget.lat || oldWidget.lon != widget.lon) &&
+        (widget.lat != 0.0 || widget.lon != 0.0)) {
+      _initialCenter = Point(coordinates: Position(widget.lon, widget.lat));
+      Future.microtask(() => _resetMap());
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Handle app lifecycle changes to properly clean up the map
+    if (state == AppLifecycleState.detached ||
+        state == AppLifecycleState.paused) {
+      _cleanupMap();
+    }
+  }
+
+  @override
+  void dispose() {
+    print("MAP PAGE: dispose called");
+    WidgetsBinding.instance.removeObserver(this);
+    // Clean up map resources
+    _cleanupMap();
+    super.dispose();
+  }
+
+  // Clean up map resources
+  void _cleanupMap() {
+    final mapProvider = Provider.of<MapProvider>(context, listen: false);
+    mapProvider.disposeMap();
+    _markerManager = null;
+    _isMapCreated = false;
+  }
+
+  // Reset the map by creating a new instance with a new key
+  void _resetMap() {
+    if (_isResetting) return;
+
+    _isResetting = true;
+    _cleanupMap();
+
+    setState(() {
+      _mapKey = UniqueKey(); // This will recreate the MapWidget
+    });
+
+    Future.delayed(Duration(milliseconds: 500), () {
+      _isResetting = false;
+    });
   }
 
   @override
@@ -141,9 +188,9 @@ class _MapPageState extends State<MapPage> {
         );
 
         try {
-          // Use a UniqueKey to ensure the MapWidget is recreated
+          // Use a unique key for the MapWidget
           return MapWidget(
-            key: const ValueKey('mapbox_map'),
+            key: _mapKey,
             onMapCreated: _onMapCreated,
             cameraOptions: CameraOptions(
               center: _initialCenter ?? MapConstants.defaultCenter,
@@ -168,6 +215,11 @@ class _MapPageState extends State<MapPage> {
                     'Error loading map: $e',
                     textAlign: TextAlign.center,
                     style: const TextStyle(color: Colors.red),
+                  ),
+                  const SizedBox(height: 16),
+                  ElevatedButton(
+                    onPressed: _resetMap,
+                    child: const Text('Retry Loading Map'),
                   ),
                 ],
               ),
@@ -292,8 +344,10 @@ class _MapPageState extends State<MapPage> {
 
       // Load initial stations only after map is fully set up
       Future.delayed(const Duration(milliseconds: 500), () {
-        stationProvider.loadSampleStations();
-        print("MAP PAGE: Initial stations loaded");
+        if (mounted) {
+          stationProvider.loadSampleStations();
+          print("MAP PAGE: Initial stations loaded");
+        }
       });
     } catch (e) {
       print("MAP PAGE: Error in onMapCreated: $e");
@@ -315,7 +369,11 @@ class _MapPageState extends State<MapPage> {
   }
 
   void _onMapMoved(MapProvider mapProvider, StationProvider stationProvider) {
+    if (!mounted) return;
+
     mapProvider.updateVisibleRegion().then((_) {
+      if (!mounted) return;
+
       if (mapProvider.currentZoom >= MapConstants.minZoomForMarkers) {
         // Zoomed in enough to show detailed stations
         if (mapProvider.visibleRegion != null) {
@@ -331,7 +389,7 @@ class _MapPageState extends State<MapPage> {
   }
 
   void _updateMarkers(List<MapStation> stations) {
-    if (_markerManager != null) {
+    if (_markerManager != null && mounted) {
       _markerManager!.addStationMarkers(stations);
     }
   }

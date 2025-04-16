@@ -1,4 +1,4 @@
-// lib/features/map/presentation/providers/clustered_map_provider.dart
+// lib/features/map/presentation/providers/enhanced_clustered_map_provider.dart
 
 import 'dart:async';
 import 'package:flutter/material.dart';
@@ -11,6 +11,28 @@ import '../../domain/usecases/setup_cluster_tap_handling.dart';
 import '../../domain/usecases/update_cluster_data.dart';
 
 enum ClusteringStatus { initial, initializing, ready, updating, error }
+
+// Define the interface
+abstract class ClusteredMapDataSource {
+  /// Initialize cluster sources and layers on the map
+  Future<void> initializeClusterLayers(MapboxMap mapboxMap);
+
+  /// Update station data in the cluster source
+  Future<void> updateClusterData(
+    MapboxMap mapboxMap,
+    List<MapStation> stations,
+  );
+
+  /// Clean up resources
+  Future<void> dispose(MapboxMap mapboxMap);
+
+  /// Setup tap handling for clusters and individual points
+  Future<void> setupTapHandling(
+    MapboxMap mapboxMap,
+    Function(MapStation) onStationTapped,
+    Function(Point, List<MapStation>) onClusterTapped,
+  );
+}
 
 class ClusteredMapProvider with ChangeNotifier {
   // Use cases

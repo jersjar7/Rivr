@@ -32,21 +32,17 @@ class MapStyleManager {
 
   /// Set up a listener for style loaded events
   void _setupStyleLoadedListener() {
-    // Style loading completed listener using the proper Mapbox API
-    mapboxMap.onStyleLoadedListener = StyleLoadedEventCallback(
-      onStyleLoaded: () {
-        print('Map style loaded: $_currentStyle');
+    // Use the correct event listener approach for Mapbox
+    mapboxMap.setOnStyleLoadedListener(() {
+      print('Map style loaded: $_currentStyle');
 
-        // Resolve any pending style load completion
-        _styleLoadCompleter?.complete(true);
-        _styleLoadCompleter = null;
+      // Resolve any pending style load completion
+      _styleLoadCompleter?.complete(true);
+      _styleLoadCompleter = null;
 
-        // Notify the cluster provider that style has changed
-        clusterProvider.handleMapStyleChanged(mapboxMap);
-
-        return true;
-      },
-    );
+      // Notify the cluster provider that style has changed
+      clusterProvider.handleMapStyleChanged(mapboxMap);
+    });
   }
 
   /// Change the map style with proper error handling and callbacks

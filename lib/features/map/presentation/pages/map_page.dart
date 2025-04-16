@@ -4,15 +4,15 @@ import 'package:flutter/material.dart';
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
 import 'package:provider/provider.dart';
 import 'package:rivr/features/map/data/datasources/enhanced_clustered_map_datasource.dart';
+import 'package:rivr/features/map/data/datasources/enhanced_clustered_map_datasource.dart'
+    as datasource;
 
 import '../../../../core/constants/map_constants.dart';
 import '../../../../core/network/connection_monitor.dart';
 import '../../../../core/widgets/empty_state.dart';
-import '../providers/enhanced_clustered_map_provider.dart';
 import '../providers/map_provider.dart';
 import '../providers/station_provider.dart';
 import '../utils/map_style_manager.dart';
-import '../widgets/map_controls.dart';
 import '../widgets/map_search_bar.dart';
 import '../widgets/station_info_panel.dart';
 import '../widgets/station_list_drawer.dart';
@@ -279,8 +279,9 @@ class _OptimizedMapPageState extends State<OptimizedMapPage>
       builder: (context, stationProvider, clusteredMapProvider, child) {
         final bool isLoading =
             stationProvider.status == StationLoadingStatus.loading ||
-            clusteredMapProvider.status == ClusteringStatus.initializing ||
-            clusteredMapProvider.status == ClusteringStatus.updating;
+            clusteredMapProvider.status ==
+                datasource.ClusteringStatus.initializing ||
+            clusteredMapProvider.status == datasource.ClusteringStatus.updating;
 
         if (!isLoading) {
           return const SizedBox.shrink();

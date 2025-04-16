@@ -2,13 +2,13 @@
 
 import 'package:dartz/dartz.dart';
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
+import 'package:rivr/features/map/presentation/providers/enhanced_clustered_map_provider.dart';
 
 import '../../../../core/error/exceptions.dart';
 import '../../../../core/error/failures.dart';
 import '../../../../core/network/network_info.dart';
 import '../../domain/entities/map_station.dart';
 import '../../domain/repositories/clustered_map_repository.dart';
-import '../datasources/clustered_map_datasource.dart';
 import '../datasources/map_station_local_datasource.dart';
 
 class ClusteredMapRepositoryImpl implements ClusteredMapRepository {

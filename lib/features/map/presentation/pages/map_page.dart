@@ -7,11 +7,12 @@ import 'package:provider/provider.dart';
 import '../../../../core/constants/map_constants.dart';
 import '../../../../core/network/connection_monitor.dart';
 import '../../../../core/widgets/empty_state.dart';
+import '../providers/clustered_map_provider.dart';
 import '../providers/map_provider.dart';
 import '../providers/station_provider.dart';
 import '../widgets/map_controls.dart';
 import '../widgets/map_search_bar.dart';
-import '../widgets/station_marker_manager.dart';
+import '../widgets/station_info_panel.dart';
 import '../widgets/station_list_drawer.dart';
 
 class MapPage extends StatefulWidget {
@@ -26,10 +27,9 @@ class MapPage extends StatefulWidget {
 
 class _MapPageState extends State<MapPage> with WidgetsBindingObserver {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
-  StationMarkerManager? _markerManager;
   Point? _initialCenter;
   bool _isMapCreated = false;
-  Key _mapKey = UniqueKey(); // Add a unique key for the map widget
+  Key _mapKey = UniqueKey(); // Unique key for the map widget
   bool _isResetting = false;
 
   @override
@@ -45,21 +45,6 @@ class _MapPageState extends State<MapPage> with WidgetsBindingObserver {
       _initialCenter = Point(coordinates: Position(widget.lon, widget.lat));
     }
     print("MAP PAGE: initState completed");
-  }
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-
-    // Initialize marker manager if not already created
-    if (_markerManager == null) {
-      final mapProvider = Provider.of<MapProvider>(context, listen: false);
-      final stationProvider = Provider.of<StationProvider>(
-        context,
-        listen: false,
-      );
-      _markerManager = StationMarkerManager(mapProvider, stationProvider);
-    }
   }
 
   @override
@@ -95,8 +80,17 @@ class _MapPageState extends State<MapPage> with WidgetsBindingObserver {
   // Clean up map resources
   void _cleanupMap() {
     final mapProvider = Provider.of<MapProvider>(context, listen: false);
+    final clusteredMapProvider = Provider.of<ClusteredMapProvider>(
+      context,
+      listen: false,
+    );
+
+    // Clean up clustering resources first
+    if (mapProvider.mapboxMap != null) {
+      clusteredMapProvider.cleanupClustering(mapProvider.mapboxMap!);
+    }
+
     mapProvider.disposeMap();
-    _markerManager = null;
     _isMapCreated = false;
   }
 
@@ -111,7 +105,7 @@ class _MapPageState extends State<MapPage> with WidgetsBindingObserver {
       _mapKey = UniqueKey(); // This will recreate the MapWidget
     });
 
-    Future.delayed(Duration(milliseconds: 500), () {
+    Future.delayed(const Duration(milliseconds: 500), () {
       _isResetting = false;
     });
   }
@@ -143,7 +137,18 @@ class _MapPageState extends State<MapPage> with WidgetsBindingObserver {
                         _buildLoadingIndicator(),
 
                         // Station info panel
-                        const StationInfoPanel(),
+                        Consumer<ClusteredMapProvider>(
+                          builder: (context, provider, child) {
+                            if (provider.selectedStation == null) {
+                              return const SizedBox.shrink();
+                            }
+
+                            return StationInfoPanel(
+                              station: provider.selectedStation!,
+                              onClose: () => provider.deselectStation(),
+                            );
+                          },
+                        ),
 
                         // Station list button (positioned at top-left)
                         Positioned(
@@ -260,9 +265,14 @@ class _MapPageState extends State<MapPage> with WidgetsBindingObserver {
   }
 
   Widget _buildLoadingIndicator() {
-    return Consumer<StationProvider>(
-      builder: (context, stationProvider, child) {
-        if (stationProvider.status != StationLoadingStatus.loading) {
+    return Consumer2<StationProvider, ClusteredMapProvider>(
+      builder: (context, stationProvider, clusteredMapProvider, child) {
+        final bool isLoading =
+            stationProvider.status == StationLoadingStatus.loading ||
+            clusteredMapProvider.status == ClusteringStatus.initializing ||
+            clusteredMapProvider.status == ClusteringStatus.updating;
+
+        if (!isLoading) {
           return const SizedBox.shrink();
         }
 
@@ -336,17 +346,31 @@ class _MapPageState extends State<MapPage> with WidgetsBindingObserver {
       context,
       listen: false,
     );
+    final clusteredMapProvider = Provider.of<ClusteredMapProvider>(
+      context,
+      listen: false,
+    );
 
     try {
       // Initialize map in the provider once
       mapProvider.onMapCreated(mapboxMap);
       print("MAP PAGE: Map initialization completed");
 
+      // Initialize clustering
+      clusteredMapProvider
+          .initialize(mapboxMap)
+          .then((_) => print("MAP PAGE: Clustering initialized"));
+
       // Load initial stations only after map is fully set up
       Future.delayed(const Duration(milliseconds: 500), () {
         if (mounted) {
-          stationProvider.loadSampleStations();
-          print("MAP PAGE: Initial stations loaded");
+          stationProvider.loadSampleStations().then((stations) {
+            // Update clustered map with the stations
+            if (stations.isNotEmpty) {
+              clusteredMapProvider.updateStations(mapboxMap, stations);
+            }
+            print("MAP PAGE: Initial stations loaded");
+          });
         }
       });
     } catch (e) {
@@ -354,21 +378,29 @@ class _MapPageState extends State<MapPage> with WidgetsBindingObserver {
     }
   }
 
-  // Implement the camera change handler
+  // Handle camera change events
   void _handleCameraChanged(CameraChangedEventData data) {
     final mapProvider = Provider.of<MapProvider>(context, listen: false);
     final stationProvider = Provider.of<StationProvider>(
       context,
       listen: false,
     );
+    final clusteredMapProvider = Provider.of<ClusteredMapProvider>(
+      context,
+      listen: false,
+    );
 
     // Debounce map movements
     mapProvider.triggerDebounceTimer(() {
-      _onMapMoved(mapProvider, stationProvider);
+      _onMapMoved(mapProvider, stationProvider, clusteredMapProvider);
     });
   }
 
-  void _onMapMoved(MapProvider mapProvider, StationProvider stationProvider) {
+  void _onMapMoved(
+    MapProvider mapProvider,
+    StationProvider stationProvider,
+    ClusteredMapProvider clusteredMapProvider,
+  ) {
     if (!mounted) return;
 
     mapProvider.updateVisibleRegion().then((_) {
@@ -377,13 +409,31 @@ class _MapPageState extends State<MapPage> with WidgetsBindingObserver {
       if (mapProvider.currentZoom >= MapConstants.minZoomForMarkers) {
         // Zoomed in enough to show detailed stations
         if (mapProvider.visibleRegion != null) {
-          stationProvider.loadStationsInRegion(mapProvider.visibleRegion!);
+          stationProvider.loadStationsInRegion(mapProvider.visibleRegion!).then(
+            (stations) {
+              // Update clustered map with the stations
+              if (stations.isNotEmpty && mapProvider.mapboxMap != null) {
+                clusteredMapProvider.updateStations(
+                  mapProvider.mapboxMap!,
+                  stations,
+                );
+              }
+            },
+          );
         }
       } else if (stationProvider.stations.isNotEmpty &&
           stationProvider.stations.length > 10) {
         // Zoomed out, show only sample stations
         stationProvider.clearStations();
-        stationProvider.loadSampleStations();
+        stationProvider.loadSampleStations().then((stations) {
+          // Update clustered map with the sample stations
+          if (stations.isNotEmpty && mapProvider.mapboxMap != null) {
+            clusteredMapProvider.updateStations(
+              mapProvider.mapboxMap!,
+              stations,
+            );
+          }
+        });
       }
     });
   }

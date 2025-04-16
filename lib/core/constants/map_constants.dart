@@ -5,7 +5,13 @@ import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
 
 class MapConstants {
   // Access token from environment file
-  static String get accessToken => dotenv.env['MAPBOX_ACCESS_TOKEN'] ?? '';
+  static String get accessToken {
+    final token = dotenv.env['MAPBOX_ACCESS_TOKEN'] ?? '';
+    if (token.isEmpty) {
+      print("WARNING: Mapbox token is empty! Check your .env files.");
+    }
+    return token;
+  }
 
   // Map styles
   static const String mapboxStreets = MapboxStyles.MAPBOX_STREETS;

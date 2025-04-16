@@ -139,7 +139,7 @@ class _MapPageState extends State<MapPage> {
         try {
           // Use a UniqueKey to ensure the MapWidget is recreated
           return MapWidget(
-            key: UniqueKey(),
+            key: const ValueKey('mapbox_map'),
             onMapCreated: _onMapCreated,
             cameraOptions: CameraOptions(
               center: _initialCenter ?? MapConstants.defaultCenter,
@@ -264,10 +264,9 @@ class _MapPageState extends State<MapPage> {
   }
 
   void _onMapCreated(MapboxMap mapboxMap) {
-    print(
-      "MAP PAGE: onMapCreated called, mapboxMap ${mapboxMap != null ? 'is not null' : 'is null'}",
-    );
+    print("MAP PAGE: onMapCreated called");
 
+    // Prevent multiple initializations
     if (_isMapCreated) {
       print("MAP PAGE: Map already created, skipping initialization");
       return;
@@ -275,6 +274,7 @@ class _MapPageState extends State<MapPage> {
 
     _isMapCreated = true;
 
+    // Get providers
     final mapProvider = Provider.of<MapProvider>(context, listen: false);
     final stationProvider = Provider.of<StationProvider>(
       context,
@@ -282,19 +282,15 @@ class _MapPageState extends State<MapPage> {
     );
 
     try {
-      // Initialize map in the provider
+      // Initialize map in the provider once
       mapProvider.onMapCreated(mapboxMap);
-      print("MAP PAGE: mapProvider.onMapCreated completed successfully");
+      print("MAP PAGE: Map initialization completed");
 
-      // Listen for station changes to update markers
-      stationProvider.addListener(() {
-        _updateMarkers(stationProvider.stations);
+      // Load initial stations only after map is fully set up
+      Future.delayed(const Duration(milliseconds: 500), () {
+        stationProvider.loadSampleStations();
+        print("MAP PAGE: Initial stations loaded");
       });
-      print("MAP PAGE: stationProvider listener added");
-
-      // Load initial sample stations
-      stationProvider.loadSampleStations();
-      print("MAP PAGE: stationProvider.loadSampleStations called");
     } catch (e) {
       print("MAP PAGE: Error in onMapCreated: $e");
     }

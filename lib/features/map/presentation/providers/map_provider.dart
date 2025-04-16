@@ -61,6 +61,13 @@ class MapProvider with ChangeNotifier {
   // Called when the map is created
   void onMapCreated(MapboxMap mapboxMap) {
     print("MAP PROVIDER: Map created, initializing map");
+
+    // If already initialized, don't reinitialize
+    if (_isMapInitialized) {
+      print("MAP PROVIDER: Map already initialized, skipping");
+      return;
+    }
+
     _mapboxMap = mapboxMap;
     _isMapInitialized = true;
 
@@ -70,13 +77,19 @@ class MapProvider with ChangeNotifier {
     // Create point annotation manager
     _createAnnotationManager();
 
-    // Enable 3D terrain if 3D mode is enabled
+    // Enable 3D terrain if 3D mode is enabled - with proper error handling
     if (_is3DMode) {
-      _enableTerrain();
+      _enableTerrain().catchError((e) {
+        print('Error enabling terrain: $e');
+        // Don't throw, just log the error
+      });
     }
 
     // Initial update of the visible region
-    updateVisibleRegion();
+    updateVisibleRegion().catchError((e) {
+      print('Error updating visible region: $e');
+      // Don't throw, just log the error
+    });
 
     print("MAP PROVIDER: Map initialization complete");
     notifyListeners();
@@ -111,32 +124,43 @@ class MapProvider with ChangeNotifier {
     if (_mapboxMap == null) return;
 
     try {
+      // Add a delay to ensure the style has loaded
+      await Future.delayed(const Duration(milliseconds: 500));
+
       var styleObj = _mapboxMap!.style;
 
       try {
         await styleObj.removeStyleSource('mapbox-dem');
+        print("MAP PROVIDER: Removed existing mapbox-dem source");
       } catch (e) {
         // Source might not exist yet, which is fine
+        print("MAP PROVIDER: No existing mapbox-dem source to remove: $e");
       }
 
       final demSource = '''{
-        "type": "raster-dem",
-        "url": "mapbox://mapbox.mapbox-terrain-dem-v1",
-        "tileSize": 512,
-        "maxzoom": 14.0
-      }''';
+      "type": "raster-dem",
+      "url": "mapbox://mapbox.mapbox-terrain-dem-v1",
+      "tileSize": 512,
+      "maxzoom": 14.0
+    }''';
 
-      await styleObj.addStyleSource('mapbox-dem', demSource);
+      try {
+        await styleObj.addStyleSource('mapbox-dem', demSource);
+        print("MAP PROVIDER: Added mapbox-dem source");
 
-      final terrain = '''{
+        final terrain = '''{
         "source": "mapbox-dem",
         "exaggeration": ${MapConstants.terrainExaggeration}
       }''';
 
-      await styleObj.setStyleTerrain(terrain);
+        await styleObj.setStyleTerrain(terrain);
+        print("MAP PROVIDER: 3D terrain enabled successfully");
+      } catch (e) {
+        print('MAP PROVIDER: Error setting terrain data: $e');
+      }
     } catch (e) {
-      print('Error setting up terrain: $e');
-      _setError('Failed to enable 3D terrain');
+      print('MAP PROVIDER: Error in _enableTerrain: $e');
+      // Don't throw, just log the error
     }
   }
 

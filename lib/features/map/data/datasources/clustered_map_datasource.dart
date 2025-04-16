@@ -47,120 +47,106 @@ class ClusteredMapDataSourceImpl implements ClusteredMapDataSource {
       // Check if source already exists and remove it if necessary
       await _safelyRemoveExistingLayers(style);
 
-      // Add the GeoJSON source with clustering enabled
-      final sourceProperties = '''
-        {
-          "type": "geojson",
-          "data": {"type": "FeatureCollection", "features": []},
-          "cluster": true,
-          "clusterMaxZoom": 14,
-          "clusterRadius": 50
-        }
-      ''';
+      // Create an empty GeoJSON feature collection
+      final emptyFeatureCollection = {
+        "type": "FeatureCollection",
+        "features": [],
+      };
 
-      await style.addSource(_sourceId, sourceProperties);
+      // Add the GeoJSON source with clustering enabled
+      final geoJsonSource = GeoJsonSource(
+        id: _sourceId,
+        data: json.encode(emptyFeatureCollection),
+        cluster: true,
+        clusterMaxZoom: 14,
+        clusterRadius: 50,
+      );
+
+      await style.addSource(geoJsonSource);
 
       // Add layer for clusters
-      final clusterLayerProperties = '''
-        {
-          "id": "$_clusterLayerId",
-          "type": "circle",
-          "source": "$_sourceId",
-          "filter": ["has", "point_count"],
-          "paint": {
-            "circle-color": [
-              "step",
-              ["get", "point_count"],
-              "#51bbd6",
-              20,
-              "#2389DA",
-              100,
-              "#f1f075",
-              750,
-              "#f28cb1"
-            ],
-            "circle-radius": [
-              "step",
-              ["get", "point_count"],
-              15,
-              20,
-              20,
-              100,
-              25,
-              750,
-              30
-            ],
-            "circle-stroke-width": 1,
-            "circle-stroke-color": "#ffffff"
-          }
-        }
-      ''';
+      final clusterLayer = CircleLayer(
+        id: _clusterLayerId,
+        sourceId: _sourceId,
+        filter: ["has", "point_count"],
+        circleColor: [
+          "step",
+          ["get", "point_count"],
+          "#51bbd6",
+          20,
+          "#2389DA",
+          100,
+          "#f1f075",
+          750,
+          "#f28cb1",
+        ],
+        circleRadius: [
+          "step",
+          ["get", "point_count"],
+          15,
+          20,
+          20,
+          100,
+          25,
+          750,
+          30,
+        ],
+        circleStrokeWidth: 1,
+        circleStrokeColor: "#ffffff",
+      );
 
-      await style.addLayer(clusterLayerProperties);
+      await style.addLayer(clusterLayer);
 
       // Add layer for cluster counts
-      final clusterCountLayerProperties = '''
-        {
-          "id": "$_clusterCountLayerId",
-          "type": "symbol",
-          "source": "$_sourceId",
-          "filter": ["has", "point_count"],
-          "layout": {
-            "text-field": "{point_count_abbreviated}",
-            "text-size": 12,
-            "text-font": ["Open Sans Bold"],
-            "text-allow-overlap": true
-          },
-          "paint": {
-            "text-color": "#ffffff"
-          }
-        }
-      ''';
+      final clusterCountLayer = SymbolLayer(
+        id: _clusterCountLayerId,
+        sourceId: _sourceId,
+        filter: ["has", "point_count"],
+        textField: "{point_count_abbreviated}",
+        textSize: 12,
+        textFont: ["Open Sans Bold"],
+        textAllowOverlap: true,
+        textColor: "#ffffff",
+      );
 
-      await style.addLayer(clusterCountLayerProperties);
+      await style.addLayer(clusterCountLayer);
 
       // Add layer for individual points
-      final pointLayerProperties = '''
-        {
-          "id": "$_unclusteredPointLayerId",
-          "type": "circle",
-          "source": "$_sourceId",
-          "filter": ["!", ["has", "point_count"]],
-          "paint": {
-            "circle-color": ["get", "color"],
-            "circle-radius": 8,
-            "circle-stroke-width": 1,
-            "circle-stroke-color": "#ffffff"
-          }
-        }
-      ''';
+      final pointLayer = CircleLayer(
+        id: _unclusteredPointLayerId,
+        sourceId: _sourceId,
+        filter: [
+          "!",
+          ["has", "point_count"],
+        ],
+        circleColor: ["get", "color"],
+        circleRadius: 8,
+        circleStrokeWidth: 1,
+        circleStrokeColor: "#ffffff",
+      );
 
-      await style.addLayer(pointLayerProperties);
+      await style.addLayer(pointLayer);
 
       // Add layer for individual point labels
-      final labelLayerProperties = '''
-        {
-          "id": "$_unclusteredLabelLayerId",
-          "type": "symbol",
-          "source": "$_sourceId",
-          "filter": ["!", ["has", "point_count"]],
-          "layout": {
-            "text-field": ["get", "name"],
-            "text-size": 11,
-            "text-offset": [0, 1.5],
-            "text-anchor": "top",
-            "text-allow-overlap": false,
-            "text-ignore-placement": false
-          },
-          "paint": {
-            "text-color": "#333333",
-            "text-halo-color": "#ffffff",
-            "text-halo-width": 1
-          }
-        }
-      ''';
+      final labelLayer = SymbolLayer(
+        id: _unclusteredLabelLayerId,
+        sourceId: _sourceId,
+        filter: [
+          "!",
+          ["has", "point_count"],
+        ],
+        textField: ["get", "name"],
+        textSize: 11,
+        textOffset: [0, 1.5],
+        textAnchor: TextAnchor.TOP,
+        textAllowOverlap: false,
+        textIgnorePlacement: false,
+        textColor: "#333333",
+        textHaloColor: "#ffffff",
+        textHaloWidth: 1,
+      );
 
-      await style.addLayer(labelLayerProperties);
+      await style.addLayer(labelLayer);
 
       _isInitialized = true;
     } catch (e) {
@@ -212,109 +198,88 @@ class ClusteredMapDataSourceImpl implements ClusteredMapDataSource {
 
     try {
       // Set up tap event handler
-      mapboxMap.onTapListener.add(
-        OnTapListener((point) async {
-          print('Map tapped at: ${point.x}, ${point.y}');
+      // Note: MapWidget has the onTapListener, not MapboxMap
+      mapboxMap.onMapTap = (coordinate) async {
+        print('Map tapped at: ${coordinate.x}, ${coordinate.y}');
 
-          // Convert screen point to map coordinate
-          final coordinate = mapboxMap.coordinateForPixel(
-            ScreenCoordinate(x: point.x, y: point.y),
+        // Convert screen point to map coordinate
+        var point = await mapboxMap.coordinateForPixel(
+          ScreenCoordinate(x: coordinate.x, y: coordinate.y),
+        );
+
+        // Create a small query rectangle around the tap point
+        final double tapBuffer = 10.0; // pixels
+
+        // Query for features within the rectangle
+        try {
+          final featureQueryOptions = RenderedQueryOptions(
+            layerIds: [_clusterLayerId, _unclusteredPointLayerId],
+            filter: null,
           );
 
-          // Create a small query rectangle around the tap point
-          final double tapBuffer = 10.0; // pixels
-          final topLeft = mapboxMap.coordinateForPixel(
-            ScreenCoordinate(x: point.x - tapBuffer, y: point.y - tapBuffer),
-          );
-          final bottomRight = mapboxMap.coordinateForPixel(
-            ScreenCoordinate(x: point.x + tapBuffer, y: point.y + tapBuffer),
+          // Create a query geometry from the screen coordinate
+          final queryGeometry = RenderedQueryGeometry.fromScreenCoordinate(
+            ScreenCoordinate(x: coordinate.x, y: coordinate.y),
           );
 
-          // Query for features within the rectangle
-          try {
-            final featureQueryOptions = RenderedQueryOptions(
-              layerIds: [_clusterLayerId, _unclusteredPointLayerId],
-              filter: null,
-            );
+          final features = await mapboxMap.queryRenderedFeatures(
+            queryGeometry,
+            featureQueryOptions,
+          );
 
-            // Create a query geometry from the screen rectangle
-            final queryGeometry = RenderedQueryGeometry.fromScreenBox(
-              min: ScreenBox(
-                min: ScreenCoordinate(
-                  x: point.x - tapBuffer,
-                  y: point.y - tapBuffer,
-                ),
-                max: ScreenCoordinate(
-                  x: point.x + tapBuffer,
-                  y: point.y + tapBuffer,
-                ),
-              ),
-            );
+          if (features.isNotEmpty) {
+            final feature = features.first!;
 
-            final features = await mapboxMap.queryRenderedFeatures(
-              queryGeometry,
-              featureQueryOptions,
-            );
+            // Check if it's a cluster
+            final properties = feature.feature.properties;
+            if (properties != null &&
+                properties.containsKey('cluster') &&
+                properties['cluster'] == true) {
+              // Handle cluster tap
+              print('Cluster tapped: ${properties['point_count']} points');
 
-            if (features.isNotEmpty) {
-              final feature = features.first;
+              // Create a mapbox Point from the tap coordinates
+              final clusterPoint = Point(
+                coordinates: Position(point.longitude, point.latitude),
+              );
 
-              // Check if it's a cluster
-              final properties = feature.feature.properties;
-              if (properties != null &&
-                  properties.containsKey('cluster') &&
-                  properties['cluster'] == true) {
-                // Handle cluster tap
-                print('Cluster tapped: ${properties['point_count']} points');
+              // Use the current stations list to find stations in this area
+              final List<MapStation> stationsParam = stations ?? [];
+              final clusteredStations = _getApproximateClusterStations(
+                stationsParam,
+                point.latitude,
+                point.longitude,
+                // Use cluster radius as a reference for finding stations
+                50.0 / (await mapboxMap.getCameraState()).zoom,
+              );
 
-                // For getting stations in the cluster, we'll need to use a different approach
-                // Since Mapbox Maps Flutter doesn't directly expose cluster expansion,
-                // we'll use a zoom-in approach or query the source data
-
-                // Create a mapbox Point from the tap coordinates
-                final clusterPoint = Point(
-                  coordinates: Position(
-                    coordinate.longitude,
-                    coordinate.latitude,
-                  ),
-                );
-
-                // Use the current stations list to find stations in this area
-                // This is a simplified approach - for a real implementation,
-                // you may want to filter based on distance or use Mapbox's GeoJSON query
-                final clusteredStations = _getApproximateClusterStations(
-                  stations,
-                  coordinate.latitude,
-                  coordinate.longitude,
-                  // Use cluster radius as a reference for finding stations
-                  50.0 / mapboxMap.cameraState.zoom,
-                );
-
-                if (clusteredStations.isNotEmpty) {
-                  onClusterTapped(clusterPoint, clusteredStations);
-                }
-              } else {
-                // Handle individual station tap
-                final stationId = properties?['id'];
-                if (stationId != null) {
-                  // Find the station in our list
-                  final stationData = stations.firstWhere(
+              if (clusteredStations.isNotEmpty) {
+                onClusterTapped(clusterPoint, clusteredStations);
+              }
+            } else {
+              // Handle individual station tap
+              final stationId = properties?['id'];
+              if (stationId != null) {
+                final List<MapStation> stationsParam = stations ?? [];
+                // Find the station in our list
+                try {
+                  final stationData = stationsParam.firstWhere(
                     (station) =>
                         station.stationId.toString() == stationId.toString(),
-                    orElse: () => stations.first, // Fallback
                   );
-
                   onStationTapped(stationData);
+                } catch (e) {
+                  print('Station not found: $e');
                 }
               }
             }
-          } catch (e) {
-            print('Error querying features: $e');
           }
+        } catch (e) {
+          print('Error querying features: $e');
+        }
 
-          return true;
-        }),
-      );
+        return true;
+      };
     } catch (e) {
       print('Error setting up tap handling: $e');
     }

@@ -1,7 +1,6 @@
 // lib/features/map/data/models/geojson_models.dart
 
 import 'dart:convert';
-import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
 import '../../domain/entities/map_station.dart';
 
 /// A Dart representation of a GeoJSON Feature

@@ -3,7 +3,6 @@
 import 'package:flutter/material.dart';
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
 import 'package:provider/provider.dart';
-import 'package:rivr/features/map/domain/entities/map_station.dart';
 
 import '../../../../core/constants/map_constants.dart';
 import '../../../../core/network/connection_monitor.dart';
@@ -133,9 +132,6 @@ class _MapPageState extends State<MapPage> with WidgetsBindingObserver {
             SafeArea(
               child: Column(
                 children: [
-                  // Search Bar - At the top
-                  const MapSearchBar(),
-
                   // Map Content - Takes remaining space
                   Expanded(
                     child: Stack(
@@ -167,6 +163,10 @@ class _MapPageState extends State<MapPage> with WidgetsBindingObserver {
                       ],
                     ),
                   ),
+
+                  // Search Bar - Now at the bottom
+                  const MapSearchBar(),
+                  const SizedBox(height: 30),
                 ],
               ),
             ),
@@ -386,11 +386,5 @@ class _MapPageState extends State<MapPage> with WidgetsBindingObserver {
         stationProvider.loadSampleStations();
       }
     });
-  }
-
-  void _updateMarkers(List<MapStation> stations) {
-    if (_markerManager != null && mounted) {
-      _markerManager!.addStationMarkers(stations);
-    }
   }
 }

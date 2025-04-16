@@ -15,6 +15,8 @@ class LiveValidationField extends StatefulWidget {
   final Duration debounceTime;
   final FocusNode? focusNode;
   final bool validateOnChange;
+  final bool isValid;
+  final bool isTouched;
 
   const LiveValidationField({
     super.key,
@@ -29,6 +31,8 @@ class LiveValidationField extends StatefulWidget {
     this.debounceTime = const Duration(milliseconds: 500),
     this.focusNode,
     this.validateOnChange = true,
+    this.isValid = false,
+    this.isTouched = false,
   });
 
   @override
@@ -150,7 +154,23 @@ class _LiveValidationFieldState extends State<LiveValidationField> {
               filled: true,
               prefixIcon:
                   widget.prefixIcon != null ? Icon(widget.prefixIcon) : null,
-              suffixIcon: widget.suffixIcon,
+              suffixIcon:
+                  widget.suffixIcon ??
+                  (widget.isTouched
+                      ? AnimatedSwitcher(
+                        duration: const Duration(milliseconds: 300),
+                        transitionBuilder:
+                            (child, animation) =>
+                                ScaleTransition(scale: animation, child: child),
+                        child: Icon(
+                          widget.isValid ? Icons.check_circle : Icons.cancel,
+                          key: ValueKey<bool>(widget.isValid),
+                          color: widget.isValid ? Colors.green : Colors.red,
+                          size: 20,
+                        ),
+                      )
+                      : null),
+
               errorText: _isDirty ? _errorText : null,
             ),
             validator: widget.validator,

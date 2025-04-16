@@ -376,6 +376,8 @@ class RegisterPageState extends State<RegisterPage>
                     prefixIcon: Icons.person,
                     validator: _validateName,
                     focusNode: _firstNameFocusNode,
+                    isValid: _isFirstNameValid,
+                    isTouched: _firstNameTouched,
                     onChanged: (value) {
                       setState(() {
                         _firstNameTouched = true;
@@ -390,6 +392,8 @@ class RegisterPageState extends State<RegisterPage>
                     prefixIcon: Icons.person,
                     validator: _validateName,
                     focusNode: _lastNameFocusNode,
+                    isValid: _isLastNameValid,
+                    isTouched: _lastNameTouched,
                     onChanged: (value) {
                       setState(() {
                         _lastNameTouched = true;
@@ -441,6 +445,8 @@ class RegisterPageState extends State<RegisterPage>
                     prefixIcon: Icons.email,
                     validator: _validateEmail,
                     focusNode: _emailFocusNode,
+                    isValid: _isEmailValid,
+                    isTouched: _emailTouched,
                     onChanged: (value) {
                       setState(() {
                         _emailTouched = true;
@@ -462,6 +468,8 @@ class RegisterPageState extends State<RegisterPage>
                     prefixIcon: Icons.lock,
                     validator: _validatePassword,
                     focusNode: _passwordFocusNode,
+                    isValid: _isPasswordValid,
+                    isTouched: _passwordTouched,
                     suffixIcon: IconButton(
                       icon: Icon(
                         _obscureText ? Icons.visibility : Icons.visibility_off,
@@ -517,6 +525,8 @@ class RegisterPageState extends State<RegisterPage>
                     prefixIcon: Icons.lock_clock,
                     validator: _validateConfirmPassword,
                     focusNode: _confirmPasswordFocusNode,
+                    isValid: _isConfirmPasswordValid,
+                    isTouched: _confirmPasswordTouched,
                     suffixIcon: IconButton(
                       icon: Icon(
                         _obscureConfirmText

@@ -29,9 +29,6 @@ import 'package:rivr/features/forecast/domain/usecases/get_return_periods.dart';
 import 'package:rivr/features/forecast/presentation/providers/forecast_provider.dart';
 import 'package:rivr/features/forecast/presentation/providers/return_period_provider.dart';
 import 'package:rivr/features/favorites/presentation/providers/favorites_provider.dart';
-import 'package:rivr/features/map/presentation/providers/map_provider.dart';
-import 'package:rivr/features/map/domain/repositories/map_station_repository.dart';
-import 'package:rivr/features/map/data/repositories_impl/map_stations_repository_impl.dart';
 import 'package:rivr/features/auth/data/datasources/biometric_auth_service.dart';
 
 final sl = GetIt.instance;
@@ -53,7 +50,6 @@ Future<void> setupServiceLocator() async {
   // Register feature-specific dependencies
   _registerAuthDependencies();
   _registerFavoritesDependencies();
-  _registerMapDependencies();
   registerForecastDependencies(sl); // Forecast dependencies
   registerMapDependencies(sl); // Register map dependencies
   _registerProviders(); // Register all providers
@@ -95,13 +91,6 @@ void _registerAuthDependencies() {
   sl.registerLazySingleton(() => SendPasswordResetEmail(sl()));
   sl.registerLazySingleton(() => SignOut(sl()));
   sl.registerLazySingleton(() => UpdateUserProfile(sl()));
-}
-
-void _registerMapDependencies() {
-  // Keep this for backward compatibility, but the main Map dependencies are now in map_di.dart
-  sl.registerLazySingleton<MapStationRepository>(
-    () => MapStationsRepositoryImpl(localDataSource: sl()),
-  );
 }
 
 // Register all providers

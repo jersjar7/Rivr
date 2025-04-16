@@ -1,5 +1,8 @@
+// lib/core/error/failures.dart
+
 abstract class Failure {
   final String message;
+
   Failure({required this.message});
 }
 
@@ -17,4 +20,12 @@ class AuthFailure extends Failure {
 
 class NetworkFailure extends Failure {
   NetworkFailure({required super.message});
+}
+
+class LocationFailure extends Failure {
+  LocationFailure({required super.message});
+}
+
+class DatabaseFailure extends Failure {
+  DatabaseFailure({required super.message});
 }

@@ -53,6 +53,8 @@ dependencies:
   local_auth: ^2.3.0
   shared_preferences: ^2.5.3
   lottie: ^3.3.1
+  mapbox_maps_flutter: ^2.7.0
+  flutter_svg: ^2.0.17
 
 dev_dependencies:
   flutter_test:
@@ -80,6 +82,8 @@ flutter:
   assets:
     - assets/img/
     - assets/animations/
+    - assets/databases/  # Added for map station database
+    - assets/map_previews/  # Added for map style previews
     - .env.development
     - .env.production
 

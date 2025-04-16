@@ -17,3 +17,15 @@ class NetworkException implements Exception {
   final String message;
   NetworkException({required this.message});
 }
+
+class LocationException implements Exception {
+  final String message;
+
+  LocationException({required this.message});
+}
+
+class DatabaseException implements Exception {
+  final String message;
+
+  DatabaseException({required this.message});
+}

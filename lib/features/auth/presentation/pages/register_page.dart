@@ -649,8 +649,6 @@ class RegisterPageState extends State<RegisterPage>
         return '😐';
       case PasswordStrength.strong:
         return '😀';
-      default:
-        return '⚪';
     }
   }
 

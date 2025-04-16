@@ -1,15 +1,19 @@
 // lib/features/map/presentation/pages/map_page.dart
 
 import 'package:flutter/material.dart';
-import 'package:flutter_map/flutter_map.dart';
-import 'package:latlong2/latlong.dart';
+import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
 import 'package:provider/provider.dart';
-import 'package:rivr/core/network/connection_monitor.dart';
-import 'package:rivr/core/widgets/empty_state.dart';
-import 'package:rivr/core/widgets/loading_indicator.dart';
-import 'package:rivr/features/map/presentation/providers/map_provider.dart';
-import 'package:rivr/features/map/presentation/widgets/enhanced_info_bubble_widget.dart';
-import 'package:rivr/features/map/presentation/widgets/enhanced_map_controls.dart';
+import 'package:rivr/features/map/domain/entities/map_station.dart';
+
+import '../../../../core/constants/map_constants.dart';
+import '../../../../core/network/connection_monitor.dart';
+import '../../../../core/widgets/empty_state.dart';
+import '../providers/map_provider.dart';
+import '../providers/station_provider.dart';
+import '../widgets/map_controls.dart';
+import '../widgets/map_search_bar.dart';
+import '../widgets/station_marker_manager.dart';
+import '../widgets/station_list_drawer.dart';
 
 class MapPage extends StatefulWidget {
   final double lat;
@@ -22,280 +26,258 @@ class MapPage extends StatefulWidget {
 }
 
 class _MapPageState extends State<MapPage> {
-  final MapController _mapController = MapController();
-  LatLng? _selectedMarkerPosition;
-  LatLng? _currentPosition;
-  bool _isLoading = false;
-  String? _errorMessage;
-  String _currentBaseMap = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
-  bool _satelliteMode = false;
-  int? _selectedStationId;
-  String? _selectedStationName;
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
+  StationMarkerManager? _markerManager;
+  Point? _initialCenter;
 
   @override
   void initState() {
     super.initState();
-    // Initialize with provided coordinates or default
-    _currentPosition = LatLng(
-      widget.lat != 0.0 ? widget.lat : 40.7128,
-      widget.lon != 0.0 ? widget.lon : -74.0060,
-    );
 
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _loadStations();
-    });
+    // Initialize center point from given coordinates or default
+    if (widget.lat != 0.0 && widget.lon != 0.0) {
+      _initialCenter = Point(coordinates: Position(widget.lon, widget.lat));
+    }
   }
 
   @override
-  void dispose() {
-    _mapController.dispose();
-    super.dispose();
-  }
+  void didChangeDependencies() {
+    super.didChangeDependencies();
 
-  Future<void> _loadStations() async {
-    if (!mounted) return;
-
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
-
-    try {
+    // Initialize marker manager if not already created
+    if (_markerManager == null) {
       final mapProvider = Provider.of<MapProvider>(context, listen: false);
-
-      final bounds = _mapController.camera.visibleBounds;
-
-      await mapProvider.loadStationsInBounds(
-        bounds.south,
-        bounds.north,
-        bounds.west,
-        bounds.east,
-        _selectedMarkerPosition,
+      final stationProvider = Provider.of<StationProvider>(
+        context,
+        listen: false,
       );
-
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-          _errorMessage = 'Failed to load stations: ${e.toString()}';
-        });
-      }
+      _markerManager = StationMarkerManager(mapProvider, stationProvider);
     }
-  }
-
-  void _onMapEvent(MapEvent event) {
-    if (event is MapEventMoveEnd) {
-      // Load new stations when the map is moved
-      _loadStations();
-    }
-  }
-
-  void _onMarkerTapped(LatLng position, int stationId, String stationName) {
-    setState(() {
-      _selectedMarkerPosition = position;
-      _selectedStationId = stationId;
-      _selectedStationName = stationName;
-    });
-  }
-
-  void _dismissInfoBubble() {
-    setState(() {
-      _selectedMarkerPosition = null;
-      _selectedStationId = null;
-      _selectedStationName = null;
-    });
-  }
-
-  void _onAddToFavorites(int stationId) {
-    // Implement favorite adding logic
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Added to favorites'),
-        duration: Duration(seconds: 2),
-      ),
-    );
-  }
-
-  void _onGetForecast(int stationId) {
-    Navigator.of(context).pushNamed(
-      '/forecast',
-      arguments: {
-        'reachId': stationId.toString(),
-        'stationName': _selectedStationName ?? 'Station $stationId',
-      },
-    );
-  }
-
-  void _onBaseMapChanged(String urlTemplate) {
-    setState(() {
-      _currentBaseMap = urlTemplate;
-    });
-  }
-
-  void _onLayerToggle(bool value) {
-    setState(() {
-      _satelliteMode = value;
-    });
   }
 
   @override
   Widget build(BuildContext context) {
-    return ConnectionAwareWidget(
-      offlineBuilder:
-          (context, status) => Scaffold(
-            appBar: AppBar(title: const Text('Map')),
-            body: Column(
-              children: [
-                const ConnectionStatusBanner(),
-                Expanded(
-                  child: NetworkErrorView(
-                    onRetry: _loadStations,
-                    isPermanentlyOffline: status.isConnected == false,
+    return Scaffold(
+      key: _scaffoldKey,
+      drawer: const StationListDrawer(),
+      body: ConnectionAwareWidget(
+        offlineBuilder: (context, status) => _buildOfflineView(),
+        child: Stack(
+          children: [
+            // Mapbox Map
+            _buildMap(),
+
+            // UI Elements
+            SafeArea(
+              child: Column(
+                children: [
+                  // Search Bar - At the top
+                  const MapSearchBar(),
+
+                  // Map Content - Takes remaining space
+                  Expanded(
+                    child: Stack(
+                      children: [
+                        // Zoom message overlay
+                        _buildZoomMessage(),
+
+                        // Loading indicator
+                        _buildLoadingIndicator(),
+
+                        // Station info panel
+                        const StationInfoPanel(),
+
+                        // Station list button (positioned at top-left)
+                        Positioned(
+                          top: 16,
+                          left: 16,
+                          child: FloatingActionButton(
+                            heroTag: 'stationListBtn',
+                            onPressed: () {
+                              _scaffoldKey.currentState?.openDrawer();
+                            },
+                            backgroundColor: Colors.white,
+                            foregroundColor: Theme.of(context).primaryColor,
+                            tooltip: 'Show station list',
+                            child: const Icon(Icons.list),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-      child: Scaffold(
-        appBar: AppBar(title: const Text('Map')),
-        body: _buildMapContent(),
+
+            // Map Controls overlay
+            const MapControls(),
+          ],
+        ),
       ),
     );
   }
 
-  Widget _buildMapContent() {
+  Widget _buildMap() {
     return Consumer<MapProvider>(
       builder: (context, mapProvider, child) {
-        final markers = mapProvider.markers;
-
-        if (_errorMessage != null) {
-          return ErrorStateView(
-            message: _errorMessage!,
-            onRetry: _loadStations,
-          );
-        }
-
-        // If no markers found after loading, show empty state
-        if (!_isLoading && markers.isEmpty) {
-          return _buildEmptyStationsView();
-        }
-
-        return Stack(
-          children: [
-            FlutterMap(
-              mapController: _mapController,
-              options: MapOptions(
-                initialCenter: _currentPosition!,
-                initialZoom: 10.0,
-                onMapEvent: _onMapEvent,
-              ),
-              children: [
-                TileLayer(
-                  urlTemplate: _currentBaseMap,
-                  subdomains: const ['a', 'b', 'c'],
-                ),
-                if (_satelliteMode)
-                  TileLayer(
-                    urlTemplate:
-                        'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-                    // opacity: 0.7,
-                  ),
-                MarkerLayer(
-                  markers:
-                      markers.map((marker) {
-                        // Extract station info from marker data
-                        // This would be properly implemented based on your marker data structure
-                        final stationId =
-                            12345; // Replace with actual station ID extraction
-                        final stationName =
-                            'Example Station'; // Replace with actual station name extraction
-
-                        return Marker(
-                          width: 40.0,
-                          height: 40.0,
-                          point: marker.point,
-                          child: GestureDetector(
-                            onTap:
-                                () => _onMarkerTapped(
-                                  marker.point,
-                                  stationId,
-                                  stationName,
-                                ),
-                            child: const Icon(
-                              Icons.water_drop,
-                              color: Colors.blue,
-                              size: 30,
-                            ),
-                          ),
-                        );
-                      }).toList(),
-                ),
-              ],
-            ),
-
-            // Map controls
-            EnhancedMapControls(
-              mapController: _mapController,
-              currentLocation: _currentPosition,
-              onLayerToggle: _onLayerToggle,
-              onBaseMapChanged: _onBaseMapChanged,
-              currentBaseMap: _currentBaseMap,
-              satelliteMode: _satelliteMode,
-            ),
-
-            // Loading indicator
-            if (_isLoading)
-              const Positioned(
-                top: 70,
-                left: 0,
-                right: 0,
-                child: Center(
-                  child: LoadingIndicator(
-                    message: 'Loading stations...',
-                    withBackground: true,
-                    size: 30,
-                  ),
-                ),
-              ),
-
-            // Info bubble for selected station
-            if (_selectedMarkerPosition != null && _selectedStationId != null)
-              Positioned(
-                bottom: 20,
-                left: 20,
-                right: 20,
-                child: EnhancedInfoBubble(
-                  stationId: _selectedStationId!,
-                  stationName: _selectedStationName ?? 'River Station',
-                  latitude: _selectedMarkerPosition!.latitude,
-                  longitude: _selectedMarkerPosition!.longitude,
-                  onAddToFavorites: _onAddToFavorites,
-                  onGetForecast: _onGetForecast,
-                  onDismiss: _dismissInfoBubble,
-                ),
-              ),
-          ],
+        return MapWidget(
+          key: const ValueKey('mapWidget'),
+          onMapCreated: _onMapCreated,
+          cameraOptions: CameraOptions(
+            center: _initialCenter ?? MapConstants.defaultCenter,
+            zoom: MapConstants.defaultZoom,
+            pitch: mapProvider.is3DMode ? MapConstants.defaultTilt : 0.0,
+            bearing: 0,
+          ),
+          styleUri: mapProvider.currentStyle,
+          // Add this parameter for camera change events
+          onCameraChangeListener: _handleCameraChanged,
         );
       },
     );
   }
 
-  // Add an empty state widget for when no stations are found
-  Widget _buildEmptyStationsView() {
-    return NoStationsFoundView(
-      onChangeLocation: () {
-        // Reset to a default location
-        _mapController.move(
-          LatLng(40.7128, -74.0060), // New York City
-          8.0,
+  Widget _buildZoomMessage() {
+    return Consumer<MapProvider>(
+      builder: (context, mapProvider, child) {
+        if (!mapProvider.showZoomMessage) {
+          return const SizedBox.shrink();
+        }
+
+        return Positioned(
+          bottom: 150,
+          left: 0,
+          right: 0,
+          child: Center(
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              decoration: BoxDecoration(
+                color: Colors.black54,
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: const Text(
+                'Zoom in to see stations',
+                style: TextStyle(color: Colors.white),
+              ),
+            ),
+          ),
         );
-        _loadStations();
       },
     );
+  }
+
+  Widget _buildLoadingIndicator() {
+    return Consumer<StationProvider>(
+      builder: (context, stationProvider, child) {
+        if (stationProvider.status != StationLoadingStatus.loading) {
+          return const SizedBox.shrink();
+        }
+
+        return Positioned(
+          bottom: 100,
+          left: 0,
+          right: 0,
+          child: Center(
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.1),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: const [
+                  SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                  SizedBox(width: 8),
+                  Text('Loading stations...'),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildOfflineView() {
+    return Scaffold(
+      body: Center(
+        child: NetworkErrorView(
+          onRetry: () {
+            final connectionMonitor = Provider.of<ConnectionMonitor>(
+              context,
+              listen: false,
+            );
+            connectionMonitor.resetOfflineStatus();
+          },
+        ),
+      ),
+    );
+  }
+
+  void _onMapCreated(MapboxMap mapboxMap) {
+    final mapProvider = Provider.of<MapProvider>(context, listen: false);
+    final stationProvider = Provider.of<StationProvider>(
+      context,
+      listen: false,
+    );
+
+    // Initialize map in the provider
+    mapProvider.onMapCreated(mapboxMap);
+
+    // Listen for station changes to update markers
+    stationProvider.addListener(() {
+      _updateMarkers(stationProvider.stations);
+    });
+
+    // Load initial sample stations
+    stationProvider.loadSampleStations();
+  }
+
+  // Implement the camera change handler
+  void _handleCameraChanged(CameraChangedEventData data) {
+    final mapProvider = Provider.of<MapProvider>(context, listen: false);
+    final stationProvider = Provider.of<StationProvider>(
+      context,
+      listen: false,
+    );
+
+    // Debounce map movements
+    mapProvider.triggerDebounceTimer(() {
+      _onMapMoved(mapProvider, stationProvider);
+    });
+  }
+
+  void _onMapMoved(MapProvider mapProvider, StationProvider stationProvider) {
+    mapProvider.updateVisibleRegion().then((_) {
+      if (mapProvider.currentZoom >= MapConstants.minZoomForMarkers) {
+        // Zoomed in enough to show detailed stations
+        if (mapProvider.visibleRegion != null) {
+          stationProvider.loadStationsInRegion(mapProvider.visibleRegion!);
+        }
+      } else if (stationProvider.stations.isNotEmpty &&
+          stationProvider.stations.length > 10) {
+        // Zoomed out, show only sample stations
+        stationProvider.clearStations();
+        stationProvider.loadSampleStations();
+      }
+    });
+  }
+
+  void _updateMarkers(List<MapStation> stations) {
+    if (_markerManager != null) {
+      _markerManager!.addStationMarkers(stations);
+    }
   }
 }

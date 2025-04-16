@@ -1,4 +1,5 @@
 // lib/core/di/service_locator.dart
+
 import 'package:get_it/get_it.dart';
 import 'package:firebase_auth/firebase_auth.dart'
     hide AuthProvider; // Hide Firebase's AuthProvider
@@ -6,6 +7,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:http/http.dart' as http;
 import 'package:rivr/common/data/local/database_helper.dart';
 import 'package:rivr/core/di/forecast_di.dart';
+import 'package:rivr/core/di/map_di.dart'; // Add this import
 import 'package:rivr/core/network/network_info.dart';
 import 'package:rivr/core/storage/app_database.dart';
 import 'package:rivr/core/storage/secure_storage.dart';
@@ -28,7 +30,7 @@ import 'package:rivr/features/forecast/presentation/providers/forecast_provider.
 import 'package:rivr/features/forecast/presentation/providers/return_period_provider.dart';
 import 'package:rivr/features/favorites/presentation/providers/favorites_provider.dart';
 import 'package:rivr/features/map/presentation/providers/map_provider.dart';
-import 'package:rivr/features/map/domain/repositories/map_stations_repository.dart';
+import 'package:rivr/features/map/domain/repositories/map_station_repository.dart';
 import 'package:rivr/features/map/data/repositories_impl/map_stations_repository_impl.dart';
 import 'package:rivr/features/auth/data/datasources/biometric_auth_service.dart';
 
@@ -53,6 +55,7 @@ Future<void> setupServiceLocator() async {
   _registerFavoritesDependencies();
   _registerMapDependencies();
   registerForecastDependencies(sl); // Forecast dependencies
+  registerMapDependencies(sl); // Register map dependencies
   _registerProviders(); // Register all providers
 
   // Biometric Authentication
@@ -95,9 +98,9 @@ void _registerAuthDependencies() {
 }
 
 void _registerMapDependencies() {
-  // Repositories
-  sl.registerLazySingleton<MapStationsRepository>(
-    () => MapStationsRepositoryImpl(databaseHelper: sl()),
+  // Keep this for backward compatibility, but the main Map dependencies are now in map_di.dart
+  sl.registerLazySingleton<MapStationRepository>(
+    () => MapStationsRepositoryImpl(localDataSource: sl()),
   );
 }
 
@@ -120,10 +123,7 @@ void _registerProviders() {
   // Favorites provider
   sl.registerFactory(() => FavoritesProvider());
 
-  // Map provider
-  sl.registerFactory(
-    () => MapProvider(repository: sl<MapStationsRepository>()),
-  );
+  // Map provider - moved to map_di.dart
 
   // Return period provider
   sl.registerFactory(

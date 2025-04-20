@@ -2,7 +2,7 @@
 
 import 'dart:convert';
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
-import '../../presentation/providers/enhanced_clustered_map_provider.dart';
+import 'clustered_map_datasource.dart'; // Updated import
 import '../../domain/entities/map_station.dart';
 
 class ClusteredMapDataSourceImpl implements ClusteredMapDataSource {

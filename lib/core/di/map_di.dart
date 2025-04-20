@@ -3,6 +3,7 @@
 import 'package:get_it/get_it.dart';
 import 'package:http/http.dart' as http;
 
+import '../../features/map/data/datasources/clustered_map_datasource.dart'; // Added this import
 import '../../features/map/data/datasources/clustered_map_datasource_impl.dart';
 import '../../features/map/data/datasources/map_station_local_datasource.dart';
 import '../../features/map/data/datasources/mapbox_remote_datasource.dart';
@@ -100,9 +101,9 @@ void registerMapDependencies(GetIt sl) {
     ),
   );
 
-  // Clustered map provider - Changed from EnhancedClusteredMapProvider to ClusteredMapProvider
+  // Register only the EnhancedClusteredMapProvider
   sl.registerFactory(
-    () => ClusteredMapProvider(
+    () => EnhancedClusteredMapProvider(
       initializeClustering: sl<InitializeClustering>(),
       updateClusterData: sl<UpdateClusterData>(),
       setupClusterTapHandling: sl<SetupClusterTapHandling>(),

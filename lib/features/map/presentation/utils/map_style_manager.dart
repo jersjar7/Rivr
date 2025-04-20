@@ -3,7 +3,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
-import 'package:rivr/features/map/data/datasources/enhanced_clustered_map_datasource.dart';
+import '../providers/enhanced_clustered_map_provider.dart'; // Updated import
 import '../../../../core/constants/map_constants.dart';
 
 /// Class to handle Mapbox style changes and related operations
@@ -12,7 +12,7 @@ class MapStyleManager {
   final MapboxMap mapboxMap;
 
   /// The clustered map provider to notify about style changes
-  final EnhancedClusteredMapProvider clusterProvider;
+  final EnhancedClusteredMapProvider clusterProvider; // Updated type
 
   /// The current map style
   String _currentStyle;
@@ -24,7 +24,7 @@ class MapStyleManager {
   /// Constructor
   MapStyleManager({
     required this.mapboxMap,
-    required this.clusterProvider,
+    required this.clusterProvider, // Updated parameter type
     String initialStyle = MapConstants.defaultMapStyle,
   }) : _currentStyle = initialStyle {
     // We don't need to set up a separate listener as the MapWidget already has

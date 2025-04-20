@@ -396,32 +396,87 @@ class _OptimizedMapPageState extends State<OptimizedMapPage>
         initialStyle: mapProvider.currentStyle,
       );
 
-      // Initialize 3D terrain if needed
-      if (_is3DMode) {
-        _styleManager!.enable3DTerrain(
-          exaggeration: MapConstants.terrainExaggeration,
-        );
-      }
+      // Load map resources first
+      _loadMapResources().then((_) {
+        // Initialize 3D terrain if needed
+        if (_is3DMode) {
+          _styleManager!.enable3DTerrain(
+            exaggeration: MapConstants.terrainExaggeration,
+          );
+        }
 
-      print("OPTIMIZED MAP: Map initialization completed");
+        print("OPTIMIZED MAP: Map initialization completed");
 
-      // Initialize clustering with better error handling
-      clusteredMapProvider.initialize(mapboxMap).then((success) {
-        if (success) {
-          print("OPTIMIZED MAP: Clustering initialized successfully");
+        // Wait for a moment to ensure style is fully loaded
+        Future.delayed(const Duration(milliseconds: 500), () {
+          // Initialize clustering with better error handling
+          clusteredMapProvider.initialize(mapboxMap).then((success) {
+            if (success) {
+              print("OPTIMIZED MAP: Clustering initialized successfully");
 
-          // Load initial stations after map is fully set up
-          Future.delayed(const Duration(milliseconds: 500), () {
-            if (mounted) {
+              // Load initial stations right away
               _loadInitialStations(stationProvider, clusteredMapProvider);
+            } else {
+              print("OPTIMIZED MAP: Clustering initialization failed");
+              // Retry once after a delay
+              Future.delayed(const Duration(seconds: 1), () {
+                print("OPTIMIZED MAP: Retrying clustering initialization");
+                clusteredMapProvider.initialize(mapboxMap).then((retrySuccess) {
+                  if (retrySuccess) {
+                    print("OPTIMIZED MAP: Retry successful, loading stations");
+                    _loadInitialStations(stationProvider, clusteredMapProvider);
+                  } else {
+                    print(
+                      "OPTIMIZED MAP: Retry failed, falling back to regular markers",
+                    );
+                    // Could implement a fallback here
+                  }
+                });
+              });
             }
           });
-        } else {
-          print("OPTIMIZED MAP: Clustering initialization failed");
-        }
+        });
       });
     } catch (e) {
       print("OPTIMIZED MAP: Error in onMapCreated: $e");
+    }
+  }
+
+  // Add this new method to load map resources
+  Future<void> _loadMapResources() async {
+    try {
+      // Preload marker images for better display
+      final defaultMarkerData = await rootBundle.load(
+        'assets/img/marker_default.png',
+      );
+      final selectedMarkerData = await rootBundle.load(
+        'assets/img/marker_selected.png',
+      );
+
+      await _mapboxMap!.style.addImage(
+        "marker-default",
+        defaultMarkerData.buffer.asUint8List(
+          defaultMarkerData.offsetInBytes,
+          defaultMarkerData.lengthInBytes,
+        ),
+        sdf: true,
+      );
+
+      await _mapboxMap!.style.addImage(
+        "marker-selected",
+        selectedMarkerData.buffer.asUint8List(
+          selectedMarkerData.offsetInBytes,
+          selectedMarkerData.lengthInBytes,
+        ),
+        sdf: true,
+      );
+
+      print("OPTIMIZED MAP: Marker resources loaded successfully");
+      return;
+    } catch (e) {
+      print("OPTIMIZED MAP: Error loading marker resources: $e");
+      // Don't rethrow - we can continue without custom markers
+      return;
     }
   }
 

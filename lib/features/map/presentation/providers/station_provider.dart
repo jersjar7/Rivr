@@ -72,20 +72,41 @@ class StationProvider with ChangeNotifier {
     _setLoading();
 
     try {
+      print("STATION PROVIDER: Loading sample stations, limit=$limit");
       final result = await getSampleStations(limit: limit);
 
       result.fold(
         (failure) {
           _setError(failure.message);
+          print(
+            "STATION PROVIDER: Error loading sample stations: ${failure.message}",
+          );
         },
         (stations) {
           _stations = stations;
+          print(
+            "STATION PROVIDER: Successfully loaded ${stations.length} sample stations",
+          );
+
+          // Log details of the first station for debugging
+          if (stations.isNotEmpty) {
+            final first = stations.first;
+            print(
+              "STATION PROVIDER: First station: id=${first.stationId}, name=${first.name ?? 'unnamed'}, position=(${first.lat}, ${first.lon})",
+            );
+          } else {
+            print(
+              "STATION PROVIDER: WARNING - No stations were returned from getSampleStations",
+            );
+          }
+
           _status = StationLoadingStatus.loaded;
           _errorMessage = null;
           notifyListeners();
         },
       );
     } catch (e) {
+      print("STATION PROVIDER: Exception loading sample stations: $e");
       _setError('Failed to load sample stations: ${e.toString()}');
     }
   }

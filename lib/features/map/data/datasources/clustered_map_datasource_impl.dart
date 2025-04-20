@@ -28,10 +28,19 @@ class ClusteredMapDataSourceImpl implements ClusteredMapDataSource {
 
       // Try to remove existing source if it exists
       try {
+        // Remove all layers first (in correct order)
+        await style.removeStyleLayer(_clusterCountLayerId);
+        await style.removeStyleLayer(_unclusteredPointsLayerId);
+        await style.removeStyleLayer(_clustersLayerId);
         await style.removeStyleSource(_sourceId);
+        print("Removed existing clustering layers and source");
       } catch (e) {
-        // Source might not exist yet, which is fine
+        print("Info: Some layers or source didn't exist: $e");
+        // Continue - this is expected in first initialization
       }
+
+      // Add a small delay to ensure cleanup completes
+      await Future.delayed(const Duration(milliseconds: 100));
 
       // Add the source
       await style.addStyleSource(_sourceId, sourceJson);

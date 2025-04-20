@@ -159,32 +159,51 @@ class EnhancedClusteredMapProvider with ChangeNotifier {
     _styleChangeCounter++;
     final currentStyleChange = _styleChangeCounter;
 
-    // Wait for style to load
     print('Map style changed, will reinitialize clustering after a delay');
 
     // Use debounce to avoid multiple reinitializations during rapid style changes
     _debounceReinitialization(() async {
       // Skip if another style change happened while waiting
       if (currentStyleChange != _styleChangeCounter) {
+        print(
+          'Skipping reinitialization as another style change was triggered',
+        );
         return;
       }
 
       print('Reinitializing clustering after style change');
+
+      // First attempt a cleanup
+      try {
+        await disposeClustering(mapboxMap);
+        print("Successfully cleaned up previous clustering resources");
+      } catch (e) {
+        print("Warning: Error during clustering cleanup: $e");
+        // Continue anyway
+      }
 
       // Save current stations
       final currentStations = List<MapStation>.from(_currentStations);
 
       // Reset initialization state
       _isInitialized = false;
+      _currentStations = [];
       _setStatus(ClusteringStatus.initial);
 
-      // Reinitialize
+      // Wait for style to be fully loaded
+      await Future.delayed(const Duration(milliseconds: 800));
+
+      // Now reinitialize
       final initialized = await initialize(mapboxMap);
+
       if (initialized && currentStations.isNotEmpty) {
+        print(
+          'Restoring ${currentStations.length} stations after style change',
+        );
         // Restore stations
         await updateStations(mapboxMap, currentStations);
       }
-    });
+    }, duration: const Duration(milliseconds: 800));
   }
 
   /// Helper method to set up tap handlers for clusters and stations
@@ -338,14 +357,20 @@ class EnhancedClusteredMapProvider with ChangeNotifier {
   }
 
   /// Debounce reinitialization to avoid multiple calls
-  void _debounceReinitialization(Future<void> Function() callback) {
+  void _debounceReinitialization(
+    Future<void> Function() callback, {
+    Duration? duration,
+  }) {
     if (_debounceTimer?.isActive ?? false) {
       _debounceTimer!.cancel();
     }
 
-    _debounceTimer = Timer(const Duration(milliseconds: 500), () async {
-      await callback();
-    });
+    _debounceTimer = Timer(
+      duration ?? const Duration(milliseconds: 500),
+      () async {
+        await callback();
+      },
+    );
   }
 
   // Helper methods

@@ -6,7 +6,7 @@ import '../di/service_locator.dart';
 import '../../features/auth/presentation/pages/auth_page.dart';
 import '../../features/auth/presentation/pages/forgot_password_page.dart';
 import '../../features/favorites/presentation/pages/favorites_page.dart';
-import '../../features/map/presentation/pages/map_page.dart';
+import '../../features/map/presentation/pages/map_page.dart'; // Make sure this import is correct
 import '../../features/map/presentation/providers/enhanced_clustered_map_provider.dart';
 import '../../features/map/presentation/providers/map_provider.dart';
 import '../../features/map/presentation/providers/station_provider.dart';
@@ -46,12 +46,12 @@ class AppRouter {
                   ChangeNotifierProvider<StationProvider>(
                     create: (context) => sl<StationProvider>(),
                   ),
-                  // Add the new clustered map provider
-                  ChangeNotifierProvider<ClusteredMapProvider>(
-                    create: (context) => sl<ClusteredMapProvider>(),
+                  // Add the enhanced clustered map provider
+                  ChangeNotifierProvider<EnhancedClusteredMapProvider>(
+                    create: (context) => sl<EnhancedClusteredMapProvider>(),
                   ),
                 ],
-                child: MapPage(
+                child: OptimizedMapPage(
                   key: UniqueKey(),
                   lat: args?['lat'] ?? 0.0,
                   lon: args?['lon'] ?? 0.0,

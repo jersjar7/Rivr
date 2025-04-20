@@ -12,7 +12,7 @@ import '../../domain/usecases/update_cluster_data.dart';
 
 enum ClusteringStatus { initial, initializing, ready, updating, error }
 
-// Define the interface
+/// Interface for cluster map data source operations.
 abstract class ClusteredMapDataSource {
   /// Initialize cluster sources and layers on the map
   Future<void> initializeClusterLayers(MapboxMap mapboxMap);

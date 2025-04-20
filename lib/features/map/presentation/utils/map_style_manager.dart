@@ -27,22 +27,8 @@ class MapStyleManager {
     required this.clusterProvider,
     String initialStyle = MapConstants.defaultMapStyle,
   }) : _currentStyle = initialStyle {
-    _setupStyleLoadedListener();
-  }
-
-  /// Set up a listener for style loaded events
-  void _setupStyleLoadedListener() {
-    // Use the correct event listener approach for Mapbox
-    mapboxMap.setOnStyleLoadedListener(() {
-      print('Map style loaded: $_currentStyle');
-
-      // Resolve any pending style load completion
-      _styleLoadCompleter?.complete(true);
-      _styleLoadCompleter = null;
-
-      // Notify the cluster provider that style has changed
-      clusterProvider.handleMapStyleChanged(mapboxMap);
-    });
+    // We don't need to set up a separate listener as the MapWidget already has
+    // a mechanism to detect style loading completion
   }
 
   /// Change the map style with proper error handling and callbacks
@@ -66,28 +52,19 @@ class MapStyleManager {
       // Load the new style
       await mapboxMap.loadStyleURI(newStyle);
 
-      // Wait for style to load completely
-      final result = await _styleLoadCompleter!.future.timeout(
-        const Duration(seconds: 5),
-        onTimeout: () {
-          print('Style load timeout - assuming success');
-          return true;
-        },
-      );
+      // Since we can't listen to style load events directly,
+      // use a delayed future to wait for style to load
+      // This is a workaround until proper event handling is available
+      await Future.delayed(const Duration(milliseconds: 1000));
 
-      if (result) {
-        print('Style change successful');
-        onStyleChanged?.call();
-        return true;
-      } else {
-        print('Style change indicated failure');
-        onStyleChangeFailed?.call();
-        return false;
-      }
+      // Notify the cluster provider that style has changed
+      // (needs to happen after style loads)
+      clusterProvider.handleMapStyleChanged(mapboxMap);
+
+      onStyleChanged?.call();
+      return true;
     } catch (e) {
       print('Error changing map style: $e');
-      _styleLoadCompleter?.completeError(e);
-      _styleLoadCompleter = null;
       onStyleChangeFailed?.call();
       return false;
     }

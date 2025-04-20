@@ -1,6 +1,7 @@
 // lib/features/map/presentation/pages/map_page.dart
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show rootBundle;
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
 import 'package:provider/provider.dart';
 import 'package:rivr/features/map/presentation/providers/enhanced_clustered_map_provider.dart';
@@ -453,22 +454,46 @@ class _OptimizedMapPageState extends State<OptimizedMapPage>
         'assets/img/marker_selected.png',
       );
 
-      await _mapboxMap!.style.addImage(
-        "marker-default",
-        defaultMarkerData.buffer.asUint8List(
-          defaultMarkerData.offsetInBytes,
-          defaultMarkerData.lengthInBytes,
-        ),
-        sdf: true,
+      // For proper image loading, you need to get the actual image dimensions
+      final defaultImage = await decodeImageFromList(
+        defaultMarkerData.buffer.asUint8List(),
+      );
+      final selectedImage = await decodeImageFromList(
+        selectedMarkerData.buffer.asUint8List(),
       );
 
-      await _mapboxMap!.style.addImage(
+      // Create MbxImage objects with proper dimensions
+      final defaultMbxImage = MbxImage(
+        width: defaultImage.width,
+        height: defaultImage.height,
+        data: defaultMarkerData.buffer.asUint8List(),
+      );
+
+      final selectedMbxImage = MbxImage(
+        width: selectedImage.width,
+        height: selectedImage.height,
+        data: selectedMarkerData.buffer.asUint8List(),
+      );
+
+      // Add images to style with proper parameters
+      await _mapboxMap!.style.addStyleImage(
+        "marker-default",
+        1.0, // scale
+        defaultMbxImage,
+        false, // sdf
+        [], // stretchX
+        [], // stretchY
+        null, // content
+      );
+
+      await _mapboxMap!.style.addStyleImage(
         "marker-selected",
-        selectedMarkerData.buffer.asUint8List(
-          selectedMarkerData.offsetInBytes,
-          selectedMarkerData.lengthInBytes,
-        ),
-        sdf: true,
+        1.0, // scale
+        selectedMbxImage,
+        false, // sdf
+        [], // stretchX
+        [], // stretchY
+        null, // content
       );
 
       print("OPTIMIZED MAP: Marker resources loaded successfully");

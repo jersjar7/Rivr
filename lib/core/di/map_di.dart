@@ -100,9 +100,9 @@ void registerMapDependencies(GetIt sl) {
     ),
   );
 
-  // Enhanced clustered map provider
+  // Clustered map provider - Changed from EnhancedClusteredMapProvider to ClusteredMapProvider
   sl.registerFactory(
-    () => EnhancedClusteredMapProvider(
+    () => ClusteredMapProvider(
       initializeClustering: sl<InitializeClustering>(),
       updateClusterData: sl<UpdateClusterData>(),
       setupClusterTapHandling: sl<SetupClusterTapHandling>(),

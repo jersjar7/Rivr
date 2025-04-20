@@ -47,8 +47,8 @@ class AppRouter {
                     create: (context) => sl<StationProvider>(),
                   ),
                   // Add the enhanced clustered map provider
-                  ChangeNotifierProvider<EnhancedClusteredMapProvider>(
-                    create: (context) => sl<EnhancedClusteredMapProvider>(),
+                  ChangeNotifierProvider<ClusteredMapProvider>(
+                    create: (context) => sl<ClusteredMapProvider>(),
                   ),
                 ],
                 child: OptimizedMapPage(

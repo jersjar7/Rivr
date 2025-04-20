@@ -4,7 +4,6 @@ import 'dart:convert';
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
 import '../../presentation/providers/enhanced_clustered_map_provider.dart';
 import '../../domain/entities/map_station.dart';
-import '../models/geojson_models.dart';
 
 class ClusteredMapDataSourceImpl implements ClusteredMapDataSource {
   // Constants for clustering

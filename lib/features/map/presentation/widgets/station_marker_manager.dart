@@ -1,8 +1,6 @@
 // lib/features/map/presentation/widgets/station_marker_manager.dart
 
-import 'package:flutter/material.dart';
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
-import 'package:provider/provider.dart';
 import '../../../../core/constants/map_constants.dart';
 import '../../domain/entities/map_station.dart';
 import '../providers/map_provider.dart';
@@ -16,22 +14,36 @@ class StationMarkerManager {
 
   Future<void> clearMarkers() async {
     final pointAnnotationManager = _mapProvider.pointAnnotationManager;
-    if (pointAnnotationManager == null) return;
+    if (pointAnnotationManager == null) {
+      print("DEBUG: pointAnnotationManager is null, can't clear markers");
+      return;
+    }
 
     try {
+      print("DEBUG: Clearing all markers");
       await pointAnnotationManager.deleteAll();
+      print("DEBUG: All markers cleared");
     } catch (e) {
-      print('Error clearing annotations: $e');
+      print("ERROR: Error clearing annotations: $e");
     }
   }
 
   Future<void> addStationMarkers(List<MapStation> stations) async {
     final pointAnnotationManager = _mapProvider.pointAnnotationManager;
-    if (pointAnnotationManager == null) return;
+    if (pointAnnotationManager == null) {
+      print("ERROR: pointAnnotationManager is null, can't add markers");
+      return;
+    }
 
     try {
       // First clear existing markers
+      print("DEBUG: Adding ${stations.length} station markers");
       await clearMarkers();
+
+      if (stations.isEmpty) {
+        print("WARNING: No stations to add as markers");
+        return;
+      }
 
       // Create marker options for each station
       final pointAnnotationOptions =
@@ -39,6 +51,10 @@ class StationMarkerManager {
             final isSelected =
                 _stationProvider.selectedStation?.stationId ==
                 station.stationId;
+
+            print(
+              "DEBUG: Creating marker for station ${station.stationId}, position=(${station.lat}, ${station.lon})",
+            );
 
             return PointAnnotationOptions(
               geometry: Point(coordinates: Position(station.lon, station.lat)),
@@ -60,13 +76,15 @@ class StationMarkerManager {
 
       // Add the markers to the map
       await pointAnnotationManager.createMulti(pointAnnotationOptions);
+      print("DEBUG: Added ${stations.length} markers to the map");
 
       // Add click listener
       pointAnnotationManager.addOnPointAnnotationClickListener(
         StationClickListener(_mapProvider, _stationProvider, this),
       );
+      print("DEBUG: Added click listener to markers");
     } catch (e) {
-      print('Error adding annotations: $e');
+      print("ERROR: Error adding annotations: $e");
     }
   }
 }
@@ -86,143 +104,43 @@ class StationClickListener extends OnPointAnnotationClickListener {
   @override
   void onPointAnnotationClick(PointAnnotation point) {
     try {
+      print("DEBUG: Marker clicked: ${point.id}");
       final tappedPosition = point.geometry.coordinates;
       final stations = _stationProvider.stations;
 
       // Find the station that matches the tapped marker
-      final tappedStation = stations.firstWhere(
-        (station) =>
-            station.lon == tappedPosition.lng &&
-            station.lat == tappedPosition.lat,
-      );
+      try {
+        final tappedStation = stations.firstWhere(
+          (station) =>
+              station.lon == tappedPosition.lng &&
+              station.lat == tappedPosition.lat,
+        );
 
-      // Select the station in the provider
-      _stationProvider.selectStation(tappedStation);
+        print("DEBUG: Found matching station: ${tappedStation.stationId}");
 
-      // Center map on the selected station
-      _mapProvider.goToLocation(
-        Point(coordinates: Position(tappedStation.lon, tappedStation.lat)),
-      );
+        // Select the station in the provider
+        _stationProvider.selectStation(tappedStation);
 
-      // Refresh markers to update the selected marker style
-      _markerManager.addStationMarkers(stations);
+        // Center map on the selected station
+        _mapProvider.goToLocation(
+          Point(coordinates: Position(tappedStation.lon, tappedStation.lat)),
+        );
+
+        // Refresh markers to update the selected marker style
+        _markerManager.addStationMarkers(stations);
+      } catch (e) {
+        print(
+          "ERROR: No matching station found for position: (${tappedPosition.lng}, ${tappedPosition.lat})",
+        );
+        print("ERROR: Available stations:");
+        for (var station in stations) {
+          print(
+            "Station ${station.stationId}: (${station.lon}, ${station.lat})",
+          );
+        }
+      }
     } catch (e) {
-      print('Error handling marker tap: $e');
+      print("ERROR: Error handling marker tap: $e");
     }
-  }
-}
-
-class StationInfoPanel extends StatelessWidget {
-  const StationInfoPanel({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    final stationProvider = Provider.of<StationProvider>(context);
-    final selectedStation = stationProvider.selectedStation;
-
-    if (selectedStation == null) {
-      return const SizedBox.shrink();
-    }
-
-    return Positioned(
-      bottom: 100,
-      left: 16,
-      right: 16,
-      child: Card(
-        elevation: 4,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Expanded(
-                    child: Text(
-                      selectedStation.name ??
-                          'Station ${selectedStation.stationId}',
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.close),
-                    onPressed: () => stationProvider.deselectStation(),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              if (selectedStation.type != null)
-                Text('Type: ${selectedStation.type}'),
-              const SizedBox(height: 4),
-              if (selectedStation.elevation != null)
-                Text(
-                  'Elevation: ${selectedStation.elevation!.toStringAsFixed(2)} m',
-                ),
-              const SizedBox(height: 4),
-              Text(
-                'Coordinates: ${selectedStation.lat.toStringAsFixed(6)}, ${selectedStation.lon.toStringAsFixed(6)}',
-              ),
-              if (selectedStation.description != null) ...[
-                const SizedBox(height: 8),
-                Text(
-                  selectedStation.description!,
-                  style: const TextStyle(fontSize: 14),
-                  maxLines: 3,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ],
-              const SizedBox(height: 16),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  ElevatedButton.icon(
-                    onPressed: () {
-                      // Navigate to forecast page
-                      Navigator.pushNamed(
-                        context,
-                        '/forecast',
-                        arguments: {
-                          'reachId': selectedStation.stationId.toString(),
-                          'stationName':
-                              selectedStation.name ??
-                              'Station ${selectedStation.stationId}',
-                        },
-                      );
-                    },
-                    icon: const Icon(Icons.analytics),
-                    label: const Text('View Forecast'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Theme.of(context).primaryColor,
-                      foregroundColor: Colors.white,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  OutlinedButton.icon(
-                    onPressed: () {
-                      // Add to favorites
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Added to favorites'),
-                          duration: Duration(seconds: 2),
-                        ),
-                      );
-                    },
-                    icon: const Icon(Icons.favorite_border),
-                    label: const Text('Favorite'),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
   }
 }

@@ -6,11 +6,12 @@ import 'firebase_options.dart';
 import 'app.dart';
 import 'core/di/service_locator.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'common/data/local/database_helper.dart'; // Import DatabaseHelper
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Load environment variables - First important change
+  // Load environment variables
   final env = const String.fromEnvironment('ENV', defaultValue: 'development');
   print("MAIN: Loading environment variables from .env.$env");
 
@@ -34,6 +35,43 @@ Future<void> main() async {
   }
 
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+
+  // Initialize database first and check for Geolocations table
+  final databaseHelper = DatabaseHelper();
+  try {
+    final db = await databaseHelper.database;
+
+    // Check for Geolocations table
+    final tables = await db.rawQuery(
+      "SELECT name FROM sqlite_master WHERE type='table' AND name='Geolocations'",
+    );
+    if (tables.isEmpty) {
+      print("MAIN: ERROR! Geolocations table not found in database!");
+    } else {
+      // Check if there are any records
+      final count = await db.rawQuery(
+        "SELECT COUNT(*) as count FROM Geolocations",
+      );
+      print(
+        "MAIN: Found ${count.first['count']} stations in Geolocations table",
+      );
+
+      // Check column names
+      final columns = await db.rawQuery("PRAGMA table_info(Geolocations)");
+      print(
+        "MAIN: Geolocations table has columns: ${columns.map((c) => c['name']).toList()}",
+      );
+
+      // Check first few records if available
+      if ((count.first['count'] as int) > 0) {
+        final sample = await db.query('Geolocations', limit: 3);
+        print("MAIN: Sample records: $sample");
+      }
+    }
+  } catch (e) {
+    print("MAIN: Error initializing database: $e");
+  }
+
   await setupServiceLocator();
   runApp(const RivrApp());
 }

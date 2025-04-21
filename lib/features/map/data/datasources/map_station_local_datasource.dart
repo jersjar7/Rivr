@@ -1,6 +1,5 @@
 // lib/features/map/data/datasources/map_station_local_datasource.dart
 
-import 'package:sqflite/sqflite.dart' as sqflite;
 import '../../../../common/data/local/database_helper.dart';
 import '../../../../core/error/exceptions.dart';
 import '../models/map_station_model.dart';
@@ -41,48 +40,94 @@ class MapStationLocalDataSourceImpl implements MapStationLocalDataSource {
     int limit = 1000,
   }) async {
     try {
+      print(
+        "DEBUG: Querying stations in region: minLat=$minLat, maxLat=$maxLat, minLon=$minLon, maxLon=$maxLon, limit=$limit",
+      );
       final db = await _databaseHelper.database;
 
+      // Check if Geolocations table exists
+      final tables = await db.rawQuery(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='Geolocations'",
+      );
+
+      if (tables.isEmpty) {
+        print("ERROR: Geolocations table not found in database!");
+        throw DatabaseException(
+          message: "Geolocations table not found in database!",
+        );
+      }
+
+      // Check table structure
+      final columns = await db.rawQuery("PRAGMA table_info(Geolocations)");
+      print("DEBUG: Geolocations table columns: $columns");
+
       final List<Map<String, dynamic>> result = await db.query(
-        'StationDetails',
+        'Geolocations',
         where: 'lat >= ? AND lat <= ? AND lon >= ? AND lon <= ?',
         whereArgs: [minLat, maxLat, minLon, maxLon],
         limit: limit,
       );
 
-      return result.map((map) => MapStationModel.fromMap(map)).toList();
+      print("DEBUG: Query returned ${result.length} stations in region");
+      if (result.isNotEmpty) {
+        print("DEBUG: First result: ${result.first}");
+      }
+
+      return result.map((map) {
+        // Add default values for missing fields
+        final enhancedMap = Map<String, dynamic>.from(map);
+        enhancedMap['name'] ??= 'Station ${map['stationId']}';
+        enhancedMap['type'] ??= 'river';
+        enhancedMap['color'] ??= '#2389DA';
+
+        return MapStationModel.fromMap(enhancedMap);
+      }).toList();
     } catch (e) {
-      print("Error querying stations: $e");
-      throw DatabaseException(message: "Failed to fetch stations: $e");
+      print("ERROR: Failed to fetch stations in region: $e");
+      throw DatabaseException(
+        message: "Failed to fetch stations in region: $e",
+      );
     }
   }
 
   @override
   Future<List<MapStationModel>> getSampleStations({int limit = 10}) async {
     try {
+      print("DEBUG: Getting sample stations with limit=$limit");
       final db = await _databaseHelper.database;
 
-      print(
-        "DEBUG: Executing sample stations query from Geolocations with limit: $limit",
+      // Check if Geolocations table exists
+      final tables = await db.rawQuery(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='Geolocations'",
       );
-      final List<Map<String, dynamic>> result = await db.rawQuery('''
-      SELECT stationId, lat, lon,
-             NULL as elevation, NULL as name, 
-             NULL as type, NULL as description, 
-             "#2389DA" as color
-      FROM Geolocations 
-      ORDER BY RANDOM() 
-      LIMIT $limit
-    ''');
 
-      print("DEBUG: Sample stations query returned ${result.length} rows");
-      if (result.isNotEmpty) {
-        print("DEBUG: First row data: ${result.first}");
+      if (tables.isEmpty) {
+        print("ERROR: Geolocations table not found in database!");
+        throw DatabaseException(
+          message: "Geolocations table not found in database!",
+        );
       }
 
-      return result.map((map) => MapStationModel.fromMap(map)).toList();
+      final List<Map<String, dynamic>> result = await db.rawQuery('''
+        SELECT stationId, lat, lon FROM Geolocations ORDER BY RANDOM() LIMIT $limit
+      ''');
+
+      print("DEBUG: Retrieved ${result.length} sample stations");
+      if (result.isNotEmpty) {
+        print("DEBUG: First sample station: ${result.first}");
+      }
+
+      return result.map((map) {
+        // Add default values for missing fields
+        final enhancedMap = Map<String, dynamic>.from(map);
+        enhancedMap['name'] ??= 'Station ${map['stationId']}';
+        enhancedMap['type'] ??= 'river';
+        enhancedMap['color'] ??= '#2389DA';
+
+        return MapStationModel.fromMap(enhancedMap);
+      }).toList();
     } catch (e) {
-      print("DEBUG: Error querying sample stations: $e");
+      print("ERROR: Failed to fetch sample stations: $e");
       throw DatabaseException(message: "Failed to fetch sample stations: $e");
     }
   }
@@ -90,14 +135,17 @@ class MapStationLocalDataSourceImpl implements MapStationLocalDataSource {
   @override
   Future<int> getStationCount() async {
     try {
+      print("DEBUG: Getting station count");
       final db = await _databaseHelper.database;
 
       final result = await db.rawQuery(
-        'SELECT COUNT(*) as count FROM StationDetails',
+        'SELECT COUNT(*) as count FROM Geolocations',
       );
-      return sqflite.Sqflite.firstIntValue(result) ?? 0;
+      final count = result.first['count'] as int;
+      print("DEBUG: Station count = $count");
+      return count;
     } catch (e) {
-      print("Error counting stations: $e");
+      print("ERROR: Failed to get station count: $e");
       throw DatabaseException(message: "Failed to count stations: $e");
     }
   }
@@ -110,6 +158,9 @@ class MapStationLocalDataSourceImpl implements MapStationLocalDataSource {
     double radius = 50.0,
   }) async {
     try {
+      print(
+        "DEBUG: Getting nearest stations to ($lat, $lon) with radius=$radius, limit=$limit",
+      );
       final db = await _databaseHelper.database;
 
       // Using Haversine formula to calculate distance
@@ -123,15 +174,28 @@ class MapStationLocalDataSourceImpl implements MapStationLocalDataSource {
 
       final List<Map<String, dynamic>> result = await db.rawQuery('''
         SELECT *, $haversineFormula AS distance
-        FROM StationDetails
+        FROM Geolocations
         WHERE $haversineFormula < $radius
         ORDER BY distance
         LIMIT $limit
       ''');
 
-      return result.map((map) => MapStationModel.fromMap(map)).toList();
+      print("DEBUG: Retrieved ${result.length} nearest stations");
+      if (result.isNotEmpty) {
+        print("DEBUG: First nearest station: ${result.first}");
+      }
+
+      return result.map((map) {
+        // Add default values for missing fields
+        final enhancedMap = Map<String, dynamic>.from(map);
+        enhancedMap['name'] ??= 'Station ${map['stationId']}';
+        enhancedMap['type'] ??= 'river';
+        enhancedMap['color'] ??= '#2389DA';
+
+        return MapStationModel.fromMap(enhancedMap);
+      }).toList();
     } catch (e) {
-      print("Error querying nearest stations: $e");
+      print("ERROR: Failed to fetch nearest stations: $e");
       throw DatabaseException(message: "Failed to fetch nearest stations: $e");
     }
   }

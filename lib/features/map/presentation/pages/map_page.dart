@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
 import 'package:provider/provider.dart';
+import 'package:rivr/common/data/local/database_helper.dart';
 import 'package:rivr/features/map/presentation/providers/enhanced_clustered_map_provider.dart';
 
 import '../../../../core/constants/map_constants.dart';
@@ -397,6 +398,38 @@ class _OptimizedMapPageState extends State<OptimizedMapPage>
         initialStyle: mapProvider.currentStyle,
       );
 
+      // Check database structure and tables
+      final databaseHelper = DatabaseHelper();
+      databaseHelper.database.then((db) {
+        db
+            .rawQuery("SELECT COUNT(*) as count FROM Geolocations")
+            .then((result) {
+              final count = result.first['count'] as int;
+              print("OPTIMIZED MAP: Geolocations table has $count stations");
+
+              if (count == 0) {
+                // Show no data error
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('No station data found in database!'),
+                    backgroundColor: Colors.red,
+                    duration: Duration(seconds: 5),
+                  ),
+                );
+              }
+            })
+            .catchError((e) {
+              print("OPTIMIZED MAP: Error checking Geolocations table: $e");
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Error accessing station data: $e'),
+                  backgroundColor: Colors.red,
+                  duration: Duration(seconds: 5),
+                ),
+              );
+            });
+      });
+
       // Load map resources first
       _loadMapResources().then((_) {
         // Initialize 3D terrain if needed
@@ -511,25 +544,69 @@ class _OptimizedMapPageState extends State<OptimizedMapPage>
     EnhancedClusteredMapProvider clusteredMapProvider,
   ) {
     print("DEBUG: Map page loading initial stations");
-    stationProvider.loadSampleStations().then((_) {
-      final stations = stationProvider.stations;
-      print("DEBUG: Map page got ${stations.length} stations from provider");
 
-      // Update clustered map with the stations
-      if (stations.isNotEmpty && _mapboxMap != null) {
-        print("DEBUG: Updating clustered map with ${stations.length} stations");
-        clusteredMapProvider
-            .updateStations(_mapboxMap!, stations)
-            .then((_) => print("DEBUG: Initial stations loaded successfully"))
-            .catchError(
-              (e) => print("DEBUG: Error loading initial stations: $e"),
+    stationProvider
+        .loadSampleStations(limit: 25)
+        .then((_) {
+          final stations = stationProvider.stations;
+          print(
+            "DEBUG: Map page got ${stations.length} stations from provider",
+          );
+
+          if (stations.isEmpty) {
+            print("ERROR: No stations loaded from database!");
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('No stations found in the database!'),
+                backgroundColor: Colors.red,
+                duration: Duration(seconds: 5),
+              ),
             );
-      } else {
-        print(
-          "DEBUG: No stations to update or map is null. Stations count: ${stations.length}, Map null: ${_mapboxMap == null}",
-        );
-      }
-    });
+            return;
+          }
+
+          // Update clustered map with the stations
+          if (_mapboxMap != null) {
+            print(
+              "DEBUG: Updating clustered map with ${stations.length} stations",
+            );
+            clusteredMapProvider
+                .updateStations(_mapboxMap!, stations)
+                .then((_) {
+                  print("DEBUG: Initial stations loaded successfully");
+
+                  // If we have a selected station location, go to it
+                  if (_initialCenter != null) {
+                    _mapboxMap!.flyTo(
+                      CameraOptions(
+                        center: _initialCenter,
+                        zoom: MapConstants.minZoomForMarkers,
+                        pitch: _is3DMode ? MapConstants.defaultTilt : 0,
+                      ),
+                      MapAnimationOptions(
+                        duration: MapConstants.mapAnimationDurationMs,
+                        startDelay: MapConstants.mapAnimationDelayMs,
+                      ),
+                    );
+                  }
+                })
+                .catchError(
+                  (e) => print("DEBUG: Error loading initial stations: $e"),
+                );
+          } else {
+            print("ERROR: Map is null, can't update stations");
+          }
+        })
+        .catchError((e) {
+          print("ERROR: Failed to load sample stations: $e");
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Error loading stations: $e'),
+              backgroundColor: Colors.red,
+              duration: Duration(seconds: 5),
+            ),
+          );
+        });
   }
 
   // Handle camera change events with debouncing

@@ -41,28 +41,46 @@ class StationProvider with ChangeNotifier {
     int limit = 1000,
   }) async {
     _setLoading();
+    print(
+      "DEBUG: StationProvider.loadStationsInRegion called with bounds: $bounds, limit: $limit",
+    );
 
     try {
+      final southwest = bounds.southwest.coordinates;
+      final northeast = bounds.northeast.coordinates;
+
       final result = await getStationsInRegion(
-        bounds.southwest.coordinates.lat.toDouble(),
-        bounds.northeast.coordinates.lat.toDouble(),
-        bounds.southwest.coordinates.lng.toDouble(),
-        bounds.northeast.coordinates.lng.toDouble(),
+        southwest.lat.toDouble(),
+        northeast.lat.toDouble(),
+        southwest.lng.toDouble(),
+        northeast.lng.toDouble(),
         limit: limit,
       );
 
       result.fold(
         (failure) {
+          print(
+            "ERROR: StationProvider failed to load stations in region: ${failure.message}",
+          );
           _setError(failure.message);
         },
         (stations) {
           _stations = stations;
+          print(
+            "DEBUG: StationProvider loaded ${stations.length} stations in region",
+          );
+          if (stations.isNotEmpty) {
+            print(
+              "DEBUG: First station: id=${stations.first.stationId}, position=(${stations.first.lat}, ${stations.first.lon})",
+            );
+          }
           _status = StationLoadingStatus.loaded;
           _errorMessage = null;
           notifyListeners();
         },
       );
     } catch (e) {
+      print("ERROR: StationProvider exception loading stations in region: $e");
       _setError('Failed to load stations: ${e.toString()}');
     }
   }
@@ -71,56 +89,36 @@ class StationProvider with ChangeNotifier {
   Future<void> loadSampleStations({int limit = 10}) async {
     _setLoading();
     print(
-      "DEBUG: Provider loadSampleStations method called with limit: $limit",
+      "DEBUG: StationProvider.loadSampleStations called with limit: $limit",
     );
 
     try {
-      print("STATION PROVIDER: Loading sample stations, limit=$limit");
       final result = await getSampleStations(limit: limit);
 
       result.fold(
         (failure) {
-          _setError(failure.message);
-          print("DEBUG: Provider received failure: ${failure.message}");
           print(
-            "STATION PROVIDER: Error loading sample stations: ${failure.message}",
+            "ERROR: StationProvider failed to load sample stations: ${failure.message}",
           );
+          _setError(failure.message);
         },
         (stations) {
           _stations = stations;
-          print("DEBUG: Stations set in provider: ${_stations.length}");
-          if (_stations.isNotEmpty) {
-            print(
-              "DEBUG: First station: id=${_stations.first.stationId}, pos=(${_stations.first.lat}, ${_stations.first.lon})",
-            );
-          } else {
-            print("DEBUG: Provider received empty stations list");
-          }
-
           print(
-            "STATION PROVIDER: Successfully loaded ${stations.length} sample stations",
+            "DEBUG: StationProvider loaded ${stations.length} sample stations",
           );
-
-          // Log details of the first station for debugging
           if (stations.isNotEmpty) {
-            final first = stations.first;
             print(
-              "STATION PROVIDER: First station: id=${first.stationId}, name=${first.name ?? 'unnamed'}, position=(${first.lat}, ${first.lon})",
-            );
-          } else {
-            print(
-              "STATION PROVIDER: WARNING - No stations were returned from getSampleStations",
+              "DEBUG: First station: id=${stations.first.stationId}, position=(${stations.first.lat}, ${stations.first.lon})",
             );
           }
-
           _status = StationLoadingStatus.loaded;
           _errorMessage = null;
           notifyListeners();
         },
       );
     } catch (e) {
-      print("DEBUG: Provider caught exception: $e");
-      print("STATION PROVIDER: Exception loading sample stations: $e");
+      print("ERROR: StationProvider exception loading sample stations: $e");
       _setError('Failed to load sample stations: ${e.toString()}');
     }
   }
@@ -133,6 +131,9 @@ class StationProvider with ChangeNotifier {
     double radius = 50.0,
   }) async {
     _setLoading();
+    print(
+      "DEBUG: StationProvider.loadNearestStations called with lat: $lat, lon: $lon, limit: $limit, radius: $radius",
+    );
 
     try {
       final result = await getNearestStations(
@@ -144,22 +145,35 @@ class StationProvider with ChangeNotifier {
 
       result.fold(
         (failure) {
+          print(
+            "ERROR: StationProvider failed to load nearest stations: ${failure.message}",
+          );
           _setError(failure.message);
         },
         (stations) {
           _stations = stations;
+          print(
+            "DEBUG: StationProvider loaded ${stations.length} nearest stations",
+          );
+          if (stations.isNotEmpty) {
+            print(
+              "DEBUG: First station: id=${stations.first.stationId}, position=(${stations.first.lat}, ${stations.first.lon})",
+            );
+          }
           _status = StationLoadingStatus.loaded;
           _errorMessage = null;
           notifyListeners();
         },
       );
     } catch (e) {
+      print("ERROR: StationProvider exception loading nearest stations: $e");
       _setError('Failed to load nearest stations: ${e.toString()}');
     }
   }
 
   // Clear all stations
   void clearStations() {
+    print("DEBUG: StationProvider.clearStations called");
     _stations = [];
     _selectedStation = null;
     _status = StationLoadingStatus.initial;
@@ -169,12 +183,16 @@ class StationProvider with ChangeNotifier {
 
   // Select a station
   void selectStation(MapStation station) {
+    print(
+      "DEBUG: StationProvider.selectStation called with station id: ${station.stationId}",
+    );
     _selectedStation = station;
     notifyListeners();
   }
 
   // Deselect the current station
   void deselectStation() {
+    print("DEBUG: StationProvider.deselectStation called");
     _selectedStation = null;
     notifyListeners();
   }

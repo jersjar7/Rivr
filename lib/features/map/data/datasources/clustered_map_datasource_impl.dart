@@ -2,7 +2,7 @@
 
 import 'dart:convert';
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
-import 'clustered_map_datasource.dart'; // Updated import
+import 'clustered_map_datasource.dart';
 import '../../domain/entities/map_station.dart';
 
 class ClusteredMapDataSourceImpl implements ClusteredMapDataSource {
@@ -15,6 +15,7 @@ class ClusteredMapDataSourceImpl implements ClusteredMapDataSource {
   @override
   Future<void> initializeClusterLayers(MapboxMap mapboxMap) async {
     try {
+      print("DEBUG: Initializing cluster layers");
       final style = mapboxMap.style;
 
       // Add the GeoJSON source with clustering enabled
@@ -33,9 +34,9 @@ class ClusteredMapDataSourceImpl implements ClusteredMapDataSource {
         await style.removeStyleLayer(_unclusteredPointsLayerId);
         await style.removeStyleLayer(_clustersLayerId);
         await style.removeStyleSource(_sourceId);
-        print("Removed existing clustering layers and source");
+        print("DEBUG: Removed existing clustering layers and source");
       } catch (e) {
-        print("Info: Some layers or source didn't exist: $e");
+        print("DEBUG: Some layers or source didn't exist: $e");
         // Continue - this is expected in first initialization
       }
 
@@ -44,6 +45,7 @@ class ClusteredMapDataSourceImpl implements ClusteredMapDataSource {
 
       // Add the source
       await style.addStyleSource(_sourceId, sourceJson);
+      print("DEBUG: Added GeoJSON source");
 
       // Add a layer for clustered points
       final clusterLayer = '''{
@@ -79,6 +81,7 @@ class ClusteredMapDataSourceImpl implements ClusteredMapDataSource {
         // Layer might not exist yet
       }
       await style.addStyleLayer(clusterLayer, null);
+      print("DEBUG: Added cluster layer");
 
       // Add a layer for unclustered points
       final pointsLayer = '''{
@@ -87,7 +90,7 @@ class ClusteredMapDataSourceImpl implements ClusteredMapDataSource {
         "source": "$_sourceId",
         "filter": ["!", ["has", "point_count"]],
         "paint": {
-          "circle-color": "#11b4da",
+          "circle-color": ["get", "color"],
           "circle-radius": 8,
           "circle-stroke-width": 1,
           "circle-stroke-color": "#ffffff"
@@ -100,6 +103,7 @@ class ClusteredMapDataSourceImpl implements ClusteredMapDataSource {
         // Layer might not exist yet
       }
       await style.addStyleLayer(pointsLayer, null);
+      print("DEBUG: Added unclustered points layer");
 
       // Add a layer for cluster counts
       final countLayer = '''{
@@ -123,10 +127,11 @@ class ClusteredMapDataSourceImpl implements ClusteredMapDataSource {
         // Layer might not exist yet
       }
       await style.addStyleLayer(countLayer, null);
+      print("DEBUG: Added cluster count layer");
 
-      print("Cluster layers initialized successfully");
+      print("DEBUG: Cluster layers initialized successfully");
     } catch (e) {
-      print("Error initializing cluster layers: $e");
+      print("ERROR: Error initializing cluster layers: $e");
       rethrow;
     }
   }
@@ -137,8 +142,10 @@ class ClusteredMapDataSourceImpl implements ClusteredMapDataSource {
     List<MapStation> stations,
   ) async {
     try {
+      print("DEBUG: Updating cluster data with ${stations.length} stations");
+
       if (stations.isEmpty) {
-        print("No stations to display");
+        print("WARNING: No stations to display");
         return;
       }
 
@@ -168,9 +175,9 @@ class ClusteredMapDataSourceImpl implements ClusteredMapDataSource {
 
       await style.setStyleSourceProperty(_sourceId, "data", sourceProperty);
 
-      print("Updated cluster data with ${stations.length} stations");
+      print("DEBUG: Updated cluster data with ${stations.length} stations");
     } catch (e) {
-      print("Error updating cluster data: $e");
+      print("ERROR: Error updating cluster data: $e");
       rethrow;
     }
   }
@@ -182,13 +189,13 @@ class ClusteredMapDataSourceImpl implements ClusteredMapDataSource {
     Function(Point, List<MapStation>) onClusterTapped,
   ) async {
     // This is implemented through the MapWidget.onTapListener property
-    // No implementation needed in this class
-    print("Tap handling will be set up through MapWidget.onTapListener");
+    print("DEBUG: Tap handling will be set up through MapWidget.onTapListener");
   }
 
   @override
   Future<void> dispose(MapboxMap mapboxMap) async {
     try {
+      print("DEBUG: Disposing cluster resources");
       final style = mapboxMap.style;
 
       try {
@@ -197,12 +204,12 @@ class ClusteredMapDataSourceImpl implements ClusteredMapDataSource {
         await style.removeStyleLayer(_clustersLayerId);
         await style.removeStyleSource(_sourceId);
       } catch (e) {
-        print("Error removing layers/source: $e");
+        print("WARNING: Error removing layers/source: $e");
       }
 
-      print("Cluster resources disposed");
+      print("DEBUG: Cluster resources disposed");
     } catch (e) {
-      print("Error disposing cluster resources: $e");
+      print("ERROR: Error disposing cluster resources: $e");
     }
   }
 }

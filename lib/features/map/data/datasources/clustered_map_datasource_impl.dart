@@ -241,6 +241,7 @@ class ClusteredMapDataSourceImpl implements ClusteredMapDataSource {
 
       // Check layer visibility
       try {
+        // Use getStyleLayerProperty correctly - it returns a StylePropertyValue
         final clusterLayerVisible = await style.getStyleLayerProperty(
           _clustersLayerId,
           "visibility",
@@ -254,34 +255,44 @@ class ClusteredMapDataSourceImpl implements ClusteredMapDataSource {
           "visibility",
         );
 
+        // Debug layer visibility value details
         print(
-          "DEBUG: Layer visibility - clusters: $clusterLayerVisible, points: $pointsLayerVisible, count: $countLayerVisible",
+          "DEBUG: Layer visibility details - clusters: ${clusterLayerVisible.kind}, points: ${pointsLayerVisible.kind}, count: ${countLayerVisible.kind}",
         );
 
-        // Force visibility if needed
-        if (clusterLayerVisible != "visible") {
+        // The correct way to check visibility is to use the value property of StylePropertyValue
+        final clusterIsVisible = clusterLayerVisible.value == "visible";
+        final pointsAreVisible = pointsLayerVisible.value == "visible";
+        final countIsVisible = countLayerVisible.value == "visible";
+
+        print(
+          "DEBUG: Layer visibility checks - clusters: $clusterIsVisible, points: $pointsAreVisible, count: $countIsVisible",
+        );
+
+        // Force visibility properly - needs to be a simple value, not a function
+        if (!clusterIsVisible) {
           await style.setStyleLayerProperty(
             _clustersLayerId,
             "visibility",
-            '{"value": "visible"}',
+            '"visible"',
           );
           print("DEBUG: Forced clusters layer visibility to visible");
         }
 
-        if (pointsLayerVisible != "visible") {
+        if (!pointsAreVisible) {
           await style.setStyleLayerProperty(
             _unclusteredPointsLayerId,
             "visibility",
-            '{"value": "visible"}',
+            '"visible"',
           );
           print("DEBUG: Forced points layer visibility to visible");
         }
 
-        if (countLayerVisible != "visible") {
+        if (!countIsVisible) {
           await style.setStyleLayerProperty(
             _clusterCountLayerId,
             "visibility",
-            '{"value": "visible"}',
+            '"visible"',
           );
           print("DEBUG: Forced count layer visibility to visible");
         }

@@ -62,9 +62,15 @@ class MapStationLocalDataSourceImpl implements MapStationLocalDataSource {
     try {
       final db = await _databaseHelper.database;
 
-      print("DEBUG: Executing sample stations query with limit: $limit");
+      print(
+        "DEBUG: Executing sample stations query from Geolocations with limit: $limit",
+      );
       final List<Map<String, dynamic>> result = await db.rawQuery('''
-      SELECT * FROM StationDetails 
+      SELECT stationId, lat, lon,
+             NULL as elevation, NULL as name, 
+             NULL as type, NULL as description, 
+             "#2389DA" as color
+      FROM Geolocations 
       ORDER BY RANDOM() 
       LIMIT $limit
     ''');
@@ -72,8 +78,6 @@ class MapStationLocalDataSourceImpl implements MapStationLocalDataSource {
       print("DEBUG: Sample stations query returned ${result.length} rows");
       if (result.isNotEmpty) {
         print("DEBUG: First row data: ${result.first}");
-      } else {
-        print("DEBUG: Query returned no rows");
       }
 
       return result.map((map) => MapStationModel.fromMap(map)).toList();

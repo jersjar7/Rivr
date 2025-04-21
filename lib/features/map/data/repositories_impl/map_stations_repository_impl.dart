@@ -44,11 +44,24 @@ class MapStationsRepositoryImpl implements MapStationRepository {
     int limit = 10,
   }) async {
     try {
+      print(
+        "DEBUG: Map repository calling getSampleStations with limit: $limit",
+      );
       final stations = await localDataSource.getSampleStations(limit: limit);
+      print(
+        "DEBUG: Repository received ${stations.length} stations from data source",
+      );
+      if (stations.isNotEmpty) {
+        print(
+          "DEBUG: First station: id=${stations.first.stationId}, lat=${stations.first.lat}, lon=${stations.first.lon}",
+        );
+      }
       return Right(stations);
     } on DatabaseException catch (e) {
+      print("DEBUG: Repository caught DatabaseException: ${e.message}");
       return Left(CacheFailure(message: e.message));
     } catch (e) {
+      print("DEBUG: Repository caught unexpected error: $e");
       return Left(ServerFailure(message: e.toString()));
     }
   }

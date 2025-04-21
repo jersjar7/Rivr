@@ -11,6 +11,13 @@ class GetSampleStations {
   GetSampleStations(this.repository);
 
   Future<Either<Failure, List<MapStation>>> call({int limit = 10}) {
-    return repository.getSampleStations(limit: limit);
+    print("DEBUG: GetSampleStations use case called with limit: $limit");
+    final result = repository.getSampleStations(limit: limit);
+    result.then((value) {
+      print(
+        "DEBUG: Use case result: ${value.fold((failure) => "Error: ${failure.message}", (stations) => "Success: ${stations.length} stations")}",
+      );
+    });
+    return result;
   }
 }

@@ -70,6 +70,9 @@ class StationProvider with ChangeNotifier {
   // Load sample stations (for low zoom levels)
   Future<void> loadSampleStations({int limit = 10}) async {
     _setLoading();
+    print(
+      "DEBUG: Provider loadSampleStations method called with limit: $limit",
+    );
 
     try {
       print("STATION PROVIDER: Loading sample stations, limit=$limit");
@@ -78,12 +81,22 @@ class StationProvider with ChangeNotifier {
       result.fold(
         (failure) {
           _setError(failure.message);
+          print("DEBUG: Provider received failure: ${failure.message}");
           print(
             "STATION PROVIDER: Error loading sample stations: ${failure.message}",
           );
         },
         (stations) {
           _stations = stations;
+          print("DEBUG: Stations set in provider: ${_stations.length}");
+          if (_stations.isNotEmpty) {
+            print(
+              "DEBUG: First station: id=${_stations.first.stationId}, pos=(${_stations.first.lat}, ${_stations.first.lon})",
+            );
+          } else {
+            print("DEBUG: Provider received empty stations list");
+          }
+
           print(
             "STATION PROVIDER: Successfully loaded ${stations.length} sample stations",
           );
@@ -106,6 +119,7 @@ class StationProvider with ChangeNotifier {
         },
       );
     } catch (e) {
+      print("DEBUG: Provider caught exception: $e");
       print("STATION PROVIDER: Exception loading sample stations: $e");
       _setError('Failed to load sample stations: ${e.toString()}');
     }

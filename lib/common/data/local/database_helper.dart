@@ -52,12 +52,33 @@ class DatabaseHelper {
     }
 
     // Open the database with migration support
-    return await openDatabase(
+    final db = await openDatabase(
       path,
       version: _databaseVersion,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
+
+    print("DEBUG: Database opened at path: $path");
+    final tables = await db.rawQuery(
+      "SELECT name FROM sqlite_master WHERE type='table'",
+    );
+    print(
+      "DEBUG: Tables in database: ${tables.map((t) => t['name']).toList()}",
+    );
+
+    try {
+      final stationCount =
+          Sqflite.firstIntValue(
+            await db.rawQuery("SELECT COUNT(*) FROM StationDetails"),
+          ) ??
+          0;
+      print("DEBUG: StationDetails table has $stationCount records");
+    } catch (e) {
+      print("DEBUG: Error checking StationDetails table: $e");
+    }
+
+    return db;
   }
 
   // Create tables if database is newly created

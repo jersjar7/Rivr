@@ -62,15 +62,23 @@ class MapStationLocalDataSourceImpl implements MapStationLocalDataSource {
     try {
       final db = await _databaseHelper.database;
 
+      print("DEBUG: Executing sample stations query with limit: $limit");
       final List<Map<String, dynamic>> result = await db.rawQuery('''
-        SELECT * FROM StationDetails 
-        ORDER BY RANDOM() 
-        LIMIT $limit
-      ''');
+      SELECT * FROM StationDetails 
+      ORDER BY RANDOM() 
+      LIMIT $limit
+    ''');
+
+      print("DEBUG: Sample stations query returned ${result.length} rows");
+      if (result.isNotEmpty) {
+        print("DEBUG: First row data: ${result.first}");
+      } else {
+        print("DEBUG: Query returned no rows");
+      }
 
       return result.map((map) => MapStationModel.fromMap(map)).toList();
     } catch (e) {
-      print("Error querying sample stations: $e");
+      print("DEBUG: Error querying sample stations: $e");
       throw DatabaseException(message: "Failed to fetch sample stations: $e");
     }
   }

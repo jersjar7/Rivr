@@ -510,17 +510,24 @@ class _OptimizedMapPageState extends State<OptimizedMapPage>
     StationProvider stationProvider,
     EnhancedClusteredMapProvider clusteredMapProvider,
   ) {
+    print("DEBUG: Map page loading initial stations");
     stationProvider.loadSampleStations().then((_) {
       final stations = stationProvider.stations;
+      print("DEBUG: Map page got ${stations.length} stations from provider");
 
       // Update clustered map with the stations
       if (stations.isNotEmpty && _mapboxMap != null) {
+        print("DEBUG: Updating clustered map with ${stations.length} stations");
         clusteredMapProvider
             .updateStations(_mapboxMap!, stations)
-            .then((_) => print("OPTIMIZED MAP: Initial stations loaded"))
+            .then((_) => print("DEBUG: Initial stations loaded successfully"))
             .catchError(
-              (e) => print("OPTIMIZED MAP: Error loading initial stations: $e"),
+              (e) => print("DEBUG: Error loading initial stations: $e"),
             );
+      } else {
+        print(
+          "DEBUG: No stations to update or map is null. Stations count: ${stations.length}, Map null: ${_mapboxMap == null}",
+        );
       }
     });
   }

@@ -1,6 +1,7 @@
 // lib/features/map/data/datasources/clustered_map_datasource_impl.dart
 
 import 'dart:convert';
+import 'dart:math';
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
 import 'clustered_map_datasource.dart';
 import '../../domain/entities/map_station.dart';
@@ -94,14 +95,23 @@ class ClusteredMapDataSourceImpl implements ClusteredMapDataSource {
       // Add a layer for unclustered points
       final pointsLayer = '''{
       "id": "$_unclusteredPointsLayerId",
-      "type": "circle",
+      "type": "symbol",
       "source": "$_sourceId",
       "filter": ["!", ["has", "point_count"]],
+      "layout": {
+        "icon-image": "marker-15",
+        "icon-size": 1.5,
+        "icon-allow-overlap": true,
+        "text-field": ["get", "name"],
+        "text-font": ["Open Sans Regular"],
+        "text-offset": [0, 1.25],
+        "text-anchor": "top",
+        "text-size": 12
+      },
       "paint": {
-        "circle-color": ["get", "color"],
-        "circle-radius": 8,
-        "circle-stroke-width": 1,
-        "circle-stroke-color": "#ffffff"
+        "text-color": "#000000",
+        "text-halo-color": "#ffffff",
+        "text-halo-width": 1
       }
     }''';
 
@@ -200,6 +210,9 @@ class ClusteredMapDataSourceImpl implements ClusteredMapDataSource {
       // Debug first feature
       if (features.isNotEmpty) {
         print("DEBUG: First feature: ${features.first}");
+        print(
+          "DEBUG: GeoJSON data: ${jsonEncode(geojsonData).substring(0, min(200, jsonEncode(geojsonData).length))}...",
+        );
       }
 
       // Update the source data
@@ -232,7 +245,7 @@ class ClusteredMapDataSourceImpl implements ClusteredMapDataSource {
       }
 
       try {
-        await style.setStyleSourceProperty(_sourceId, "data", sourceProperty);
+        await style.setStyleSourceProperty(_sourceId, "data", geojsonData);
         print("DEBUG: Updated source data property successfully");
       } catch (e) {
         print("ERROR: Failed to update source data: $e");

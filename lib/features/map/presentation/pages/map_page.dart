@@ -538,26 +538,36 @@ class _OptimizedMapPageState extends State<OptimizedMapPage>
     }
   }
 
-  // Load initial set of stations
+  // Load initial set of stations (always full region, no samples)
   void _loadInitialStations(
     StationProvider stationProvider,
     EnhancedClusteredMapProvider clusteredMapProvider,
   ) {
     print("DEBUG: Map page loading initial stations");
 
+    // Grab the current visible region from your MapProvider
+    final mapProvider = Provider.of<MapProvider>(context, listen: false);
+    final region = mapProvider.visibleRegion;
+    if (region == null) {
+      print("WARN: No visible region yet, skipping station load");
+      return;
+    }
+
+    // Load every station in that region
     stationProvider
-        .loadSampleStations(limit: 25)
+        .loadStationsInRegion(
+          region,
+          limit: MapConstants.maxMarkersForPerformance,
+        )
         .then((_) {
           final stations = stationProvider.stations;
-          print(
-            "DEBUG: Map page got ${stations.length} stations from provider",
-          );
+          print("DEBUG: Loaded ${stations.length} stations in region");
 
           if (stations.isEmpty) {
-            print("ERROR: No stations loaded from database!");
+            print("ERROR: No stations in database for this region!");
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
-                content: Text('No stations found in the database!'),
+                content: Text('No stations found in this area!'),
                 backgroundColor: Colors.red,
                 duration: Duration(seconds: 5),
               ),
@@ -565,45 +575,21 @@ class _OptimizedMapPageState extends State<OptimizedMapPage>
             return;
           }
 
-          // Update clustered map with the stations
+          // Push them into your clustering provider
           if (_mapboxMap != null) {
-            print(
-              "DEBUG: Updating clustered map with ${stations.length} stations",
-            );
             clusteredMapProvider
                 .updateStations(_mapboxMap!, stations)
-                .then((_) {
-                  print("DEBUG: Initial stations loaded successfully");
-
-                  // If we have a selected station location, go to it
-                  if (_initialCenter != null) {
-                    _mapboxMap!.flyTo(
-                      CameraOptions(
-                        center: _initialCenter,
-                        zoom: MapConstants.minZoomForMarkers,
-                        pitch: _is3DMode ? MapConstants.defaultTilt : 0,
-                      ),
-                      MapAnimationOptions(
-                        duration: MapConstants.mapAnimationDurationMs,
-                        startDelay: MapConstants.mapAnimationDelayMs,
-                      ),
-                    );
-                  }
-                })
-                .catchError(
-                  (e) => print("DEBUG: Error loading initial stations: $e"),
-                );
-          } else {
-            print("ERROR: Map is null, can't update stations");
+                .then((_) => print("DEBUG: Initial clusters updated"))
+                .catchError((e) => print("ERROR: Clustering failed: $e"));
           }
         })
         .catchError((e) {
-          print("ERROR: Failed to load sample stations: $e");
+          print("ERROR: Failed to load stations in region: $e");
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text('Error loading stations: $e'),
               backgroundColor: Colors.red,
-              duration: Duration(seconds: 5),
+              duration: const Duration(seconds: 5),
             ),
           );
         });
@@ -656,24 +642,25 @@ class _OptimizedMapPageState extends State<OptimizedMapPage>
             },
           );
         }
-      } else if (stationProvider.stations.isNotEmpty &&
-          stationProvider.stations.length > 10) {
-        // Zoomed out, show only sample stations
-        stationProvider.clearStations();
-        stationProvider.loadSampleStations().then((_) {
-          // Update clustered map with the sample stations
-          final stations = stationProvider.stations;
-          if (stations.isNotEmpty && _mapboxMap != null) {
-            clusteredMapProvider
-                .updateStations(_mapboxMap!, stations)
-                .catchError(
-                  (e) => print(
-                    "OPTIMIZED MAP: Error updating sample stations: $e",
-                  ),
-                );
-          }
-        });
       }
+      // } else if (stationProvider.stations.isNotEmpty &&
+      //     stationProvider.stations.length > 10) {
+      //   // Zoomed out, show only sample stations
+      //   stationProvider.clearStations();
+      //   stationProvider.loadSampleStations().then((_) {
+      //     // Update clustered map with the sample stations
+      //     final stations = stationProvider.stations;
+      //     if (stations.isNotEmpty && _mapboxMap != null) {
+      //       clusteredMapProvider
+      //           .updateStations(_mapboxMap!, stations)
+      //           .catchError(
+      //             (e) => print(
+      //               "OPTIMIZED MAP: Error updating sample stations: $e",
+      //             ),
+      //           );
+      //     }
+      //   });
+      // }
     });
   }
 
@@ -751,14 +738,15 @@ class _OptimizedMapPageState extends State<OptimizedMapPage>
             },
           );
         }
-      } else {
-        stationProvider.loadSampleStations().then((_) {
-          clusteredMapProvider.updateStations(
-            _mapboxMap!,
-            stationProvider.stations,
-          );
-        });
       }
+      // } else {
+      //   stationProvider.loadSampleStations().then((_) {
+      //     clusteredMapProvider.updateStations(
+      //       _mapboxMap!,
+      //       stationProvider.stations,
+      //     );
+      //   });
+      // }
     });
   }
 

@@ -35,7 +35,7 @@ class MapConstants {
   static const double defaultZoom = 9.0;
 
   // Minimum zoom level to show station markers
-  static const double minZoomForMarkers = 10.0;
+  static const double minZoomForMarkers = 5.0;
 
   // 3D settings
   static const double defaultTilt = 45.0;

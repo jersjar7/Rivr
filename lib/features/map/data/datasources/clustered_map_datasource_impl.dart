@@ -1,7 +1,6 @@
 // lib/features/map/data/datasources/clustered_map_datasource_impl.dart
 
 import 'dart:convert';
-import 'dart:math';
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
 import 'clustered_map_datasource.dart';
 import '../../domain/entities/map_station.dart';
@@ -10,6 +9,7 @@ class ClusteredMapDataSourceImpl implements ClusteredMapDataSource {
   // Constants for clustering
   static const String _sourceId = 'stations-source';
   static const String _clustersLayerId = 'clusters';
+  static const String _unclusteredCircleLayerId = 'unclustered-points-circle';
   static const String _unclusteredPointsLayerId = 'unclustered-points';
   static const String _clusterCountLayerId = 'cluster-count';
 
@@ -19,153 +19,124 @@ class ClusteredMapDataSourceImpl implements ClusteredMapDataSource {
       print("DEBUG: Initializing cluster layers");
       final style = mapboxMap.style;
 
-      // Add the GeoJSON source with clustering enabled
-      final sourceJson = '''{
-      "type": "geojson",
-      "data": { "type": "FeatureCollection", "features": [] },
-      "cluster": true,
-      "clusterMaxZoom": 14,
-      "clusterRadius": 50
-    }''';
-
-      // Try to remove existing source if it exists
+      // Remove existing layers & source if present
       try {
-        // Remove all layers first (in correct order)
         await style.removeStyleLayer(_clusterCountLayerId);
         await style.removeStyleLayer(_unclusteredPointsLayerId);
+        await style.removeStyleLayer(_unclusteredCircleLayerId);
         await style.removeStyleLayer(_clustersLayerId);
         await style.removeStyleSource(_sourceId);
         print("DEBUG: Removed existing clustering layers and source");
       } catch (e) {
-        print("DEBUG: Some layers or source didn't exist: $e");
-        // Continue - this is expected in first initialization
+        print("DEBUG: No existing clustering to remove: $e");
       }
 
-      // Add a small delay to ensure cleanup completes
+      // Small delay to ensure cleanup
       await Future.delayed(const Duration(milliseconds: 100));
 
-      // Add the source
+      // Add the GeoJSON source with clustering enabled
+      final sourceJson = '''{
+        "type": "geojson",
+        "data": { "type": "FeatureCollection", "features": [] },
+        "cluster": true,
+        "clusterMaxZoom": 14,
+        "clusterRadius": 50
+      }''';
       await style.addStyleSource(_sourceId, sourceJson);
-      print("DEBUG: Added GeoJSON source with ID: $_sourceId");
+      print("DEBUG: Added GeoJSON source '$_sourceId'");
 
-      // DEBUG: Check if source exists
-      try {
-        final sourceExists = await style.styleSourceExists(_sourceId);
-        print("DEBUG: Source $_sourceId exists check: $sourceExists");
-      } catch (e) {
-        print("DEBUG: Error checking source existence: $e");
-      }
-
-      // Add a layer for clustered points
+      // Cluster circles layer
       final clusterLayer = '''{
-      "id": "$_clustersLayerId",
-      "type": "circle",
-      "source": "$_sourceId",
-      "filter": ["has", "point_count"],
-      "paint": {
-        "circle-color": [
-          "step",
-          ["get", "point_count"],
-          "#51bbd6",
-          10,
-          "#f1f075",
-          30,
-          "#f28cb1"
-        ],
-        "circle-radius": [
-          "step",
-          ["get", "point_count"],
-          20,
-          10,
-          25,
-          30,
-          30
-        ]
-      }
-    }''';
-
-      try {
-        await style.removeStyleLayer(_clustersLayerId);
-      } catch (e) {
-        // Layer might not exist yet
-      }
+        "id": "$_clustersLayerId",
+        "type": "circle",
+        "source": "$_sourceId",
+        "filter": ["has", "point_count"],
+        "paint": {
+          "circle-color": [
+            "step",
+            ["get", "point_count"],
+            "#51bbd6",
+            10,
+            "#f1f075",
+            30,
+            "#f28cb1"
+          ],
+          "circle-radius": [
+            "step",
+            ["get", "point_count"],
+            20,
+            10,
+            25,
+            30,
+            30
+          ]
+        }
+      }''';
       await style.addStyleLayer(clusterLayer, null);
-      print("DEBUG: Added cluster layer with ID: $_clustersLayerId");
+      print("DEBUG: Added cluster layer '$_clustersLayerId'");
 
-      // Add a layer for unclustered points
-      final pointsLayer = '''{
-      "id": "$_unclusteredPointsLayerId",
-      "type": "symbol",
-      "source": "$_sourceId",
-      "filter": ["!", ["has", "point_count"]],
-      "layout": {
-        "icon-image": "marker-15",
-        "icon-size": 1.5,
-        "icon-allow-overlap": true,
-        "text-field": ["get", "name"],
-        "text-font": ["Open Sans Regular"],
-        "text-offset": [0, 1.25],
-        "text-anchor": "top",
-        "text-size": 12
-      },
-      "paint": {
-        "text-color": "#000000",
-        "text-halo-color": "#ffffff",
-        "text-halo-width": 1
-      }
-    }''';
-
-      try {
-        await style.removeStyleLayer(_unclusteredPointsLayerId);
-      } catch (e) {
-        // Layer might not exist yet
-      }
-      await style.addStyleLayer(pointsLayer, null);
+      // Unclustered single‐point circles (always visible)
+      final circleLayer = '''{
+        "id": "$_unclusteredCircleLayerId",
+        "type": "circle",
+        "source": "$_sourceId",
+        "filter": ["!", ["has", "point_count"]],
+        "paint": {
+          "circle-color": "#11b4da",
+          "circle-radius": 6,
+          "circle-stroke-width": 1,
+          "circle-stroke-color": "#ffffff"
+        }
+      }''';
+      await style.addStyleLayer(circleLayer, null);
       print(
-        "DEBUG: Added unclustered points layer with ID: $_unclusteredPointsLayerId",
+        "DEBUG: Added unclustered-circle layer '$_unclusteredCircleLayerId'",
       );
 
-      // Add a layer for cluster counts
+      // Unclustered symbol layer on top of circles (for labels/icons)
+      final pointsLayer = '''{
+        "id": "$_unclusteredPointsLayerId",
+        "type": "symbol",
+        "source": "$_sourceId",
+        "filter": ["!", ["has", "point_count"]],
+        "layout": {
+          "icon-image": "marker-default",
+          "icon-size": 0.1,
+          "icon-allow-overlap": true,
+          "text-field": ["get", "name"],
+          "text-font": ["Open Sans Regular"],
+          "text-offset": [0, 1.25],
+          "text-anchor": "top",
+          "text-size": 12
+        },
+        "paint": {
+          "text-color": "#000000",
+          "text-halo-color": "#ffffff",
+          "text-halo-width": 1
+        }
+      }''';
+      await style.addStyleLayer(pointsLayer, null);
+      print(
+        "DEBUG: Added unclustered-symbol layer '$_unclusteredPointsLayerId'",
+      );
+
+      // Cluster count labels
       final countLayer = '''{
-      "id": "$_clusterCountLayerId",
-      "type": "symbol",
-      "source": "$_sourceId",
-      "filter": ["has", "point_count"],
-      "layout": {
-        "text-field": "{point_count_abbreviated}",
-        "text-font": ["DIN Offc Pro Medium", "Arial Unicode MS Bold"],
-        "text-size": 12
-      },
-      "paint": {
-        "text-color": "#ffffff"
-      }
-    }''';
-
-      try {
-        await style.removeStyleLayer(_clusterCountLayerId);
-      } catch (e) {
-        // Layer might not exist yet
-      }
+        "id": "$_clusterCountLayerId",
+        "type": "symbol",
+        "source": "$_sourceId",
+        "filter": ["has", "point_count"],
+        "layout": {
+          "text-field": "{point_count_abbreviated}",
+          "text-font": ["DIN Offc Pro Medium", "Arial Unicode MS Bold"],
+          "text-size": 12
+        },
+        "paint": {
+          "text-color": "#ffffff"
+        }
+      }''';
       await style.addStyleLayer(countLayer, null);
-      print("DEBUG: Added cluster count layer with ID: $_clusterCountLayerId");
-
-      // DEBUG: Check if layers exist
-      try {
-        final clusterLayerExists = await style.styleLayerExists(
-          _clustersLayerId,
-        );
-        final pointsLayerExists = await style.styleLayerExists(
-          _unclusteredPointsLayerId,
-        );
-        final countLayerExists = await style.styleLayerExists(
-          _clusterCountLayerId,
-        );
-        print(
-          "DEBUG: Layers exist checks - clusters: $clusterLayerExists, points: $pointsLayerExists, count: $countLayerExists",
-        );
-      } catch (e) {
-        print("DEBUG: Error checking layer existence: $e");
-      }
+      print("DEBUG: Added cluster-count layer '$_clusterCountLayerId'");
 
       print("DEBUG: Cluster layers initialized successfully");
     } catch (e) {
@@ -181,13 +152,12 @@ class ClusteredMapDataSourceImpl implements ClusteredMapDataSource {
   ) async {
     try {
       print("DEBUG: Updating cluster data with ${stations.length} stations");
-
       if (stations.isEmpty) {
         print("WARNING: No stations to display");
         return;
       }
 
-      // Convert stations to GeoJSON format
+      // Convert stations to GeoJSON
       final features =
           stations.map((station) {
             return {
@@ -207,113 +177,29 @@ class ClusteredMapDataSourceImpl implements ClusteredMapDataSource {
 
       final geojsonData = {"type": "FeatureCollection", "features": features};
 
-      // Debug first feature
-      if (features.isNotEmpty) {
-        print("DEBUG: First feature: ${features.first}");
-        print(
-          "DEBUG: GeoJSON data: ${jsonEncode(geojsonData).substring(0, min(200, jsonEncode(geojsonData).length))}...",
-        );
-      }
-
-      // Update the source data
       final style = mapboxMap.style;
-      final sourceProperty = jsonEncode({"data": geojsonData});
 
-      // Check if source exists before updating
-      try {
-        final sourceExists = await style.styleSourceExists(_sourceId);
-        print(
-          "DEBUG: Source $_sourceId exists check before update: $sourceExists",
-        );
-
-        if (!sourceExists) {
-          print("ERROR: Cannot update non-existent source $_sourceId");
-          // Try to recreate the source if it doesn't exist
-          final sourceJson = '''{
+      // Ensure source exists
+      final exists = await style.styleSourceExists(_sourceId);
+      if (!exists) {
+        print("DEBUG: Source '$_sourceId' missing, recreating");
+        final sourceJson = jsonEncode({
           "type": "geojson",
-          "data": ${jsonEncode(geojsonData)},
+          "data": geojsonData,
           "cluster": true,
           "clusterMaxZoom": 14,
-          "clusterRadius": 50
-        }''';
-          await style.addStyleSource(_sourceId, sourceJson);
-          print("DEBUG: Recreated missing source $_sourceId");
-          return;
-        }
-      } catch (e) {
-        print("DEBUG: Error checking source existence: $e");
+          "clusterRadius": 50,
+        });
+        await style.addStyleSource(_sourceId, sourceJson);
       }
 
-      try {
-        await style.setStyleSourceProperty(_sourceId, "data", geojsonData);
-        print("DEBUG: Updated source data property successfully");
-      } catch (e) {
-        print("ERROR: Failed to update source data: $e");
-        rethrow;
-      }
-
-      // Check layer visibility
-      try {
-        // Use getStyleLayerProperty correctly - it returns a StylePropertyValue
-        final clusterLayerVisible = await style.getStyleLayerProperty(
-          _clustersLayerId,
-          "visibility",
-        );
-        final pointsLayerVisible = await style.getStyleLayerProperty(
-          _unclusteredPointsLayerId,
-          "visibility",
-        );
-        final countLayerVisible = await style.getStyleLayerProperty(
-          _clusterCountLayerId,
-          "visibility",
-        );
-
-        // Debug layer visibility value details
-        print(
-          "DEBUG: Layer visibility details - clusters: ${clusterLayerVisible.kind}, points: ${pointsLayerVisible.kind}, count: ${countLayerVisible.kind}",
-        );
-
-        // The correct way to check visibility is to use the value property of StylePropertyValue
-        final clusterIsVisible = clusterLayerVisible.value == "visible";
-        final pointsAreVisible = pointsLayerVisible.value == "visible";
-        final countIsVisible = countLayerVisible.value == "visible";
-
-        print(
-          "DEBUG: Layer visibility checks - clusters: $clusterIsVisible, points: $pointsAreVisible, count: $countIsVisible",
-        );
-
-        // Force visibility properly - needs to be a simple value, not a function
-        if (!clusterIsVisible) {
-          await style.setStyleLayerProperty(
-            _clustersLayerId,
-            "visibility",
-            '"visible"',
-          );
-          print("DEBUG: Forced clusters layer visibility to visible");
-        }
-
-        if (!pointsAreVisible) {
-          await style.setStyleLayerProperty(
-            _unclusteredPointsLayerId,
-            "visibility",
-            '"visible"',
-          );
-          print("DEBUG: Forced points layer visibility to visible");
-        }
-
-        if (!countIsVisible) {
-          await style.setStyleLayerProperty(
-            _clusterCountLayerId,
-            "visibility",
-            '"visible"',
-          );
-          print("DEBUG: Forced count layer visibility to visible");
-        }
-      } catch (e) {
-        print("DEBUG: Error checking/setting layer visibility: $e");
-      }
-
-      print("DEBUG: Updated cluster data with ${stations.length} stations");
+      // Use the GeoJSON update API for reliability and performance
+      await style.setStyleSourceProperty(
+        _sourceId,
+        "data",
+        geojsonData, // your Map<String, dynamic> or List of features
+      );
+      print("DEBUG: GeoJSON source data updated via setGeoJsonSourceData");
     } catch (e) {
       print("ERROR: Error updating cluster data: $e");
       rethrow;
@@ -326,8 +212,8 @@ class ClusteredMapDataSourceImpl implements ClusteredMapDataSource {
     Function(MapStation) onStationTapped,
     Function(Point, List<MapStation>) onClusterTapped,
   ) async {
-    // This is implemented through the MapWidget.onTapListener property
-    print("DEBUG: Tap handling will be set up through MapWidget.onTapListener");
+    // Handled externally via MapWidget.onTapListener
+    print("DEBUG: Tap handling is configured in the MapWidget layer");
   }
 
   @override
@@ -335,17 +221,16 @@ class ClusteredMapDataSourceImpl implements ClusteredMapDataSource {
     try {
       print("DEBUG: Disposing cluster resources");
       final style = mapboxMap.style;
-
       try {
         await style.removeStyleLayer(_clusterCountLayerId);
         await style.removeStyleLayer(_unclusteredPointsLayerId);
+        await style.removeStyleLayer(_unclusteredCircleLayerId);
         await style.removeStyleLayer(_clustersLayerId);
         await style.removeStyleSource(_sourceId);
+        print("DEBUG: Cluster resources removed");
       } catch (e) {
-        print("WARNING: Error removing layers/source: $e");
+        print("WARNING: Error removing clustering resources: $e");
       }
-
-      print("DEBUG: Cluster resources disposed");
     } catch (e) {
       print("ERROR: Error disposing cluster resources: $e");
     }

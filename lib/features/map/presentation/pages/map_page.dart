@@ -608,7 +608,8 @@ class _OptimizedMapPageState extends State<OptimizedMapPage>
   }
 
   // Handle map movement with proper station loading
-  void _onMapMoved() {
+  // Handle map movement with dynamic clustering radius
+  Future<void> _onMapMoved() async {
     if (!mounted || _mapboxMap == null) return;
 
     final mapProvider = Provider.of<MapProvider>(context, listen: false);
@@ -621,47 +622,44 @@ class _OptimizedMapPageState extends State<OptimizedMapPage>
       listen: false,
     );
 
-    mapProvider.updateVisibleRegion().then((_) {
-      if (!mounted) return;
+    // 1) Update the visible region & get the current zoom
+    await mapProvider.updateVisibleRegion();
+    final bounds = mapProvider.visibleRegion;
+    if (bounds == null) return;
+    final zoom = mapProvider.currentZoom;
 
-      if (mapProvider.currentZoom >= MapConstants.minZoomForMarkers) {
-        // Zoomed in enough to show detailed stations
-        if (mapProvider.visibleRegion != null) {
-          stationProvider.loadStationsInRegion(mapProvider.visibleRegion!).then(
-            (_) {
-              // Update clustered map with the stations
-              final stations = stationProvider.stations;
-              if (stations.isNotEmpty && _mapboxMap != null) {
-                clusteredMapProvider
-                    .updateStations(_mapboxMap!, stations)
-                    .catchError(
-                      (e) =>
-                          print("OPTIMIZED MAP: Error updating stations: $e"),
-                    );
-              }
-            },
+    // 2) Pick a clusterRadius based on zoom
+    final dynamicRadius =
+        zoom < 5
+            ? 500 // very zoomed out → huge clusters
+            : zoom < 8
+            ? 300 // mid zoom → medium clusters
+            : MapConstants.clusterRadius; // default (e.g. 50)
+
+    // 3) Apply it to your source before clustering
+    try {
+      await _mapboxMap!.style.setStyleSourceProperty(
+        "stations-source", // your source ID
+        "clusterRadius",
+        dynamicRadius,
+      );
+    } catch (e) {
+      print("WARN: could not update clusterRadius: $e");
+    }
+
+    // 4) Load and cluster stations normally
+    stationProvider
+        .loadStationsInRegion(
+          bounds,
+          limit: MapConstants.maxMarkersForPerformance,
+        )
+        .then((_) {
+          clusteredMapProvider.updateStations(
+            _mapboxMap!,
+            stationProvider.stations,
           );
-        }
-      }
-      // } else if (stationProvider.stations.isNotEmpty &&
-      //     stationProvider.stations.length > 10) {
-      //   // Zoomed out, show only sample stations
-      //   stationProvider.clearStations();
-      //   stationProvider.loadSampleStations().then((_) {
-      //     // Update clustered map with the sample stations
-      //     final stations = stationProvider.stations;
-      //     if (stations.isNotEmpty && _mapboxMap != null) {
-      //       clusteredMapProvider
-      //           .updateStations(_mapboxMap!, stations)
-      //           .catchError(
-      //             (e) => print(
-      //               "OPTIMIZED MAP: Error updating sample stations: $e",
-      //             ),
-      //           );
-      //     }
-      //   });
-      // }
-    });
+        })
+        .catchError((e) => print("ERROR updating stations: $e"));
   }
 
   // Change map style using the style manager
@@ -726,27 +724,18 @@ class _OptimizedMapPageState extends State<OptimizedMapPage>
     );
 
     mapProvider.updateVisibleRegion().then((_) {
-      if (mapProvider.currentZoom >= MapConstants.minZoomForMarkers) {
-        if (mapProvider.visibleRegion != null) {
-          stationProvider.loadStationsInRegion(mapProvider.visibleRegion!).then(
-            (_) {
-              // Update clustered map with the stations
-              clusteredMapProvider.updateStations(
-                _mapboxMap!,
-                stationProvider.stations,
-              );
-            },
-          );
-        }
-      }
-      // } else {
-      //   stationProvider.loadSampleStations().then((_) {
-      //     clusteredMapProvider.updateStations(
-      //       _mapboxMap!,
-      //       stationProvider.stations,
-      //     );
-      //   });
-      // }
+      final bounds = mapProvider.visibleRegion;
+      if (bounds == null) return;
+
+      stationProvider
+          .loadStationsInRegion(bounds)
+          .then(
+            (_) => clusteredMapProvider.updateStations(
+              _mapboxMap!,
+              stationProvider.stations,
+            ),
+          )
+          .catchError((e) => print("Error refreshing stations: $e"));
     });
   }
 

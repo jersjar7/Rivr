@@ -120,10 +120,10 @@ class EnhancedClusteredMapProvider with ChangeNotifier {
     return _queueOperation(() async {
       try {
         // Skip if no actual changes
-        if (_areStationsEqual(_currentStations, stations)) {
-          print('Station data unchanged, skipping update');
-          return;
-        }
+        // if (_areStationsEqual(_currentStations, stations)) {
+        //   print('Station data unchanged, skipping update');
+        //   return;
+        // }
 
         _setStatus(ClusteringStatus.updating);
         _currentStations = List.from(stations);

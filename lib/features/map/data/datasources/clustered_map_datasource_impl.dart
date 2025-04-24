@@ -2,6 +2,7 @@
 
 import 'dart:convert';
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
+import 'package:rivr/core/constants/map_constants.dart';
 import 'clustered_map_datasource.dart';
 import '../../domain/entities/map_station.dart';
 
@@ -45,33 +46,22 @@ class ClusteredMapDataSourceImpl implements ClusteredMapDataSource {
       await style.addStyleSource(_sourceId, sourceJson);
       print("DEBUG: Added GeoJSON source '$_sourceId'");
 
-      // Cluster circles layer
+      // unified paint JSON fragment
+      const bubblePaint = '''
+        "paint": {
+          "circle-color": "${MapConstants.defaultMarkerColor}", 
+          "circle-radius": 20
+        }
+      ''';
+
+      // 1) Cluster circles layer (always blue, radius=25)
       final clusterLayer = '''{
         "id": "$_clustersLayerId",
         "type": "circle",
         "source": "$_sourceId",
         "filter": ["has", "point_count"],
-        "paint": {
-          "circle-color": [
-            "step",
-            ["get", "point_count"],
-            "#51bbd6",
-            10,
-            "#f1f075",
-            30,
-            "#f28cb1"
-          ],
-          "circle-radius": [
-            "step",
-            ["get", "point_count"],
-            20,
-            10,
-            25,
-            30,
-            30
-          ]
-        }
-      }''';
+        $bubblePaint
+        }''';
       await style.addStyleLayer(clusterLayer, null);
       print("DEBUG: Added cluster layer '$_clustersLayerId'");
 
@@ -127,8 +117,13 @@ class ClusteredMapDataSourceImpl implements ClusteredMapDataSource {
         "source": "$_sourceId",
         "filter": ["has", "point_count"],
         "layout": {
-          "text-field": "{point_count_abbreviated}",
-          "text-font": ["DIN Offc Pro Medium", "Arial Unicode MS Bold"],
+          "text-field": [
+            "step",
+            ["get", "point_count"],
+            ["to-string", ["get", "point_count_abbreviated"]],
+            1000, "1000+"
+          ],
+          "text-font": ["DIN Offc Pro Medium","Arial Unicode MS Bold"],
           "text-size": 12
         },
         "paint": {
@@ -136,6 +131,7 @@ class ClusteredMapDataSourceImpl implements ClusteredMapDataSource {
         }
       }''';
       await style.addStyleLayer(countLayer, null);
+
       print("DEBUG: Added cluster-count layer '$_clusterCountLayerId'");
 
       print("DEBUG: Cluster layers initialized successfully");

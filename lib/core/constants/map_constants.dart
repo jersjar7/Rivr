@@ -45,7 +45,7 @@ class MapConstants {
   static const int clusterRadius = 50; // pixels
   static const int clusterMaxZoom = 12; // max zoom to cluster points
   static const int maxMarkersForPerformance =
-      1000; // maximum markers to display
+      1300000; // maximum markers to display
 
   // Marker style
   static const double defaultMarkerSize = 15.0;

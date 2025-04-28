@@ -378,4 +378,10 @@ class MapProvider with ChangeNotifier {
     _isMapInitialized = false;
     notifyListeners();
   }
+
+  // Set the current map style
+  void setCurrentStyle(String style) {
+    _currentStyle = style;
+    notifyListeners();
+  }
 }

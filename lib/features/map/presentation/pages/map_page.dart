@@ -3,7 +3,7 @@
 import 'package:flutter/material.dart';
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
 import 'package:provider/provider.dart';
-import 'package:flutter/foundation.dart';
+import 'package:rivr/features/map/presentation/utils/map_tap_handler.dart';
 
 import '../../../../core/constants/map_constants.dart';
 import '../../../../core/network/connection_monitor.dart';
@@ -48,6 +48,8 @@ class _OptimizedMapPageState extends State<OptimizedMapPage>
 
   // Helper instance
   late MapInitializationHelper _initHelper;
+
+  MapTapHandler? _mapTapHandler;
 
   @override
   void initState() {
@@ -222,6 +224,14 @@ class _OptimizedMapPageState extends State<OptimizedMapPage>
             ),
             styleUri: mapProvider.currentStyle,
             onCameraChangeListener: _handleCameraChanged,
+            // Add the onTapListener here
+            onTapListener: (tapData) {
+              if (_mapTapHandler != null) {
+                _mapTapHandler!.handleMapTap(tapData);
+              } else {
+                print("Warning: MapTapHandler is null, can't process tap");
+              }
+            },
           );
         } catch (e) {
           print("OPTIMIZED MAP: Exception building map: $e");
@@ -259,6 +269,10 @@ class _OptimizedMapPageState extends State<OptimizedMapPage>
 
     _isMapCreated = true;
     _mapboxMap = mapboxMap;
+
+    // Initialize map tap handler
+    _mapTapHandler = MapTapHandler(mapboxMap: mapboxMap, context: context);
+    _mapTapHandler!.setupTapHandlers();
 
     // Get providers
     final stationProvider = Provider.of<StationProvider>(

@@ -1,40 +1,44 @@
 // lib/features/map/presentation/utils/map_tap_handler.dart
-
 import 'dart:math' as Math;
 import 'package:flutter/material.dart';
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
 import 'package:provider/provider.dart';
-import 'package:rivr/features/map/presentation/providers/enhanced_clustered_map_provider.dart';
-import 'package:rivr/features/map/presentation/providers/station_provider.dart';
 
+import '../providers/enhanced_clustered_map_provider.dart';
+import '../providers/station_provider.dart';
 import '../providers/map_provider.dart';
 import '../../../../core/constants/map_constants.dart';
 
-/// Handles tap events on the map, including marker and cluster taps
 class MapTapHandler {
   final MapboxMap mapboxMap;
   final BuildContext context;
 
-  const MapTapHandler({required this.mapboxMap, required this.context});
+  MapTapHandler({required this.mapboxMap, required this.context});
 
-  /// Set up the tap handlers for the map
+  /// Set up the tap handler
   Future<void> setupTapHandlers() async {
     print("MapTapHandler: Setting up tap handlers");
-    // The actual tap handling will be done through the MapWidget's onTapListener
-    // which should be set up in the MapWidget creation.
-    // This class will handle the business logic when taps occur.
+    // The actual handling will be done via the handleMapTap method
+    // which is connected to the MapWidget's onTapListener in map_page.dart
   }
 
   /// Handle tap events from the map
   Future<void> handleMapTap(MapContentGestureContext tapContext) async {
     try {
-      // Get tap coordinates
-      final screenCoord = tapContext.touchPosition;
-      final mapCoord = tapContext.point;
+      // Get providers
       final clusteredMapProvider = Provider.of<EnhancedClusteredMapProvider>(
         context,
         listen: false,
       );
+      final stationProvider = Provider.of<StationProvider>(
+        context,
+        listen: false,
+      );
+      final mapProvider = Provider.of<MapProvider>(context, listen: false);
+
+      // Get tap coordinates
+      final screenCoord = tapContext.touchPosition;
+      final mapCoord = tapContext.point;
 
       print(
         "Map tapped at screen coord: $screenCoord, map coord: ${mapCoord.coordinates.lat}, ${mapCoord.coordinates.lng}",
@@ -45,12 +49,19 @@ class MapTapHandler {
 
       // If no features found, deselect current station
       if (features.isEmpty) {
+        print("No features found at tap location, deselecting station");
         clusteredMapProvider.deselectStation();
         return;
       }
 
       // Process the tap based on the features found
-      await processFeatures(features, mapCoord);
+      await processFeatures(
+        features,
+        mapCoord,
+        clusteredMapProvider,
+        stationProvider,
+        mapProvider,
+      );
     } catch (e) {
       print("Error handling map tap: $e");
     }
@@ -91,6 +102,9 @@ class MapTapHandler {
   Future<void> processFeatures(
     List<QueriedRenderedFeature?> features,
     Point mapCoord,
+    EnhancedClusteredMapProvider clusteredMapProvider,
+    StationProvider stationProvider,
+    MapProvider mapProvider,
   ) async {
     if (features.isEmpty) return;
 
@@ -100,14 +114,24 @@ class MapTapHandler {
 
     // Check if the feature is a cluster
     final properties = feature.queriedFeature.feature as Map<String, dynamic>;
+    print("Feature properties: $properties");
 
     // Handle cluster tap
     if (properties.containsKey('cluster') && properties['cluster'] == true) {
-      await handleClusterTap(properties, mapCoord);
+      await handleClusterTap(properties, mapCoord, mapProvider);
+      return;
     }
+
     // Handle station tap
-    else if (properties.containsKey('id')) {
-      await handleStationTap(properties, mapCoord);
+    if (properties.containsKey('id')) {
+      await handleStationTap(
+        properties,
+        mapCoord,
+        clusteredMapProvider,
+        stationProvider,
+        mapProvider,
+      );
+      return;
     }
   }
 
@@ -115,9 +139,8 @@ class MapTapHandler {
   Future<void> handleClusterTap(
     Map<String, dynamic> properties,
     Point mapCoord,
+    MapProvider mapProvider,
   ) async {
-    final mapProvider = Provider.of<MapProvider>(context, listen: false);
-
     print("Tapped on cluster with ${properties['point_count']} points");
 
     // Zoom in to expand the cluster
@@ -136,28 +159,31 @@ class MapTapHandler {
   Future<void> handleStationTap(
     Map<String, dynamic> properties,
     Point mapCoord,
+    EnhancedClusteredMapProvider clusteredMapProvider,
+    StationProvider stationProvider,
+    MapProvider mapProvider,
   ) async {
-    final stationProvider = Provider.of<StationProvider>(
-      context,
-      listen: false,
-    );
-    final clusteredMapProvider = Provider.of<EnhancedClusteredMapProvider>(
-      context,
-      listen: false,
-    );
-
     final stationId = properties['id'].toString();
-
     print("Tapped on station with ID: $stationId");
 
     // Find matching station in our list
     try {
       final stations = stationProvider.stations;
+
+      // Convert stationId to int if necessary
+      final int stationIdInt = int.parse(stationId);
+
+      // Find the tapped station
       final tappedStation = stations.firstWhere(
-        (station) => station.stationId.toString() == stationId,
+        (station) => station.stationId == stationIdInt,
+        orElse: () => throw Exception("Station not found in provider"),
       );
 
-      // Select this station
+      print(
+        "Found matching station: ${tappedStation.stationId}, name: ${tappedStation.name}",
+      );
+
+      // Select this station in the provider
       clusteredMapProvider.selectStation(tappedStation);
 
       // Center map on the selected station with a nice zoom level
@@ -180,12 +206,5 @@ class MapTapHandler {
     } catch (e) {
       print("Error finding station with ID $stationId: $e");
     }
-  }
-
-  /// Clean up resources
-  void dispose() {
-    // No need to unsubscribe from anything, as the MapWidget tap listeners
-    // will be disposed when the widget is disposed
-    print("MapTapHandler disposed");
   }
 }

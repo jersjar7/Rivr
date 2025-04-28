@@ -108,6 +108,9 @@ class _OptimizedMapPageState extends State<OptimizedMapPage>
         listen: false,
       );
 
+      // Clean up the map tap handler
+      _mapTapHandler = null;
+
       // Clean up clustering resources first
       clusteredMapProvider.cleanupClustering(_mapboxMap!);
 
@@ -270,10 +273,6 @@ class _OptimizedMapPageState extends State<OptimizedMapPage>
     _isMapCreated = true;
     _mapboxMap = mapboxMap;
 
-    // Initialize map tap handler
-    _mapTapHandler = MapTapHandler(mapboxMap: mapboxMap, context: context);
-    _mapTapHandler!.setupTapHandlers();
-
     // Get providers
     final stationProvider = Provider.of<StationProvider>(
       context,
@@ -283,6 +282,10 @@ class _OptimizedMapPageState extends State<OptimizedMapPage>
       context,
       listen: false,
     );
+
+    // Initialize the map tap handler
+    _mapTapHandler = MapTapHandler(mapboxMap: mapboxMap, context: context);
+    _mapTapHandler!.setupTapHandlers();
 
     // Initialize the map
     _initHelper.initializeMap(

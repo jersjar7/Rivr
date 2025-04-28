@@ -1,6 +1,7 @@
 // lib/features/map/presentation/providers/map_provider.dart
 
 import 'dart:async';
+import 'dart:math' as Math;
 import 'package:flutter/material.dart';
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
 
@@ -245,14 +246,18 @@ class MapProvider with ChangeNotifier {
   }
 
   // Go to location
-  void goToLocation(Point point) {
+  void goToLocation(Point point, {double? zoom}) {
     if (_mapboxMap == null) return;
 
     try {
+      // Get the zoom level to use - either the provided one or a default close-up zoom
+      final zoomLevel =
+          zoom ?? Math.max(MapConstants.minZoomForMarkers + 4.0, _currentZoom);
+
       _mapboxMap!.flyTo(
         CameraOptions(
           center: point,
-          zoom: MapConstants.minZoomForMarkers,
+          zoom: zoomLevel, // Use the calculated zoom level
           pitch: _is3DMode ? MapConstants.defaultTilt : 0,
         ),
         MapAnimationOptions(

@@ -17,6 +17,7 @@ import '../utils/map_style_manager.dart';
 import '../widgets/map_search_bar.dart';
 import '../widgets/station_info_panel.dart';
 import '../widgets/station_list_drawer.dart';
+import '../widgets/drawer_pull_tag.dart';
 
 class OptimizedMapPage extends StatefulWidget {
   final double lat;
@@ -185,6 +186,11 @@ class _OptimizedMapPageState extends State<OptimizedMapPage>
                             tooltip: 'Show station list',
                             child: const Icon(Icons.list),
                           ),
+                        ),
+                        // ADD THE DRAWER PULL TAG HERE
+                        DrawerPullTag(
+                          onTap: () => _scaffoldKey.currentState?.openDrawer(),
+                          backgroundColor: Theme.of(context).primaryColor,
                         ),
                       ],
                     ),

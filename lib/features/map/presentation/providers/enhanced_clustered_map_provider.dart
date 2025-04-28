@@ -386,14 +386,4 @@ class EnhancedClusteredMapProvider with ChangeNotifier {
     _status = ClusteringStatus.error;
     notifyListeners();
   }
-
-  bool _areStationsEqual(List<MapStation> list1, List<MapStation> list2) {
-    if (list1.length != list2.length) return false;
-
-    // Simple check - compare lengths and check if all IDs are the same
-    final set1 = list1.map((s) => s.stationId).toSet();
-    final set2 = list2.map((s) => s.stationId).toSet();
-
-    return set1.containsAll(set2) && set2.containsAll(set1);
-  }
 }

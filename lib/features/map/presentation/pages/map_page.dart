@@ -3,6 +3,7 @@
 import 'package:flutter/material.dart';
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
 import 'package:provider/provider.dart';
+import 'package:flutter/foundation.dart';
 
 import '../../../../core/constants/map_constants.dart';
 import '../../../../core/network/connection_monitor.dart';
@@ -329,13 +330,17 @@ class _OptimizedMapPageState extends State<OptimizedMapPage>
           bounds,
           limit: MapConstants.maxMarkersForPerformance,
         )
-        .then((_) {
-          clusteredMapProvider.updateStations(
-            _mapboxMap!,
-            stationProvider.stations,
-          );
-        })
-        .catchError((e) => print("ERROR updating stations: $e"));
+        .then(
+          (_) {
+            clusteredMapProvider.updateStations(
+              _mapboxMap!,
+              stationProvider.stations,
+            );
+          },
+          onError: (e) {
+            debugPrint("ERROR updating stations: $e");
+          },
+        );
   }
 
   // Change map style

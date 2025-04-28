@@ -18,9 +18,6 @@ class MapStyleManager {
   String _currentStyle;
   String get currentStyle => _currentStyle;
 
-  /// Completer that resolves when a style load finishes
-  Completer<bool>? _styleLoadCompleter;
-
   /// Constructor
   MapStyleManager({
     required this.mapboxMap,
@@ -44,9 +41,6 @@ class MapStyleManager {
 
     print('Changing map style to: $newStyle');
     _currentStyle = newStyle;
-
-    // Create a completer to track style load completion
-    _styleLoadCompleter = Completer<bool>();
 
     try {
       // Load the new style

@@ -141,13 +141,23 @@ class _OptimizedMapPageState extends State<OptimizedMapPage>
         offlineBuilder: (context, status) => _buildOfflineView(),
         child: Stack(
           children: [
-            // Mapbox Map
+            // Mapbox Map (bottommost layer)
             _buildMap(),
 
-            // Add the hint widget once, passing state & handler:
+            // Add the hint widget
             ZoomHintWidget(
               show: _showZoomHint,
               onClose: () => setState(() => _showZoomHint = false),
+            ),
+
+            // Drawer pull tag - Move to main Stack to always be visible
+            Positioned(
+              left: 0,
+              top: MediaQuery.of(context).padding.top + 100,
+              child: DrawerPullTag(
+                onTap: () => _scaffoldKey.currentState?.openDrawer(),
+                backgroundColor: Theme.of(context).primaryColor,
+              ),
             ),
 
             // UI Elements
@@ -160,27 +170,6 @@ class _OptimizedMapPageState extends State<OptimizedMapPage>
                       children: [
                         // Loading indicator
                         MapLoadingIndicator(),
-
-                        // Station list button (positioned at top-left)
-                        Positioned(
-                          top: 16,
-                          left: 16,
-                          child: FloatingActionButton(
-                            heroTag: 'stationListBtn',
-                            onPressed: () {
-                              _scaffoldKey.currentState?.openDrawer();
-                            },
-                            backgroundColor: Colors.white,
-                            foregroundColor: Theme.of(context).primaryColor,
-                            tooltip: 'Show station list',
-                            child: const Icon(Icons.list),
-                          ),
-                        ),
-                        // Drawer pull tag
-                        DrawerPullTag(
-                          onTap: () => _scaffoldKey.currentState?.openDrawer(),
-                          backgroundColor: Theme.of(context).primaryColor,
-                        ),
                       ],
                     ),
                   ),

@@ -29,7 +29,7 @@ class DrawerPullTag extends StatelessWidget {
         child: GestureDetector(
           onTap: onTap,
           child: Container(
-            height: 80,
+            height: 70,
             width: 24,
             decoration: BoxDecoration(
               color: backgroundColor ?? theme.primaryColor,

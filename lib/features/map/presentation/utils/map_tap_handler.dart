@@ -112,26 +112,40 @@ class MapTapHandler {
     final feature = features.firstWhere((f) => f != null, orElse: () => null);
     if (feature == null) return;
 
-    // Check if the feature is a cluster
-    final properties = feature.queriedFeature.feature as Map<String, dynamic>;
-    print("Feature properties: $properties");
+    try {
+      // Safely cast the feature to Map<String, dynamic>
+      final Map<String, dynamic> properties = {};
 
-    // Handle cluster tap
-    if (properties.containsKey('cluster') && properties['cluster'] == true) {
-      await handleClusterTap(properties, mapCoord, mapProvider);
-      return;
-    }
+      // Get the feature safely
+      final queryFeature = feature.queriedFeature.feature;
+      // Convert all keys to strings
+      queryFeature.forEach((key, value) {
+        if (key is String) {
+          properties[key] = value;
+        }
+      });
 
-    // Handle station tap
-    if (properties.containsKey('id')) {
-      await handleStationTap(
-        properties,
-        mapCoord,
-        clusteredMapProvider,
-        stationProvider,
-        mapProvider,
-      );
-      return;
+      print("Feature properties: $properties");
+
+      // Handle cluster tap
+      if (properties.containsKey('cluster') && properties['cluster'] == true) {
+        await handleClusterTap(properties, mapCoord, mapProvider);
+        return;
+      }
+
+      // Handle station tap
+      if (properties.containsKey('id')) {
+        await handleStationTap(
+          properties,
+          mapCoord,
+          clusteredMapProvider,
+          stationProvider,
+          mapProvider,
+        );
+        return;
+      }
+    } catch (e) {
+      print("Error processing features: $e");
     }
   }
 

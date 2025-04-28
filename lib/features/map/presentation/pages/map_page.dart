@@ -6,6 +6,7 @@ import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
 import 'package:provider/provider.dart';
 import 'package:rivr/common/data/local/database_helper.dart';
 import 'package:rivr/features/map/presentation/providers/enhanced_clustered_map_provider.dart';
+import 'package:rivr/features/map/presentation/widgets/zoom_hint.dart';
 
 import '../../../../core/constants/map_constants.dart';
 import '../../../../core/network/connection_monitor.dart';
@@ -41,6 +42,9 @@ class _OptimizedMapPageState extends State<OptimizedMapPage>
   bool _isMapCreated = false;
   bool _isResetting = false;
   bool _is3DMode = true;
+
+  bool _showZoomHint = true;
+  bool _hasUserInteracted = false;
 
   @override
   void initState() {
@@ -136,6 +140,12 @@ class _OptimizedMapPageState extends State<OptimizedMapPage>
             // Mapbox Map
             _buildMap(),
 
+            // Add the hint widget once, passing state & handler:
+            ZoomHintWidget(
+              show: _showZoomHint,
+              onClose: () => setState(() => _showZoomHint = false),
+            ),
+
             // UI Elements
             SafeArea(
               child: Column(
@@ -144,9 +154,6 @@ class _OptimizedMapPageState extends State<OptimizedMapPage>
                   Expanded(
                     child: Stack(
                       children: [
-                        // Zoom message overlay
-                        _buildZoomMessage(),
-
                         // Loading indicator
                         _buildLoadingIndicator(),
 
@@ -240,35 +247,6 @@ class _OptimizedMapPageState extends State<OptimizedMapPage>
           onRefresh: _refreshStations,
           onZoomIn: _zoomIn,
           onZoomOut: _zoomOut,
-        );
-      },
-    );
-  }
-
-  Widget _buildZoomMessage() {
-    return Consumer<MapProvider>(
-      builder: (context, mapProvider, child) {
-        if (!mapProvider.showZoomMessage) {
-          return const SizedBox.shrink();
-        }
-
-        return Positioned(
-          bottom: 150,
-          left: 0,
-          right: 0,
-          child: Center(
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              decoration: BoxDecoration(
-                color: Colors.black54,
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: const Text(
-                'Zoom in to see stations',
-                style: TextStyle(color: Colors.white),
-              ),
-            ),
-          ),
         );
       },
     );
@@ -597,14 +575,12 @@ class _OptimizedMapPageState extends State<OptimizedMapPage>
 
   // Handle camera change events with debouncing
   void _handleCameraChanged(CameraChangedEventData data) {
-    if (_mapboxMap == null) return;
-
+    if (!_hasUserInteracted) {
+      _hasUserInteracted = true;
+      return; // skip the first, system-driven change
+    }
     final mapProvider = Provider.of<MapProvider>(context, listen: false);
-
-    // Debounce map movements
-    mapProvider.triggerDebounceTimer(() {
-      _onMapMoved();
-    });
+    mapProvider.triggerDebounceTimer(_onMapMoved);
   }
 
   // Handle map movement with proper station loading
@@ -622,32 +598,28 @@ class _OptimizedMapPageState extends State<OptimizedMapPage>
       listen: false,
     );
 
-    // 1) Update the visible region & get the current zoom
+    // 1) Update visible region & zoom
     await mapProvider.updateVisibleRegion();
     final bounds = mapProvider.visibleRegion;
     if (bounds == null) return;
     final zoom = mapProvider.currentZoom;
-
-    // 2) Pick a clusterRadius based on zoom
-    final dynamicRadius =
-        zoom < 5
-            ? 500 // very zoomed out → huge clusters
-            : zoom < 8
-            ? 300 // mid zoom → medium clusters
-            : MapConstants.clusterRadius; // default (e.g. 50)
-
-    // 3) Apply it to your source before clustering
-    try {
-      await _mapboxMap!.style.setStyleSourceProperty(
-        "stations-source", // your source ID
-        "clusterRadius",
-        dynamicRadius,
-      );
-    } catch (e) {
-      print("WARN: could not update clusterRadius: $e");
+    if (zoom < MapConstants.minZoomForMarkers && !_showZoomHint) {
+      setState(() => _showZoomHint = true);
     }
 
-    // 4) Load and cluster stations normally
+    // 2) If we've gone above, dismiss it
+    if (zoom >= MapConstants.minZoomForMarkers && _showZoomHint) {
+      setState(() => _showZoomHint = false);
+    }
+
+    // 3) only cluster at or above threshold
+    if (zoom < MapConstants.minZoomForMarkers) {
+      // clear any existing clusters & skip loading
+      clusteredMapProvider.cleanupClustering(_mapboxMap!);
+      return;
+    }
+
+    // 4) Load & cluster stations
     stationProvider
         .loadStationsInRegion(
           bounds,

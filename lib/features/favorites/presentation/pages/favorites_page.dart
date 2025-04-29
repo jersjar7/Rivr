@@ -2,10 +2,10 @@
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:rivr/core/widgets/empty_state.dart';
-import 'package:rivr/core/widgets/loading_indicator.dart';
-import 'package:rivr/features/favorites/presentation/providers/favorites_provider.dart';
-import 'package:rivr/features/favorites/presentation/widgets/favorite_list_item.dart';
+import '../providers/favorites_provider.dart';
+import '../../../../features/auth/presentation/providers/auth_provider.dart';
+import '../../../../core/widgets/empty_state.dart';
+import '../widgets/favorite_item.dart';
 
 class FavoritesPage extends StatefulWidget {
   final double lat;
@@ -18,8 +18,6 @@ class FavoritesPage extends StatefulWidget {
 }
 
 class _FavoritesPageState extends State<FavoritesPage> {
-  bool _isLoading = true;
-
   @override
   void initState() {
     super.initState();
@@ -27,156 +25,109 @@ class _FavoritesPageState extends State<FavoritesPage> {
   }
 
   Future<void> _loadFavorites() async {
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
     final favoritesProvider = Provider.of<FavoritesProvider>(
       context,
       listen: false,
     );
 
-    setState(() {
-      _isLoading = true;
-    });
-
-    await favoritesProvider.loadFavorites();
-
-    if (mounted) {
-      setState(() {
-        _isLoading = false;
-      });
+    final user = authProvider.currentUser;
+    if (user != null) {
+      await favoritesProvider.loadFavorites(user.uid);
     }
   }
 
-  Future<void> _refreshFavorites() async {
-    final favoritesProvider = Provider.of<FavoritesProvider>(
+  void _navigateToMap() {
+    Navigator.pushNamed(
       context,
-      listen: false,
+      '/map',
+      arguments: {'lat': widget.lat, 'lon': widget.lon},
     );
-
-    await favoritesProvider.refreshFavorites();
   }
 
-  void _navigateToMap() {
-    Navigator.of(
+  void _navigateToForecast(String reachId, String stationName) {
+    Navigator.pushNamed(
       context,
-    ).pushNamed('/map', arguments: {'lat': widget.lat, 'lon': widget.lon});
+      '/forecast',
+      arguments: {'reachId': reachId, 'stationName': stationName},
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('My Rivers'),
+        title: const Text('My Favorites'),
         actions: [
           IconButton(
             icon: const Icon(Icons.map),
             onPressed: _navigateToMap,
             tooltip: 'Explore Map',
           ),
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: _refreshFavorites,
-            tooltip: 'Refresh',
-          ),
         ],
       ),
-      body: _buildBody(),
-    );
-  }
+      body: Consumer<FavoritesProvider>(
+        builder: (context, favoritesProvider, child) {
+          final status = favoritesProvider.status;
+          final favorites = favoritesProvider.favorites;
 
-  Widget _buildBody() {
-    if (_isLoading) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const LoadingIndicator(
-              message: 'Loading your favorite rivers...',
-              withBackground: true,
-            ),
-            const SizedBox(height: 40),
-            // Add skeleton loading for favorite items
-            ...List.generate(3, (index) => _buildSkeletonFavoriteItem()),
-          ],
-        ),
-      );
-    }
+          if (status == FavoritesStatus.loading) {
+            return const Center(child: CircularProgressIndicator());
+          }
 
-    return Consumer<FavoritesProvider>(
-      builder: (context, provider, child) {
-        final favorites = provider.favorites;
+          if (status == FavoritesStatus.error) {
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    'Error: ${favoritesProvider.errorMessage}',
+                    style: const TextStyle(color: Colors.red),
+                  ),
+                  const SizedBox(height: 16),
+                  ElevatedButton(
+                    onPressed: _loadFavorites,
+                    child: const Text('Retry'),
+                  ),
+                ],
+              ),
+            );
+          }
 
-        if (provider.isError) {
-          return ErrorStateView(
-            title: 'Could not load favorites',
-            message:
-                provider.errorMessage ??
-                'An error occurred while loading your favorites',
-            onRetry: _refreshFavorites,
-          );
-        }
+          if (favorites.isEmpty) {
+            return EmptyFavoritesView(onExploreMap: _navigateToMap);
+          }
 
-        if (favorites.isEmpty) {
-          return EmptyFavoritesView(onExploreMap: _navigateToMap);
-        }
-
-        return RefreshIndicator(
-          onRefresh: _refreshFavorites,
-          child: ListView.builder(
+          return ReorderableListView.builder(
+            padding: const EdgeInsets.all(8.0),
             itemCount: favorites.length,
-            padding: const EdgeInsets.symmetric(vertical: 8.0),
+            onReorder: favoritesProvider.reorderFavorites,
             itemBuilder: (context, index) {
-              return FavoriteListItem(
-                favorite: favorites[index],
-                onTap: () {
-                  // Navigate to forecast page
-                  Navigator.of(context).pushNamed(
-                    '/forecast',
-                    arguments: {
-                      'reachId': favorites[index].stationId.toString(),
-                      'stationName': favorites[index].name,
-                    },
+              final favorite = favorites[index];
+
+              return FavoriteItem(
+                key: Key('favorite_${favorite.stationId}'),
+                favorite: favorite,
+                onTap:
+                    () =>
+                        _navigateToForecast(favorite.stationId, favorite.name),
+                onDelete: () {
+                  final authProvider = Provider.of<AuthProvider>(
+                    context,
+                    listen: false,
                   );
+                  final user = authProvider.currentUser;
+                  if (user != null) {
+                    favoritesProvider.deleteFavorite(
+                      user.uid,
+                      favorite.stationId,
+                    );
+                  }
                 },
               );
             },
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildSkeletonFavoriteItem() {
-    return ShimmerLoading(
-      child: Card(
-        margin: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        child: Container(
-          padding: const EdgeInsets.all(16.0),
-          height: 100,
-          child: Row(
-            children: [
-              const SkeletonLoadingBox(
-                width: 60,
-                height: 60,
-                borderRadius: BorderRadius.all(Radius.circular(30)),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const SkeletonLoadingBox(width: 120, height: 20),
-                    const SizedBox(height: 8),
-                    const SkeletonLoadingBox(width: 80, height: 16),
-                    const SizedBox(height: 8),
-                    const SkeletonLoadingBox(width: 100, height: 16),
-                  ],
-                ),
-              ),
-              const SkeletonLoadingBox(width: 60, height: 40),
-            ],
-          ),
-        ),
+          );
+        },
       ),
     );
   }

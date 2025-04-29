@@ -7,7 +7,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:http/http.dart' as http;
 import 'package:rivr/common/data/local/database_helper.dart';
 import 'package:rivr/core/di/forecast_di.dart';
-import 'package:rivr/core/di/map_di.dart'; // Add this import
+import 'package:rivr/core/di/map_di.dart';
 import 'package:rivr/core/network/network_info.dart';
 import 'package:rivr/core/storage/app_database.dart';
 import 'package:rivr/core/storage/secure_storage.dart';
@@ -24,6 +24,14 @@ import 'package:rivr/features/auth/domain/usecases/sign_out.dart';
 import 'package:rivr/features/auth/domain/usecases/update_user_profile.dart';
 import 'package:rivr/features/auth/presentation/providers/auth_provider.dart'
     as app; // Use alias for our AuthProvider
+import 'package:rivr/features/favorites/data/datasources/favorites_local_datasource.dart';
+import 'package:rivr/features/favorites/data/repositories/favorites_repository_impl.dart';
+import 'package:rivr/features/favorites/domain/repositories/favorites_repository.dart';
+import 'package:rivr/features/favorites/domain/usecases/add_favorite.dart';
+import 'package:rivr/features/favorites/domain/usecases/get_favorites.dart';
+import 'package:rivr/features/favorites/domain/usecases/is_favorite.dart';
+import 'package:rivr/features/favorites/domain/usecases/remove_favorite.dart';
+import 'package:rivr/features/favorites/domain/usecases/update_favorite_position.dart';
 import 'package:rivr/features/forecast/domain/usecases/get_forecast.dart';
 import 'package:rivr/features/forecast/domain/usecases/get_return_periods.dart';
 import 'package:rivr/features/forecast/presentation/providers/forecast_provider.dart';
@@ -108,6 +116,25 @@ void _registerAuthDependencies() {
   sl.registerLazySingleton(() => UpdateUserProfile(sl()));
 }
 
+void _registerFavoritesDependencies() {
+  // Data sources
+  sl.registerLazySingleton<FavoritesLocalDataSource>(
+    () => FavoritesLocalDataSourceImpl(databaseHelper: sl()),
+  );
+
+  // Repositories
+  sl.registerLazySingleton<FavoritesRepository>(
+    () => FavoritesRepositoryImpl(localDataSource: sl()),
+  );
+
+  // Use cases
+  sl.registerLazySingleton(() => GetFavorites(sl()));
+  sl.registerLazySingleton(() => AddFavorite(sl()));
+  sl.registerLazySingleton(() => RemoveFavorite(sl()));
+  sl.registerLazySingleton(() => UpdateFavoritePosition(sl()));
+  sl.registerLazySingleton(() => IsFavorite(sl()));
+}
+
 // Register all providers
 void _registerProviders() {
   // Auth provider - use the aliased version
@@ -125,9 +152,15 @@ void _registerProviders() {
   );
 
   // Favorites provider
-  sl.registerFactory(() => FavoritesProvider());
-
-  // Map provider - moved to map_di.dart
+  sl.registerFactory(
+    () => FavoritesProvider(
+      getFavorites: sl(),
+      addFavorite: sl(),
+      removeFavorite: sl(),
+      updateFavoritePosition: sl(),
+      isFavorite: sl(),
+    ),
+  );
 
   // Return period provider
   sl.registerFactory(
@@ -152,9 +185,4 @@ void _registerProviders() {
       getReturnPeriods: sl<GetReturnPeriods>(),
     ),
   );
-}
-
-// Placeholder implementation for favorites dependencies
-void _registerFavoritesDependencies() {
-  // TODO: Implement favorites dependencies when needed
 }

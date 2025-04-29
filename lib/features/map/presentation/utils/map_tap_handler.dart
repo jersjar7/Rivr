@@ -192,14 +192,28 @@ class MapTapHandler {
     // Find matching station in our list
     try {
       final stations = stationProvider.stations;
+      final stationId = properties['id'].toString();
+      print("Looking up station with ID: $stationId");
+      print(
+        "Attempting to find station with ID: $stationId in ${stations.length} stations",
+      );
 
       // Convert stationId to int if necessary
       final int stationIdInt = int.parse(stationId);
+      print("Converted to int: $stationIdInt");
+
+      print("Current stations in provider: ${stations.length}");
+      print(
+        "First few station IDs: ${stations.take(5).map((s) => s.stationId).toList()}",
+      );
 
       // Find the tapped station
       final tappedStation = stations.firstWhere(
         (station) => station.stationId == stationIdInt,
-        orElse: () => throw Exception("Station not found in provider"),
+        orElse: () {
+          print("Station with ID $stationIdInt not found in provider");
+          throw Exception("Station not found in provider");
+        },
       );
 
       print(

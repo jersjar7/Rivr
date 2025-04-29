@@ -14,8 +14,13 @@ class UpdateClusterData {
 
   Future<Either<Failure, void>> call(
     MapboxMap mapboxMap,
-    List<MapStation> stations,
-  ) {
-    return repository.updateClusterData(mapboxMap, stations);
+    List<MapStation> stations, {
+    MapStation? selectedStation,
+  }) {
+    return repository.updateClusterData(
+      mapboxMap,
+      stations,
+      selectedStation: selectedStation,
+    );
   }
 }

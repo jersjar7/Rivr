@@ -1,4 +1,4 @@
-// lib/features/map/data/repositories_impl/clustered_map_repository_impl.dart
+// Update to lib/features/map/data/repositories_impl/clustered_map_repository_impl.dart
 
 import 'package:dartz/dartz.dart';
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
@@ -8,7 +8,7 @@ import '../../../../core/error/failures.dart';
 import '../../../../core/network/network_info.dart';
 import '../../domain/entities/map_station.dart';
 import '../../domain/repositories/clustered_map_repository.dart';
-import '../datasources/clustered_map_datasource.dart'; // Updated import
+import '../datasources/clustered_map_datasource.dart';
 import '../datasources/map_station_local_datasource.dart';
 
 class ClusteredMapRepositoryImpl implements ClusteredMapRepository {
@@ -39,10 +39,15 @@ class ClusteredMapRepositoryImpl implements ClusteredMapRepository {
   @override
   Future<Either<Failure, void>> updateClusterData(
     MapboxMap mapboxMap,
-    List<MapStation> stations,
-  ) async {
+    List<MapStation> stations, {
+    MapStation? selectedStation,
+  }) async {
     try {
-      await clusterDataSource.updateClusterData(mapboxMap, stations);
+      await clusterDataSource.updateClusterData(
+        mapboxMap,
+        stations,
+        selectedStation: selectedStation,
+      );
       return const Right(null);
     } on ServerException catch (e) {
       return Left(ServerFailure(message: e.message));

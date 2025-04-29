@@ -1,5 +1,4 @@
-// lib/features/map/presentation/pages/map_page.dart
-
+// lib/features/map/presentation/pages/map_page.dart - Updated
 import 'package:flutter/material.dart';
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
 import 'package:provider/provider.dart';
@@ -49,6 +48,7 @@ class _OptimizedMapPageState extends State<OptimizedMapPage>
   // Helper instance
   late MapInitializationHelper _initHelper;
 
+  // Map tap handler
   MapTapHandler? _mapTapHandler;
 
   @override
@@ -109,7 +109,10 @@ class _OptimizedMapPageState extends State<OptimizedMapPage>
       );
 
       // Clean up the map tap handler
-      _mapTapHandler = null;
+      if (_mapTapHandler != null) {
+        _mapTapHandler!.dispose();
+        _mapTapHandler = null;
+      }
 
       // Clean up clustering resources first
       clusteredMapProvider.cleanupClustering(_mapboxMap!);
@@ -175,7 +178,7 @@ class _OptimizedMapPageState extends State<OptimizedMapPage>
                     child: Stack(
                       children: [
                         // Loading indicator
-                        MapLoadingIndicator(),
+                        const MapLoadingIndicator(),
                       ],
                     ),
                   ),

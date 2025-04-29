@@ -13,8 +13,9 @@ abstract class ClusteredMapRepository {
   /// Update the stations data in the clusters
   Future<Either<Failure, void>> updateClusterData(
     MapboxMap mapboxMap,
-    List<MapStation> stations,
-  );
+    List<MapStation> stations, {
+    MapStation? selectedStation,
+  });
 
   /// Set up tap handling for clusters and individual stations
   Future<Either<Failure, void>> setupClusterTapHandling(

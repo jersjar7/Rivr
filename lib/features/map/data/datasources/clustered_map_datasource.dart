@@ -11,8 +11,9 @@ abstract class ClusteredMapDataSource {
   /// Update station data in the cluster source
   Future<void> updateClusterData(
     MapboxMap mapboxMap,
-    List<MapStation> stations,
-  );
+    List<MapStation> stations, {
+    MapStation? selectedStation,
+  });
 
   /// Clean up resources
   Future<void> dispose(MapboxMap mapboxMap);

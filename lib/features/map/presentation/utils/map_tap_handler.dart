@@ -1,17 +1,23 @@
-// lib/features/map/presentation/utils/map_tap_handler.dart
+// lib/features/map/presentation/utils/map_tap_handler.dart - Updated
 import 'dart:math' as Math;
 import 'package:flutter/material.dart';
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
 import 'package:provider/provider.dart';
+import 'package:rivr/features/map/domain/entities/map_station.dart';
 
 import '../providers/enhanced_clustered_map_provider.dart';
 import '../providers/station_provider.dart';
 import '../providers/map_provider.dart';
+import '../widgets/stream_info_panel.dart';
 import '../../../../core/constants/map_constants.dart';
 
 class MapTapHandler {
   final MapboxMap mapboxMap;
   final BuildContext context;
+
+  // Track the currently displayed info panel
+  StreamInfoPanel? _currentInfoPanel;
+  OverlayEntry? _overlayEntry;
 
   MapTapHandler({required this.mapboxMap, required this.context});
 
@@ -47,10 +53,11 @@ class MapTapHandler {
       // Query for features at the tap location
       final features = await queryFeaturesAtPoint(screenCoord);
 
-      // If no features found, deselect current station
+      // If no features found, deselect current station and remove info panel
       if (features.isEmpty) {
         print("No features found at tap location, deselecting station");
         clusteredMapProvider.deselectStation();
+        _removeInfoPanel();
         return;
       }
 
@@ -130,6 +137,8 @@ class MapTapHandler {
       // Handle cluster tap
       if (properties.containsKey('cluster') && properties['cluster'] == true) {
         await handleClusterTap(properties, mapCoord, mapProvider);
+        // Remove info panel when zooming into a cluster
+        _removeInfoPanel();
         return;
       }
 
@@ -210,15 +219,85 @@ class MapTapHandler {
           center: Point(
             coordinates: Position(tappedStation.lon, tappedStation.lat),
           ),
-          zoom: Math.max(13.0, currentZoom),
+          zoom: Math.max(14.0, currentZoom), // Zoom in closer to the station
         ),
         MapAnimationOptions(
           duration: MapConstants.mapAnimationDurationMs,
           startDelay: MapConstants.mapAnimationDelayMs,
         ),
       );
+
+      // Show the info panel for the selected station
+      _showInfoPanel(
+        tappedStation,
+        clusteredMapProvider,
+        stationProvider,
+        mapProvider,
+      );
     } catch (e) {
       print("Error finding station with ID $stationId: $e");
     }
+  }
+
+  /// Show the stream info panel for the selected station
+  void _showInfoPanel(
+    MapStation station,
+    EnhancedClusteredMapProvider clusteredMapProvider,
+    StationProvider stationProvider,
+    MapProvider mapProvider,
+  ) {
+    // Remove existing panel first
+    _removeInfoPanel();
+
+    // Find the overlay to add our widget to
+    final overlay = Overlay.of(context);
+
+    // Create a new info panel
+    _currentInfoPanel = StreamInfoPanel(
+      station: station,
+      onClose: () {
+        // When closed, deselect the station and remove the panel
+        clusteredMapProvider.deselectStation();
+        _removeInfoPanel();
+      },
+      onAddToFavorites: (station) async {
+        // Handle adding to favorites - you can implement this later
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Added ${station.name ?? "Station ${station.stationId}"} to favorites',
+            ),
+          ),
+        );
+      },
+      onViewForecast: (reachId, stationName) {
+        // Navigate to the forecast page
+        Navigator.pushNamed(
+          context,
+          '/forecast',
+          arguments: {'reachId': reachId, 'stationName': stationName},
+        );
+      },
+    );
+
+    // Create an overlay entry to show the panel
+    _overlayEntry = OverlayEntry(builder: (context) => _currentInfoPanel!);
+
+    // Add the entry to the overlay
+    overlay.insert(_overlayEntry!);
+  }
+
+  /// Remove the current info panel if it exists
+  void _removeInfoPanel() {
+    if (_overlayEntry != null) {
+      _overlayEntry!.remove();
+      _overlayEntry = null;
+      _currentInfoPanel = null;
+    }
+  }
+
+  /// Clean up resources when map is disposed
+  void dispose() {
+    _removeInfoPanel();
   }
 }

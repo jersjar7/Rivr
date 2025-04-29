@@ -1,4 +1,4 @@
-// lib/features/map/data/datasources/clustered_map_datasource_impl.dart
+// Update to lib/features/map/data/datasources/clustered_map_datasource_impl.dart
 
 import 'dart:convert';
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
@@ -13,6 +13,7 @@ class ClusteredMapDataSourceImpl implements ClusteredMapDataSource {
   static const String _unclusteredCircleLayerId = 'unclustered-points-circle';
   static const String _unclusteredPointsLayerId = 'unclustered-points';
   static const String _clusterCountLayerId = 'cluster-count';
+  static const String _selectedPointLayerId = 'selected-point';
 
   @override
   Future<void> initializeClusterLayers(MapboxMap mapboxMap) async {
@@ -22,6 +23,7 @@ class ClusteredMapDataSourceImpl implements ClusteredMapDataSource {
 
       // Remove existing layers & source if present
       try {
+        await style.removeStyleLayer(_selectedPointLayerId);
         await style.removeStyleLayer(_clusterCountLayerId);
         await style.removeStyleLayer(_unclusteredPointsLayerId);
         await style.removeStyleLayer(_unclusteredCircleLayerId);
@@ -83,12 +85,15 @@ class ClusteredMapDataSourceImpl implements ClusteredMapDataSource {
         "DEBUG: Added unclustered-circle layer '$_unclusteredCircleLayerId'",
       );
 
-      // Unclustered symbol layer on top of circles (for labels/icons)
+      // Unclustered symbol layer on top of circles (for normal markers)
       final pointsLayer = '''{
         "id": "$_unclusteredPointsLayerId",
         "type": "symbol",
         "source": "$_sourceId",
-        "filter": ["!", ["has", "point_count"]],
+        "filter": ["all", 
+          ["!", ["has", "point_count"]], 
+          ["!=", ["get", "isSelected"], true]
+        ],
         "layout": {
           "icon-image": "marker-default",
           "icon-size": 0.1,
@@ -109,6 +114,34 @@ class ClusteredMapDataSourceImpl implements ClusteredMapDataSource {
       print(
         "DEBUG: Added unclustered-symbol layer '$_unclusteredPointsLayerId'",
       );
+
+      // Selected point symbol layer (for selected marker with different icon)
+      final selectedPointLayer = '''{
+        "id": "$_selectedPointLayerId",
+        "type": "symbol",
+        "source": "$_sourceId",
+        "filter": ["all", 
+          ["!", ["has", "point_count"]], 
+          ["==", ["get", "isSelected"], true]
+        ],
+        "layout": {
+          "icon-image": "marker-selected",
+          "icon-size": 0.12,
+          "icon-allow-overlap": true,
+          "text-field": ["get", "name"],
+          "text-font": ["Open Sans Bold"],
+          "text-offset": [0, 1.5],
+          "text-anchor": "top",
+          "text-size": 14
+        },
+        "paint": {
+          "text-color": "#000000",
+          "text-halo-color": "#ffffff",
+          "text-halo-width": 2
+        }
+      }''';
+      await style.addStyleLayer(selectedPointLayer, null);
+      print("DEBUG: Added selected-point layer '$_selectedPointLayerId'");
 
       // Cluster count labels
       final countLayer = '''{
@@ -133,7 +166,6 @@ class ClusteredMapDataSourceImpl implements ClusteredMapDataSource {
       await style.addStyleLayer(countLayer, null);
 
       print("DEBUG: Added cluster-count layer '$_clusterCountLayerId'");
-
       print("DEBUG: Cluster layers initialized successfully");
     } catch (e) {
       print("ERROR: Error initializing cluster layers: $e");
@@ -144,8 +176,9 @@ class ClusteredMapDataSourceImpl implements ClusteredMapDataSource {
   @override
   Future<void> updateClusterData(
     MapboxMap mapboxMap,
-    List<MapStation> stations,
-  ) async {
+    List<MapStation> stations, {
+    MapStation? selectedStation,
+  }) async {
     try {
       print("DEBUG: Updating cluster data with ${stations.length} stations");
       if (stations.isEmpty) {
@@ -156,6 +189,10 @@ class ClusteredMapDataSourceImpl implements ClusteredMapDataSource {
       // Convert stations to GeoJSON
       final features =
           stations.map((station) {
+            // Check if this is the selected station
+            final bool isSelected =
+                selectedStation?.stationId == station.stationId;
+
             return {
               "type": "Feature",
               "properties": {
@@ -163,6 +200,7 @@ class ClusteredMapDataSourceImpl implements ClusteredMapDataSource {
                 "name": station.name ?? "Station ${station.stationId}",
                 "type": station.type ?? "unknown",
                 "color": station.color ?? "#2389DA",
+                "isSelected": isSelected, // Add selected flag
               },
               "geometry": {
                 "type": "Point",
@@ -218,6 +256,7 @@ class ClusteredMapDataSourceImpl implements ClusteredMapDataSource {
       print("DEBUG: Disposing cluster resources");
       final style = mapboxMap.style;
       try {
+        await style.removeStyleLayer(_selectedPointLayerId);
         await style.removeStyleLayer(_clusterCountLayerId);
         await style.removeStyleLayer(_unclusteredPointsLayerId);
         await style.removeStyleLayer(_unclusteredCircleLayerId);

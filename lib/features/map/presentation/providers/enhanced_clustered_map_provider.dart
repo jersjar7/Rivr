@@ -1,4 +1,4 @@
-// lib/features/map/presentation/providers/enhanced_clustered_map_provider.dart
+// Update to lib/features/map/presentation/providers/enhanced_clustered_map_provider.dart
 
 import 'dart:async';
 import 'package:flutter/material.dart';
@@ -119,16 +119,16 @@ class EnhancedClusteredMapProvider with ChangeNotifier {
     // Queue the update operation
     return _queueOperation(() async {
       try {
-        // Skip if no actual changes
-        // if (_areStationsEqual(_currentStations, stations)) {
-        //   print('Station data unchanged, skipping update');
-        //   return;
-        // }
-
         _setStatus(ClusteringStatus.updating);
         _currentStations = List.from(stations);
 
-        final result = await updateClusterData(mapboxMap, stations);
+        // Pass the selected station to the data source
+        final result = await updateClusterData(
+          mapboxMap,
+          stations,
+          // Pass the currently selected station
+          selectedStation: _selectedStation,
+        );
 
         result.fold(
           (failure) {
@@ -182,8 +182,9 @@ class EnhancedClusteredMapProvider with ChangeNotifier {
         // Continue anyway
       }
 
-      // Save current stations
+      // Save current stations and selected station
       final currentStations = List<MapStation>.from(_currentStations);
+      final savedSelectedStation = _selectedStation;
 
       // Reset initialization state
       _isInitialized = false;
@@ -200,6 +201,9 @@ class EnhancedClusteredMapProvider with ChangeNotifier {
         print(
           'Restoring ${currentStations.length} stations after style change',
         );
+        // Restore selected station
+        _selectedStation = savedSelectedStation;
+
         // Restore stations
         await updateStations(mapboxMap, currentStations);
       }
@@ -266,14 +270,31 @@ class EnhancedClusteredMapProvider with ChangeNotifier {
 
   /// Select a station programmatically
   void selectStation(MapStation station) {
+    // Store previous selection state to check if it changed
+    final previouslySelected = _selectedStation?.stationId;
+
+    // Update the selected station
     _selectedStation = station;
-    notifyListeners();
+
+    // If we have a map with stations loaded, update the marker styling
+    if (_isInitialized && _currentStations.isNotEmpty) {
+      // Only trigger the operation if the selection actually changed
+      if (previouslySelected != station.stationId) {
+        print('Selection changed, updating markers with new selected station');
+        notifyListeners();
+      }
+    } else {
+      // Just notify listeners if we don't need to update markers
+      notifyListeners();
+    }
   }
 
   /// Deselect the current station
   void deselectStation() {
-    _selectedStation = null;
-    notifyListeners();
+    if (_selectedStation != null) {
+      _selectedStation = null;
+      notifyListeners();
+    }
   }
 
   /// Helper method to trigger a debounced operation
@@ -297,6 +318,9 @@ class EnhancedClusteredMapProvider with ChangeNotifier {
 
     print('Recovering from potential style change');
 
+    // Save current selected station
+    final savedSelectedStation = _selectedStation;
+
     // Reset initialization state
     _isInitialized = false;
 
@@ -307,6 +331,9 @@ class EnhancedClusteredMapProvider with ChangeNotifier {
     final initialized = await initialize(mapboxMap);
 
     if (initialized && stations.isNotEmpty) {
+      // Restore selected station
+      _selectedStation = savedSelectedStation;
+
       // Restore stations
       await updateStations(mapboxMap, stations);
     }

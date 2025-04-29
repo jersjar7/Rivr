@@ -1,13 +1,12 @@
 // lib/features/map/presentation/widgets/stream_info_panel.dart
 
 import 'package:flutter/material.dart';
-import 'dart:io';
 import '../../domain/entities/map_station.dart';
 import '../../../../core/utils/location_utils.dart';
 import '../../../../core/widgets/loading_indicator.dart';
 import '../../../../common/data/remote/reach_service.dart';
-import '../../../../core/network/network_info.dart';
-import '../../../../core/di/service_locator.dart';
+import '../../../../core/error/app_exception.dart';
+import '../../../../core/error/error_handler.dart';
 
 class StreamInfoPanel extends StatefulWidget {
   final MapStation station;
@@ -32,13 +31,12 @@ class _StreamInfoPanelState extends State<StreamInfoPanel> {
   bool _hasError = false;
   bool _isNetworkError = false;
   String _errorMessage = '';
+  String? _errorRecovery;
   Map<String, dynamic>? _reachData;
-  late NetworkInfo _networkInfo;
 
   @override
   void initState() {
     super.initState();
-    _networkInfo = sl<NetworkInfo>();
     print(
       "StreamInfoPanel: initializing for station ID: ${widget.station.stationId}",
     );
@@ -52,28 +50,16 @@ class _StreamInfoPanelState extends State<StreamInfoPanel> {
       _isLoading = true;
       _hasError = false;
       _isNetworkError = false;
+      _errorMessage = '';
+      _errorRecovery = null;
     });
 
     try {
-      // Check for network connectivity first
-      final isConnected = await _networkInfo.isConnected;
-      if (!isConnected) {
-        if (!mounted) return;
-        setState(() {
-          _isLoading = false;
-          _hasError = true;
-          _isNetworkError = true;
-          _errorMessage =
-              'No internet connection. Please check your network settings and try again.';
-        });
-        return;
-      }
-
       print("Fetching reach data for station ID: ${widget.station.stationId}");
       final reachService = ReachService();
       final reachId = widget.station.stationId.toString();
 
-      print("Making API request to NOAA API for reach ID: $reachId");
+      print("Making API request for reach ID: $reachId");
       final data = await reachService.fetchReach(reachId);
       print("API response received for reach ID $reachId");
 
@@ -85,28 +71,20 @@ class _StreamInfoPanelState extends State<StreamInfoPanel> {
       });
 
       print("StreamInfoPanel: Data loaded successfully");
-    } on SocketException catch (e) {
-      print("Network error fetching reach data: $e");
-
-      if (!mounted) return;
-
-      setState(() {
-        _isLoading = false;
-        _hasError = true;
-        _isNetworkError = true;
-        _errorMessage =
-            'Network connection issue. Please check your internet connection and try again.';
-      });
     } catch (e) {
       print("Error fetching reach data for ${widget.station.stationId}: $e");
 
       if (!mounted) return;
 
+      // Use global error handler
+      final exception = ErrorHandler.handleError(e);
+
       setState(() {
         _isLoading = false;
         _hasError = true;
-        _isNetworkError = e is NetworkException;
-        _errorMessage = 'Failed to load stream data: ${e.toString()}';
+        _isNetworkError = exception is NetworkException;
+        _errorMessage = ErrorHandler.getUserFriendlyMessage(exception);
+        _errorRecovery = ErrorHandler.getRecoverySuggestion(exception);
       });
     }
   }
@@ -119,7 +97,7 @@ class _StreamInfoPanelState extends State<StreamInfoPanel> {
     final theme = Theme.of(context);
 
     return Positioned(
-      bottom: 100,
+      bottom: 85,
       left: 16,
       right: 16,
       child: Material(
@@ -192,10 +170,17 @@ class _StreamInfoPanelState extends State<StreamInfoPanel> {
               color: _isNetworkError ? Colors.orange[800] : Colors.red,
             ),
           ),
+          if (_errorRecovery != null) ...[
+            const SizedBox(height: 8),
+            Text(
+              _errorRecovery!,
+              style: TextStyle(color: Colors.grey[700], fontSize: 12),
+            ),
+          ],
           if (_isNetworkError) ...[
             const SizedBox(height: 8),
             Text(
-              'Stream information cannot be loaded without an internet connection. Basic station information is still available below.',
+              'Basic station information is still available below.',
               style: TextStyle(color: Colors.grey[700], fontSize: 12),
             ),
           ],

@@ -23,13 +23,16 @@ import 'package:rivr/features/auth/domain/usecases/send_password_reset_email.dar
 import 'package:rivr/features/auth/domain/usecases/sign_out.dart';
 import 'package:rivr/features/auth/domain/usecases/update_user_profile.dart';
 import 'package:rivr/features/auth/presentation/providers/auth_provider.dart'
-    as app; // Use alias for your AuthProvider
+    as app; // Use alias for our AuthProvider
 import 'package:rivr/features/forecast/domain/usecases/get_forecast.dart';
 import 'package:rivr/features/forecast/domain/usecases/get_return_periods.dart';
 import 'package:rivr/features/forecast/presentation/providers/forecast_provider.dart';
 import 'package:rivr/features/forecast/presentation/providers/return_period_provider.dart';
 import 'package:rivr/features/favorites/presentation/providers/favorites_provider.dart';
 import 'package:rivr/features/auth/data/datasources/biometric_auth_service.dart';
+// Import new global components
+import '../network/api_client.dart';
+import '../config/api_config.dart';
 
 final sl = GetIt.instance;
 
@@ -46,6 +49,18 @@ Future<void> setupServiceLocator() async {
   sl.registerLazySingleton<AppDatabase>(() => AppDatabaseImpl());
   sl.registerLazySingleton<SecureStorage>(() => SecureStorageImpl());
   sl.registerLazySingleton(() => DatabaseHelper());
+
+  // Register global API client
+  sl.registerLazySingleton<ApiClient>(
+    () => ApiClient(networkInfo: sl<NetworkInfo>()),
+  );
+
+  // Validate API configuration during startup
+  if (!ApiConfig.validateConfig()) {
+    print(
+      'WARNING: API configuration validation failed. Some features may not work correctly.',
+    );
+  }
 
   // Register feature-specific dependencies
   _registerAuthDependencies();

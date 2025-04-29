@@ -1,24 +1,20 @@
 // lib/common/data/remote/reach_service.dart
 
-import 'dart:convert';
-import 'dart:io';
-import 'package:http/http.dart' as http;
-import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:rivr/core/config/api_config.dart';
+import 'package:rivr/core/di/service_locator.dart';
+import 'package:rivr/core/error/app_exception.dart';
+import 'package:rivr/core/network/api_client.dart';
 
+/// Service for fetching river reach data from the NOAA API
 class ReachService {
-  final String baseUrl;
-  final http.Client _httpClient;
-  final Duration timeout;
+  final ApiClient _apiClient;
 
-  ReachService({
-    String? baseUrl,
-    http.Client? httpClient,
-    this.timeout = const Duration(seconds: 15),
-  }) : baseUrl =
-           baseUrl ??
-           dotenv.env['API_BASE_URL'] ??
-           'https://api.water.noaa.gov/nwps/v1',
-       _httpClient = httpClient ?? http.Client();
+  /// Create a new ReachService instance
+  ///
+  /// Optionally provide an ApiClient. If not provided,
+  /// it will be retrieved from the service locator.
+  ReachService({ApiClient? apiClient})
+    : _apiClient = apiClient ?? sl<ApiClient>();
 
   /// Fetches data for a specific reach ID
   Future<dynamic> fetchReach(String reachId) async {
@@ -26,43 +22,26 @@ class ReachService {
       throw ArgumentError('Reach ID cannot be empty');
     }
 
-    final uri = Uri.parse('$baseUrl/reaches/$reachId');
-    print('ReachService: Fetching data from $uri');
+    final url = ApiConfig.getReachUrl(reachId);
+    print('ReachService: Fetching data from $url');
 
     try {
-      final response = await _httpClient
-          .get(uri)
-          .timeout(
-            timeout,
-            onTimeout: () {
-              throw TimeoutException(
-                'Request timed out after ${timeout.inSeconds} seconds',
-              );
-            },
-          );
-
-      if (response.statusCode == 200) {
-        final jsonData = json.decode(response.body);
-        print('ReachService: Successfully fetched data for reach $reachId');
-        return jsonData;
-      } else if (response.statusCode == 404) {
-        print('ReachService: Reach ID $reachId not found (404)');
-        throw NotFoundException('Reach with ID $reachId not found');
-      } else {
-        print(
-          'ReachService: Failed to load reach $reachId - Status code ${response.statusCode}',
+      // Use the global API client which handles all error cases
+      final data = await _apiClient.get(url);
+      print('ReachService: Successfully fetched data for reach $reachId');
+      return data;
+    } on DataException catch (e) {
+      if (e.code == 'not_found') {
+        throw DataException.notFound(
+          entityName: 'Reach',
+          entityId: reachId,
+          originalError: e,
         );
-        throw ApiException('Failed to load reach data: ${response.statusCode}');
       }
-    } on SocketException catch (e) {
-      print('ReachService: Network error - ${e.message}');
-      throw NetworkException('Network error - Check your internet connection');
-    } on TimeoutException catch (e) {
-      print('ReachService: Request timeout - ${e.message}');
-      throw TimeoutException('Request timed out. Please try again later.');
+      rethrow;
     } catch (e) {
-      print('ReachService: Unexpected error - $e');
-      throw UnexpectedException('An unexpected error occurred: $e');
+      print('ReachService: Error fetching reach data: $e');
+      rethrow; // Let the global error handler manage this
     }
   }
 
@@ -75,78 +54,29 @@ class ReachService {
       throw ArgumentError('Reach ID cannot be empty');
     }
 
-    final uri = Uri.parse(
-      '$baseUrl/reaches/$reachId/streamflow?series=$series',
-    );
-    print('ReachService: Fetching forecast from $uri');
+    // Build URL with query parameters directly in the ApiClient
+    final url = '${ApiConfig.baseUrl}/reaches/$reachId/streamflow';
+    print('ReachService: Fetching forecast from $url');
 
     try {
-      final response = await _httpClient.get(uri).timeout(timeout);
-
-      if (response.statusCode == 200) {
-        return json.decode(response.body);
-      } else if (response.statusCode == 404) {
-        throw NotFoundException('Forecast not found for reach ID $reachId');
-      } else {
-        throw ApiException('Failed to load forecast: ${response.statusCode}');
-      }
-    } on SocketException catch (e) {
-      print('ReachService: Network error - ${e.message}');
-      throw NetworkException('Network error: ${e.toString()}');
-    } on TimeoutException catch (e) {
-      print('ReachService: Request timeout - ${e.message}');
-      throw TimeoutException(
-        'Request timed out after ${timeout.inSeconds} seconds',
+      final data = await _apiClient.get(
+        url,
+        queryParameters: {'series': series},
       );
+      print('ReachService: Successfully fetched forecast for reach $reachId');
+      return data;
+    } on DataException catch (e) {
+      if (e.code == 'not_found') {
+        throw DataException.notFound(
+          entityName: 'Forecast',
+          entityId: reachId,
+          originalError: e,
+        );
+      }
+      rethrow;
     } catch (e) {
-      print('ReachService: Unexpected error - $e');
-      throw UnexpectedException('An unexpected error occurred: $e');
+      print('ReachService: Error fetching forecast data: $e');
+      rethrow; // Let the global error handler manage this
     }
   }
-
-  /// Disposes the HTTP client resources
-  void dispose() {
-    _httpClient.close();
-  }
-}
-
-/// Custom exceptions for the ReachService
-class ApiException implements Exception {
-  final String message;
-  ApiException(this.message);
-
-  @override
-  String toString() => 'ApiException: $message';
-}
-
-class NetworkException implements Exception {
-  final String message;
-  NetworkException(this.message);
-
-  @override
-  String toString() => 'NetworkException: $message';
-}
-
-class NotFoundException implements Exception {
-  final String message;
-  NotFoundException(this.message);
-
-  @override
-  String toString() => 'NotFoundException: $message';
-}
-
-class TimeoutException implements Exception {
-  final String message;
-  TimeoutException(this.message);
-
-  @override
-  String toString() => 'TimeoutException: $message';
-}
-
-class UnexpectedException implements Exception {
-  final String message;
-  UnexpectedException(this.message);
-
-  @override
-  String toString() => 'UnexpectedException: $message';
 }

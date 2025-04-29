@@ -17,6 +17,7 @@ class StreamInfoPanel extends StatefulWidget {
   final VoidCallback onClose;
   final Future<void> Function(MapStation)? onAddToFavorites;
   final Function(String, String)? onViewForecast;
+  final Function? onNavigateToFavorites;
 
   const StreamInfoPanel({
     super.key,
@@ -24,6 +25,7 @@ class StreamInfoPanel extends StatefulWidget {
     required this.onClose,
     this.onAddToFavorites,
     this.onViewForecast,
+    this.onNavigateToFavorites,
   });
 
   @override
@@ -119,11 +121,20 @@ class _StreamInfoPanelState extends State<StreamInfoPanel> {
 
       await favoritesProvider.addNewFavorite(favorite);
 
+      // Show confirmation snackbar
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Added ${station.name ?? "Station"} to favorites'),
         ),
       );
+
+      // Close info panel
+      widget.onClose();
+
+      // Navigate to favorites page if callback provided
+      if (widget.onNavigateToFavorites != null) {
+        widget.onNavigateToFavorites!();
+      }
     } else {
       // Handle case where user is not logged in
       ScaffoldMessenger.of(context).showSnackBar(

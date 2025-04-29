@@ -22,8 +22,14 @@ import '../widgets/map_components/map_loading_indicator.dart';
 class OptimizedMapPage extends StatefulWidget {
   final double lat;
   final double lon;
+  final Function? onStationAddedToFavorites;
 
-  const OptimizedMapPage({super.key, this.lat = 0.0, this.lon = 0.0});
+  const OptimizedMapPage({
+    super.key,
+    this.lat = 0.0,
+    this.lon = 0.0,
+    this.onStationAddedToFavorites,
+  });
 
   @override
   State<OptimizedMapPage> createState() => _OptimizedMapPageState();

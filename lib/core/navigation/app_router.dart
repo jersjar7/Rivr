@@ -19,12 +19,16 @@ class AppRouter {
     switch (settings.name) {
       case '/':
         return MaterialPageRoute(builder: (_) => const SplashPage());
+
       case '/auth':
         return MaterialPageRoute(builder: (_) => const AuthPage());
+
       case '/biometric-settings':
         return MaterialPageRoute(builder: (_) => const BiometricSettingsPage());
+
       case '/forgot-password':
         return MaterialPageRoute(builder: (_) => const ForgotPasswordPage());
+
       case '/favorites':
         final args = settings.arguments as Map<String, dynamic>?;
         return MaterialPageRoute(
@@ -34,8 +38,13 @@ class AppRouter {
                 lon: args?['lon'] ?? 0.0,
               ),
         );
+
       case '/map':
         final args = settings.arguments as Map<String, dynamic>?;
+        // Add a callback parameter for when a station is added to favorites
+        final onStationAddedToFavorites =
+            args?['onStationAddedToFavorites'] as Function?;
+
         return MaterialPageRoute(
           builder:
               (context) => MultiProvider(
@@ -46,7 +55,6 @@ class AppRouter {
                   ChangeNotifierProvider<StationProvider>(
                     create: (context) => sl<StationProvider>(),
                   ),
-                  // Use EnhancedClusteredMapProvider consistently
                   ChangeNotifierProvider<EnhancedClusteredMapProvider>(
                     create: (context) => sl<EnhancedClusteredMapProvider>(),
                   ),
@@ -55,9 +63,11 @@ class AppRouter {
                   key: UniqueKey(),
                   lat: args?['lat'] ?? 0.0,
                   lon: args?['lon'] ?? 0.0,
+                  onStationAddedToFavorites: onStationAddedToFavorites,
                 ),
               ),
         );
+
       case '/forecast':
         final args = settings.arguments as Map<String, dynamic>;
         return MaterialPageRoute(
@@ -67,6 +77,11 @@ class AppRouter {
                 stationName: args['stationName'],
               ),
         );
+
+      // Add a route for after successful authentication - goes to favorites
+      case '/auth_success':
+        return MaterialPageRoute(builder: (_) => const FavoritesPage());
+
       default:
         return MaterialPageRoute(
           builder:

@@ -49,10 +49,9 @@ class _SplashPageState extends State<SplashPage> {
         print("SPLASH: Component is still mounted, proceeding with navigation");
         // Now check if authenticated and navigate accordingly
         if (authProvider.isAuthenticated) {
-          print("SPLASH: User is authenticated, navigating to map");
-          Navigator.of(
-            context,
-          ).pushReplacementNamed('/map', arguments: {'lat': 0.0, 'lon': 0.0});
+          print("SPLASH: User is authenticated, navigating to favorites");
+          // Changed from map to favorites
+          Navigator.of(context).pushReplacementNamed('/favorites');
         } else {
           print("SPLASH: User is not authenticated, navigating to auth");
           Navigator.of(context).pushReplacementNamed('/auth');

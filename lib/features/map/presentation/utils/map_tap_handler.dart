@@ -15,12 +15,17 @@ import '../../../../core/constants/map_constants.dart';
 class MapTapHandler {
   final MapboxMap mapboxMap;
   final BuildContext context;
+  final Function? onStationAddedToFavorites;
 
   // Track the currently displayed info panel
   StreamInfoPanel? _currentInfoPanel;
   OverlayEntry? _overlayEntry;
 
-  MapTapHandler({required this.mapboxMap, required this.context});
+  MapTapHandler({
+    required this.mapboxMap,
+    required this.context,
+    this.onStationAddedToFavorites,
+  });
 
   /// Set up the tap handler
   Future<void> setupTapHandlers() async {
@@ -319,6 +324,19 @@ class MapTapHandler {
             '/forecast',
             arguments: {'reachId': reachId, 'stationName': stationName},
           );
+        },
+        onNavigateToFavorites: () {
+          // Navigate to favorites page after adding
+          if (onStationAddedToFavorites != null) {
+            onStationAddedToFavorites!();
+          } else {
+            // Default navigation if no callback provided
+            Navigator.pushNamedAndRemoveUntil(
+              context,
+              '/favorites',
+              (route) => false, // Clear the stack
+            );
+          }
         },
       );
 

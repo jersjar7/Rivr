@@ -41,7 +41,14 @@ class _FavoritesPageState extends State<FavoritesPage> {
     Navigator.pushNamed(
       context,
       '/map',
-      arguments: {'lat': widget.lat, 'lon': widget.lon},
+      arguments: {
+        'lat': widget.lat,
+        'lon': widget.lon,
+        'onStationAddedToFavorites': () {
+          // When a station is added from map, reload favorites
+          _loadFavorites();
+        },
+      },
     );
   }
 
@@ -57,14 +64,8 @@ class _FavoritesPageState extends State<FavoritesPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('My Favorites'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.map),
-            onPressed: _navigateToMap,
-            tooltip: 'Explore Map',
-          ),
-        ],
+        title: const Text('My Rivers'),
+        // Remove map action since we have a FAB now
       ),
       body: Consumer<FavoritesProvider>(
         builder: (context, favoritesProvider, child) {
@@ -128,6 +129,13 @@ class _FavoritesPageState extends State<FavoritesPage> {
             },
           );
         },
+      ),
+      // Add FAB to navigate to map
+      floatingActionButton: FloatingActionButton(
+        onPressed: _navigateToMap,
+        tooltip: 'Add River',
+        backgroundColor: Theme.of(context).primaryColor,
+        child: const Icon(Icons.add),
       ),
     );
   }

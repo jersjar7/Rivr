@@ -19,12 +19,27 @@ class _AuthPageState extends State<AuthPage> {
     });
   }
 
+  // Add this method to handle successful authentication
+  void _onAuthSuccess() {
+    // Navigate to favorites page after successful authentication
+    // This replaces the entire navigation stack to prevent going back to login
+    Navigator.of(
+      context,
+    ).pushNamedAndRemoveUntil('/favorites', (route) => false);
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_showLoginPage) {
-      return LoginPage(onRegisterTap: _toggleView);
+      return LoginPage(
+        onRegisterTap: _toggleView,
+        onLoginSuccess: _onAuthSuccess, // Pass the callback to LoginPage
+      );
     } else {
-      return RegisterPage(onLoginTap: _toggleView);
+      return RegisterPage(
+        onLoginTap: _toggleView,
+        onRegisterSuccess: _onAuthSuccess, // Pass the callback to RegisterPage
+      );
     }
   }
 }

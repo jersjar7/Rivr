@@ -1,12 +1,16 @@
 // lib/features/map/presentation/widgets/stream_info_panel.dart
 
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../../domain/entities/map_station.dart';
 import '../../../../core/utils/location_utils.dart';
 import '../../../../core/widgets/loading_indicator.dart';
 import '../../../../common/data/remote/reach_service.dart';
 import '../../../../core/error/app_exception.dart';
 import '../../../../core/error/error_handler.dart';
+import '../../../../features/auth/presentation/providers/auth_provider.dart';
+import '../../../../features/favorites/presentation/providers/favorites_provider.dart';
+import '../../../../features/favorites/domain/entities/favorite.dart';
 
 class StreamInfoPanel extends StatefulWidget {
   final MapStation station;
@@ -86,6 +90,45 @@ class _StreamInfoPanelState extends State<StreamInfoPanel> {
         _errorMessage = ErrorHandler.getUserFriendlyMessage(exception);
         _errorRecovery = ErrorHandler.getRecoverySuggestion(exception);
       });
+    }
+  }
+
+  Future<void> _addToFavorites(MapStation station) async {
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final favoritesProvider = Provider.of<FavoritesProvider>(
+      context,
+      listen: false,
+    );
+
+    final user = authProvider.currentUser;
+    if (user != null) {
+      final favorite = Favorite(
+        stationId: station.stationId.toString(),
+        name: station.name ?? 'Station ${station.stationId}',
+        userId: user.uid,
+        position: 0, // This will be updated by the provider
+        color: station.color,
+        description:
+            _reachData != null && _reachData!.containsKey('description')
+                ? _reachData!['description'] as String?
+                : null,
+        imgNumber:
+            1, // Default image number, you can assign a random one if desired
+        lastUpdated: DateTime.now().millisecondsSinceEpoch,
+      );
+
+      await favoritesProvider.addNewFavorite(favorite);
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Added ${station.name ?? "Station"} to favorites'),
+        ),
+      );
+    } else {
+      // Handle case where user is not logged in
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please log in to add favorites')),
+      );
     }
   }
 
@@ -225,11 +268,7 @@ class _StreamInfoPanelState extends State<StreamInfoPanel> {
                 onPressed:
                     widget.onAddToFavorites != null
                         ? () => widget.onAddToFavorites!(widget.station)
-                        : () {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Added to favorites')),
-                          );
-                        },
+                        : () => _addToFavorites(widget.station),
                 icon: const Icon(Icons.favorite_border),
                 label: const Text('Add to Favorites'),
                 style: OutlinedButton.styleFrom(
@@ -406,11 +445,7 @@ class _StreamInfoPanelState extends State<StreamInfoPanel> {
                 onPressed:
                     widget.onAddToFavorites != null
                         ? () => widget.onAddToFavorites!(widget.station)
-                        : () {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Added to favorites')),
-                          );
-                        },
+                        : () => _addToFavorites(widget.station),
                 icon: const Icon(Icons.favorite_border),
                 label: const Text('Add to Favorites'),
                 style: OutlinedButton.styleFrom(

@@ -17,6 +17,12 @@ class DatabaseHelper {
   // Current database version - increment when schema changes
   static const int _databaseVersion = 1;
 
+  // Table names with consistent casing
+  static const String tableGeolocations = 'geolocations';
+  static const String tableFavorites = 'favorites';
+  static const String tableForecastCache = 'forecast_cache';
+  static const String tableReturnPeriodCache = 'return_period_cache';
+
   Future<Database> get database async {
     if (_database != null) return _database!;
     _database = await _initDatabase();
@@ -26,10 +32,7 @@ class DatabaseHelper {
   Future<Database> _initDatabase() async {
     // Get the path to the database file
     String databasesPath = await getDatabasesPath();
-    String path = join(
-      databasesPath,
-      'stationsDatabase.db',
-    ); // Corrected filename with 's'
+    String path = join(databasesPath, 'stations_database.db');
 
     // Check if the database exists
     bool dbExists = await databaseExists(path);
@@ -40,7 +43,7 @@ class DatabaseHelper {
         print("DEBUG: Database doesn't exist, copying from assets");
         await Directory(dirname(path)).create(recursive: true);
         ByteData data = await rootBundle.load(
-          'assets/databases/stationsDatabase.db', // Corrected filename with 's'
+          'assets/databases/stationsDatabase.db',
         );
         List<int> bytes = data.buffer.asUint8List(
           data.offsetInBytes,
@@ -78,81 +81,112 @@ class DatabaseHelper {
       "DEBUG: Tables in database: ${tables.map((t) => t['name']).toList().join(', ')}",
     );
 
-    // Check specifically for Geolocations table
-    final geolocations = await db.rawQuery(
-      "SELECT name FROM sqlite_master WHERE type='table' AND name='Geolocations'",
-    );
-
-    if (geolocations.isEmpty) {
-      print("ERROR: Geolocations table not found!");
-    } else {
-      // Check table structure
-      final columns = await db.rawQuery("PRAGMA table_info(Geolocations)");
-      print("DEBUG: Geolocations table columns: $columns");
-
-      // Get count of stations
-      try {
-        final count = await db.rawQuery(
-          "SELECT COUNT(*) as count FROM Geolocations",
-        );
-        print("DEBUG: Geolocations table has ${count.first['count']} records");
-      } catch (e) {
-        print("ERROR: Failed to count records in Geolocations: $e");
-      }
-    }
+    // Ensure all required tables exist
+    await ensureAllTablesExist(db);
   }
 
   // Create tables if database is newly created
   Future<void> _onCreate(Database db, int version) async {
     print("DEBUG: Creating database tables");
 
-    // If the database is copied from assets, these CREATE statements
-    // won't run since the database already exists.
-    // But they're here as a backup in case the database isn't copied correctly.
+    // Create all required tables
+    await ensureAllTablesExist(db);
+  }
 
-    await db.execute('''
-      CREATE TABLE IF NOT EXISTS Geolocations (
-        stationId INTEGER PRIMARY KEY,
-        lat REAL NOT NULL,
-        lon REAL NOT NULL
-      )
-    ''');
+  // Central method to ensure all tables exist
+  Future<void> ensureAllTablesExist([Database? providedDb]) async {
+    final db = providedDb ?? await database;
 
-    await db.execute('''
-      CREATE TABLE IF NOT EXISTS Favorites (
-        favoriteId INTEGER PRIMARY KEY AUTOINCREMENT,
-        stationId INTEGER NOT NULL,
-        name TEXT NOT NULL,
-        color TEXT,
-        description TEXT,
-        position INTEGER NOT NULL,
-        img_number INTEGER,
-        dateFavorited TEXT,
-        timeFavorited TEXT,
-        lastSyncTimestamp INTEGER
-      )
-    ''');
+    // Ensure each table exists
+    await ensureGeolocationsTableExists(db);
+    await ensureFavoritesTableExists(db);
+    await ensureForecastCacheTableExists(db);
+    await ensureReturnPeriodCacheTableExists(db);
+  }
 
-    await db.execute('''
-      CREATE TABLE IF NOT EXISTS forecast_cache (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        reach_id TEXT NOT NULL,
-        forecast_type TEXT NOT NULL,
-        data TEXT NOT NULL,
-        timestamp INTEGER NOT NULL,
-        UNIQUE(reach_id, forecast_type)
-      )
-    ''');
+  // Check if a table exists
+  Future<bool> tableExists(String tableName, [Database? providedDb]) async {
+    final db = providedDb ?? await database;
+    var tableInfo = await db.rawQuery(
+      "SELECT name FROM sqlite_master WHERE type='table' AND name=?",
+      [tableName],
+    );
+    return tableInfo.isNotEmpty;
+  }
 
-    await db.execute('''
-      CREATE TABLE IF NOT EXISTS return_period_cache (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        reach_id TEXT NOT NULL,
-        data TEXT NOT NULL,
-        timestamp INTEGER NOT NULL,
-        UNIQUE(reach_id)
-      )
-    ''');
+  // Methods for each table
+  Future<void> ensureGeolocationsTableExists([Database? providedDb]) async {
+    final db = providedDb ?? await database;
+
+    if (!await tableExists(tableGeolocations, db)) {
+      print("DEBUG: Creating geolocations table");
+      await db.execute('''
+        CREATE TABLE $tableGeolocations (
+          stationId INTEGER PRIMARY KEY,
+          lat REAL NOT NULL,
+          lon REAL NOT NULL
+        )
+      ''');
+    }
+  }
+
+  Future<void> ensureFavoritesTableExists([Database? providedDb]) async {
+    final db = providedDb ?? await database;
+
+    if (!await tableExists(tableFavorites, db)) {
+      print("DEBUG: Creating favorites table");
+      await db.execute('''
+        CREATE TABLE $tableFavorites (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          stationId TEXT NOT NULL,
+          name TEXT NOT NULL,
+          userId TEXT NOT NULL,
+          position INTEGER NOT NULL,
+          color TEXT,
+          description TEXT,
+          imgNumber INTEGER,
+          lastUpdated INTEGER NOT NULL,
+          UNIQUE(stationId, userId)
+        )
+      ''');
+    }
+  }
+
+  Future<void> ensureForecastCacheTableExists([Database? providedDb]) async {
+    final db = providedDb ?? await database;
+
+    if (!await tableExists(tableForecastCache, db)) {
+      print("DEBUG: Creating forecast cache table");
+      await db.execute('''
+        CREATE TABLE $tableForecastCache (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          reach_id TEXT NOT NULL,
+          forecast_type TEXT NOT NULL,
+          data TEXT NOT NULL,
+          timestamp INTEGER NOT NULL,
+          UNIQUE(reach_id, forecast_type)
+        )
+      ''');
+    }
+  }
+
+  Future<void> ensureReturnPeriodCacheTableExists([
+    Database? providedDb,
+  ]) async {
+    final db = providedDb ?? await database;
+
+    if (!await tableExists(tableReturnPeriodCache, db)) {
+      print("DEBUG: Creating return period cache table");
+      await db.execute('''
+        CREATE TABLE $tableReturnPeriodCache (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          reach_id TEXT NOT NULL,
+          data TEXT NOT NULL,
+          timestamp INTEGER NOT NULL,
+          UNIQUE(reach_id)
+        )
+      ''');
+    }
   }
 
   // Helper method to debug table contents
@@ -167,46 +201,6 @@ class DatabaseHelper {
     }
   }
 
-  // Ensure all required tables exist
-  Future<void> ensureTablesExist() async {
-    final db = await database;
-
-    if (!await tableExists('forecast_cache')) {
-      await db.execute('''
-        CREATE TABLE IF NOT EXISTS forecast_cache (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          reach_id TEXT NOT NULL,
-          forecast_type TEXT NOT NULL,
-          data TEXT NOT NULL,
-          timestamp INTEGER NOT NULL,
-          UNIQUE(reach_id, forecast_type)
-        )
-      ''');
-    }
-
-    if (!await tableExists('return_period_cache')) {
-      await db.execute('''
-        CREATE TABLE IF NOT EXISTS return_period_cache (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          reach_id TEXT NOT NULL,
-          data TEXT NOT NULL,
-          timestamp INTEGER NOT NULL,
-          UNIQUE(reach_id)
-        )
-      ''');
-    }
-  }
-
-  // Check if a table exists
-  Future<bool> tableExists(String tableName) async {
-    final db = await database;
-    var tableInfo = await db.rawQuery(
-      "SELECT name FROM sqlite_master WHERE type='table' AND name=?",
-      [tableName],
-    );
-    return tableInfo.isNotEmpty;
-  }
-
   // Clear cache older than a certain threshold
   Future<int> clearOldCache(int maxAgeInHours) async {
     final db = await database;
@@ -215,7 +209,7 @@ class DatabaseHelper {
 
     // Delete stale forecast cache entries
     final deletedCount = await db.delete(
-      'forecast_cache',
+      tableForecastCache,
       where: 'timestamp < ?',
       whereArgs: [threshold],
     );
@@ -224,7 +218,7 @@ class DatabaseHelper {
     final returnPeriodThreshold =
         DateTime.now().millisecondsSinceEpoch - (7 * 24 * 3600 * 1000);
     await db.delete(
-      'return_period_cache',
+      tableReturnPeriodCache,
       where: 'timestamp < ?',
       whereArgs: [returnPeriodThreshold],
     );

@@ -15,9 +15,6 @@ import 'package:rivr/features/forecast/domain/usecases/get_return_periods.dart';
 
 /// Registers all forecast-related dependencies
 void registerForecastDependencies(GetIt sl) {
-  // Ensure database tables are created
-  sl<DatabaseHelper>().ensureTablesExist();
-
   // Data sources
   sl.registerLazySingleton<ForecastRemoteDataSource>(
     () => ForecastRemoteDataSourceImpl(client: sl<http.Client>()),

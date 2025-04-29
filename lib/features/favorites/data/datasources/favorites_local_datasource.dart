@@ -22,42 +22,8 @@ class FavoritesLocalDataSourceImpl implements FavoritesLocalDataSource {
 
   FavoritesLocalDataSourceImpl({required DatabaseHelper databaseHelper})
     : _databaseHelper = databaseHelper {
-    // Ensure the favorites table exists
-    _ensureFavoritesTableExists();
-  }
-
-  // Private method to ensure favorites table exists
-  Future<void> _ensureFavoritesTableExists() async {
-    try {
-      final db = await _databaseHelper.database;
-
-      // Check if favorites table exists
-      final tables = await db.rawQuery(
-        "SELECT name FROM sqlite_master WHERE type='table' AND name='favorites'",
-      );
-
-      if (tables.isEmpty) {
-        // Create favorites table if it doesn't exist
-        print("Creating favorites table as it doesn't exist");
-        await db.execute('''
-          CREATE TABLE favorites(
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            stationId TEXT NOT NULL,
-            name TEXT NOT NULL,
-            userId TEXT NOT NULL,
-            position INTEGER NOT NULL,
-            color TEXT,
-            description TEXT,
-            imgNumber INTEGER,
-            lastUpdated INTEGER NOT NULL,
-            UNIQUE(stationId, userId)
-          )
-        ''');
-      }
-    } catch (e) {
-      print("Error ensuring favorites table exists: $e");
-      // Don't throw here to avoid startup errors
-    }
+    // Ensure the favorites table exists when the data source is created
+    _databaseHelper.ensureFavoritesTableExists();
   }
 
   @override
@@ -65,7 +31,7 @@ class FavoritesLocalDataSourceImpl implements FavoritesLocalDataSource {
     try {
       final db = await _databaseHelper.database;
       final List<Map<String, dynamic>> results = await db.query(
-        'favorites',
+        DatabaseHelper.tableFavorites, // Use the constant from DatabaseHelper
         where: 'userId = ?',
         whereArgs: [userId],
         orderBy: 'position ASC',
@@ -86,7 +52,7 @@ class FavoritesLocalDataSourceImpl implements FavoritesLocalDataSource {
 
       // Get the highest position for this user
       final maxPositionResult = await db.rawQuery(
-        'SELECT MAX(position) as maxPos FROM favorites WHERE userId = ?',
+        'SELECT MAX(position) as maxPos FROM ${DatabaseHelper.tableFavorites} WHERE userId = ?',
         [favorite.userId],
       );
 
@@ -97,11 +63,15 @@ class FavoritesLocalDataSourceImpl implements FavoritesLocalDataSource {
       final timestamp = DateTime.now().millisecondsSinceEpoch;
 
       // Insert with the next position
-      await db.insert('favorites', {
-        ...favorite.toMap(),
-        'position': newPosition,
-        'lastUpdated': timestamp,
-      }, conflictAlgorithm: ConflictAlgorithm.replace);
+      await db.insert(
+        DatabaseHelper.tableFavorites,
+        {
+          ...favorite.toMap(),
+          'position': newPosition,
+          'lastUpdated': timestamp,
+        },
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
     } catch (e) {
       throw app_exceptions.DatabaseException(
         message: 'Failed to add favorite: $e',
@@ -114,7 +84,7 @@ class FavoritesLocalDataSourceImpl implements FavoritesLocalDataSource {
     try {
       final db = await _databaseHelper.database;
       await db.delete(
-        'favorites',
+        DatabaseHelper.tableFavorites,
         where: 'userId = ? AND stationId = ?',
         whereArgs: [userId, stationId],
       );
@@ -134,7 +104,7 @@ class FavoritesLocalDataSourceImpl implements FavoritesLocalDataSource {
     try {
       final db = await _databaseHelper.database;
       await db.update(
-        'favorites',
+        DatabaseHelper.tableFavorites,
         {
           'position': position,
           'lastUpdated': DateTime.now().millisecondsSinceEpoch,
@@ -154,7 +124,7 @@ class FavoritesLocalDataSourceImpl implements FavoritesLocalDataSource {
     try {
       final db = await _databaseHelper.database;
       final List<Map<String, dynamic>> results = await db.query(
-        'favorites',
+        DatabaseHelper.tableFavorites,
         where: 'userId = ? AND stationId = ?',
         whereArgs: [userId, stationId],
         limit: 1,

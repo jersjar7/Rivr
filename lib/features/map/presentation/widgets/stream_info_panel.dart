@@ -1,10 +1,13 @@
 // lib/features/map/presentation/widgets/stream_info_panel.dart
 
 import 'package:flutter/material.dart';
+import 'dart:io';
 import '../../domain/entities/map_station.dart';
 import '../../../../core/utils/location_utils.dart';
 import '../../../../core/widgets/loading_indicator.dart';
 import '../../../../common/data/remote/reach_service.dart';
+import '../../../../core/network/network_info.dart';
+import '../../../../core/di/service_locator.dart';
 
 class StreamInfoPanel extends StatefulWidget {
   final MapStation station;
@@ -27,12 +30,15 @@ class StreamInfoPanel extends StatefulWidget {
 class _StreamInfoPanelState extends State<StreamInfoPanel> {
   bool _isLoading = true;
   bool _hasError = false;
+  bool _isNetworkError = false;
   String _errorMessage = '';
   Map<String, dynamic>? _reachData;
+  late NetworkInfo _networkInfo;
 
   @override
   void initState() {
     super.initState();
+    _networkInfo = sl<NetworkInfo>();
     print(
       "StreamInfoPanel: initializing for station ID: ${widget.station.stationId}",
     );
@@ -45,9 +51,24 @@ class _StreamInfoPanelState extends State<StreamInfoPanel> {
     setState(() {
       _isLoading = true;
       _hasError = false;
+      _isNetworkError = false;
     });
 
     try {
+      // Check for network connectivity first
+      final isConnected = await _networkInfo.isConnected;
+      if (!isConnected) {
+        if (!mounted) return;
+        setState(() {
+          _isLoading = false;
+          _hasError = true;
+          _isNetworkError = true;
+          _errorMessage =
+              'No internet connection. Please check your network settings and try again.';
+        });
+        return;
+      }
+
       print("Fetching reach data for station ID: ${widget.station.stationId}");
       final reachService = ReachService();
       final reachId = widget.station.stationId.toString();
@@ -64,6 +85,18 @@ class _StreamInfoPanelState extends State<StreamInfoPanel> {
       });
 
       print("StreamInfoPanel: Data loaded successfully");
+    } on SocketException catch (e) {
+      print("Network error fetching reach data: $e");
+
+      if (!mounted) return;
+
+      setState(() {
+        _isLoading = false;
+        _hasError = true;
+        _isNetworkError = true;
+        _errorMessage =
+            'Network connection issue. Please check your internet connection and try again.';
+      });
     } catch (e) {
       print("Error fetching reach data for ${widget.station.stationId}: $e");
 
@@ -72,7 +105,8 @@ class _StreamInfoPanelState extends State<StreamInfoPanel> {
       setState(() {
         _isLoading = false;
         _hasError = true;
-        _errorMessage = 'Failed to load stream data: $e';
+        _isNetworkError = e is NetworkException;
+        _errorMessage = 'Failed to load stream data: ${e.toString()}';
       });
     }
   }
@@ -146,9 +180,48 @@ class _StreamInfoPanelState extends State<StreamInfoPanel> {
             ],
           ),
           const SizedBox(height: 16),
-          const Icon(Icons.error_outline, color: Colors.red, size: 32),
+          Icon(
+            _isNetworkError ? Icons.cloud_off : Icons.error_outline,
+            color: _isNetworkError ? Colors.orange : Colors.red,
+            size: 32,
+          ),
           const SizedBox(height: 8),
-          Text(_errorMessage, style: const TextStyle(color: Colors.red)),
+          Text(
+            _errorMessage,
+            style: TextStyle(
+              color: _isNetworkError ? Colors.orange[800] : Colors.red,
+            ),
+          ),
+          if (_isNetworkError) ...[
+            const SizedBox(height: 8),
+            Text(
+              'Stream information cannot be loaded without an internet connection. Basic station information is still available below.',
+              style: TextStyle(color: Colors.grey[700], fontSize: 12),
+            ),
+          ],
+          const SizedBox(height: 16),
+          // Still show basic station information even when API call fails
+          _buildDetailRow(
+            Icons.pin_drop,
+            'Station ID: ${widget.station.stationId}',
+          ),
+          const SizedBox(height: 4),
+          _buildDetailRow(
+            Icons.location_on,
+            LocationUtils.formatCoordinates(
+              widget.station.lat,
+              widget.station.lon,
+            ),
+          ),
+
+          if (widget.station.elevation != null) ...[
+            const SizedBox(height: 4),
+            _buildDetailRow(
+              Icons.height,
+              'Elevation: ${widget.station.elevation!.toStringAsFixed(2)} m',
+            ),
+          ],
+
           const SizedBox(height: 16),
           Center(
             child: OutlinedButton.icon(
@@ -156,6 +229,57 @@ class _StreamInfoPanelState extends State<StreamInfoPanel> {
               icon: const Icon(Icons.refresh),
               label: const Text('Try Again'),
             ),
+          ),
+
+          // Action buttons - still available without reach data
+          const SizedBox(height: 16),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              OutlinedButton.icon(
+                onPressed:
+                    widget.onAddToFavorites != null
+                        ? () => widget.onAddToFavorites!(widget.station)
+                        : () {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Added to favorites')),
+                          );
+                        },
+                icon: const Icon(Icons.favorite_border),
+                label: const Text('Add to Favorites'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: Theme.of(context).primaryColor,
+                ),
+              ),
+              const SizedBox(width: 8),
+              ElevatedButton.icon(
+                onPressed:
+                    widget.onViewForecast != null
+                        ? () => widget.onViewForecast!(
+                          widget.station.stationId.toString(),
+                          widget.station.name ??
+                              'Station ${widget.station.stationId}',
+                        )
+                        : () {
+                          Navigator.pushNamed(
+                            context,
+                            '/forecast',
+                            arguments: {
+                              'reachId': widget.station.stationId.toString(),
+                              'stationName':
+                                  widget.station.name ??
+                                  'Station ${widget.station.stationId}',
+                            },
+                          );
+                        },
+                icon: const Icon(Icons.analytics),
+                label: const Text('View Forecast'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Theme.of(context).primaryColor,
+                  foregroundColor: Colors.white,
+                ),
+              ),
+            ],
           ),
         ],
       ),

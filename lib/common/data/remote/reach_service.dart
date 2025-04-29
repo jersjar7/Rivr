@@ -59,7 +59,7 @@ class ReachService {
       throw NetworkException('Network error - Check your internet connection');
     } on TimeoutException catch (e) {
       print('ReachService: Request timeout - ${e.message}');
-      rethrow;
+      throw TimeoutException('Request timed out. Please try again later.');
     } catch (e) {
       print('ReachService: Unexpected error - $e');
       throw UnexpectedException('An unexpected error occurred: $e');
@@ -90,11 +90,17 @@ class ReachService {
       } else {
         throw ApiException('Failed to load forecast: ${response.statusCode}');
       }
+    } on SocketException catch (e) {
+      print('ReachService: Network error - ${e.message}');
+      throw NetworkException('Network error: ${e.toString()}');
+    } on TimeoutException catch (e) {
+      print('ReachService: Request timeout - ${e.message}');
+      throw TimeoutException(
+        'Request timed out after ${timeout.inSeconds} seconds',
+      );
     } catch (e) {
-      if (e is TimeoutException || e is SocketException) {
-        throw NetworkException('Network error: ${e.toString()}');
-      }
-      rethrow;
+      print('ReachService: Unexpected error - $e');
+      throw UnexpectedException('An unexpected error occurred: $e');
     }
   }
 

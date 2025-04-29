@@ -22,13 +22,13 @@ import '../widgets/map_components/map_loading_indicator.dart';
 class OptimizedMapPage extends StatefulWidget {
   final double lat;
   final double lon;
-  final Function? onStationAddedToFavorites;
+  final Function? onStationAddedToFavorites; // Add callback parameter
 
   const OptimizedMapPage({
     super.key,
     this.lat = 0.0,
     this.lon = 0.0,
-    this.onStationAddedToFavorites,
+    this.onStationAddedToFavorites, // Optional parameter
   });
 
   @override
@@ -147,70 +147,95 @@ class _OptimizedMapPageState extends State<OptimizedMapPage>
     });
   }
 
+  // Handle the back button press
+  Future<bool> _onWillPop() async {
+    // If a station was added to favorites, execute the callback before popping
+    if (widget.onStationAddedToFavorites != null) {
+      widget.onStationAddedToFavorites!();
+    }
+    return true; // Allow the page to be popped
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      key: _scaffoldKey,
-      drawer: const StationListDrawer(),
-      body: ConnectionAwareWidget(
-        offlineBuilder: (context, status) => _buildOfflineView(),
-        child: Stack(
-          children: [
-            // Mapbox Map (bottommost layer)
-            _buildMap(),
+    return WillPopScope(
+      onWillPop: _onWillPop,
+      child: Scaffold(
+        key: _scaffoldKey,
+        drawer: const StationListDrawer(),
+        appBar: AppBar(
+          title: const Text('Add River'),
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            // When back button is pressed in AppBar, execute callback if provided
+            onPressed: () {
+              if (widget.onStationAddedToFavorites != null) {
+                widget.onStationAddedToFavorites!();
+              }
+              Navigator.of(context).pop();
+            },
+          ),
+        ),
+        body: ConnectionAwareWidget(
+          offlineBuilder: (context, status) => _buildOfflineView(),
+          child: Stack(
+            children: [
+              // Mapbox Map (bottommost layer)
+              _buildMap(),
 
-            // Add the hint widget
-            ZoomHintWidget(
-              show: _showZoomHint,
-              onClose: () => setState(() => _showZoomHint = false),
-            ),
-
-            // Drawer pull tag - Move to main Stack to always be visible
-            Positioned(
-              left: 0,
-              top: MediaQuery.of(context).padding.top + 100,
-              child: DrawerPullTag(
-                onTap: () => _scaffoldKey.currentState?.openDrawer(),
-                backgroundColor: Theme.of(context).primaryColor,
+              // Add the hint widget
+              ZoomHintWidget(
+                show: _showZoomHint,
+                onClose: () => setState(() => _showZoomHint = false),
               ),
-            ),
 
-            // UI Elements
-            SafeArea(
-              child: Column(
-                children: [
-                  // Map Content - Takes remaining space
-                  Expanded(
-                    child: Stack(
-                      children: [
-                        // Loading indicator
-                        const MapLoadingIndicator(),
-                      ],
+              // Drawer pull tag - Move to main Stack to always be visible
+              Positioned(
+                left: 0,
+                top: MediaQuery.of(context).padding.top + 100,
+                child: DrawerPullTag(
+                  onTap: () => _scaffoldKey.currentState?.openDrawer(),
+                  backgroundColor: Theme.of(context).primaryColor,
+                ),
+              ),
+
+              // UI Elements
+              SafeArea(
+                child: Column(
+                  children: [
+                    // Map Content - Takes remaining space
+                    Expanded(
+                      child: Stack(
+                        children: [
+                          // Loading indicator
+                          const MapLoadingIndicator(),
+                        ],
+                      ),
                     ),
-                  ),
 
-                  // Search Bar - at the bottom
-                  const MapSearchBar(),
-                  const SizedBox(height: 30),
-                ],
+                    // Search Bar - at the bottom
+                    const MapSearchBar(),
+                    const SizedBox(height: 30),
+                  ],
+                ),
               ),
-            ),
 
-            // Map Controls overlay
-            Consumer<MapProvider>(
-              builder: (context, mapProvider, _) {
-                return MapControls(
-                  is3DMode: _is3DMode,
-                  currentStyle: mapProvider.currentStyle,
-                  onStyleChanged: _changeMapStyle,
-                  onToggle3D: _toggle3DTerrain,
-                  onRefresh: _refreshStations,
-                  onZoomIn: _zoomIn,
-                  onZoomOut: _zoomOut,
-                );
-              },
-            ),
-          ],
+              // Map Controls overlay
+              Consumer<MapProvider>(
+                builder: (context, mapProvider, _) {
+                  return MapControls(
+                    is3DMode: _is3DMode,
+                    currentStyle: mapProvider.currentStyle,
+                    onStyleChanged: _changeMapStyle,
+                    onToggle3D: _toggle3DTerrain,
+                    onRefresh: _refreshStations,
+                    onZoomIn: _zoomIn,
+                    onZoomOut: _zoomOut,
+                  );
+                },
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -292,8 +317,12 @@ class _OptimizedMapPageState extends State<OptimizedMapPage>
       listen: false,
     );
 
-    // Initialize the map tap handler
-    _mapTapHandler = MapTapHandler(mapboxMap: mapboxMap, context: context);
+    // Initialize the map tap handler, passing the callback
+    _mapTapHandler = MapTapHandler(
+      mapboxMap: mapboxMap,
+      context: context,
+      onStationAddedToFavorites: widget.onStationAddedToFavorites,
+    );
     _mapTapHandler!.setupTapHandlers();
 
     // Initialize the map

@@ -15,7 +15,7 @@ import '../../../../core/constants/map_constants.dart';
 class MapTapHandler {
   final MapboxMap mapboxMap;
   final BuildContext context;
-  final Function? onStationAddedToFavorites;
+  final Function? onStationAddedToFavorites; // Add this parameter
 
   // Track the currently displayed info panel
   StreamInfoPanel? _currentInfoPanel;
@@ -24,7 +24,7 @@ class MapTapHandler {
   MapTapHandler({
     required this.mapboxMap,
     required this.context,
-    this.onStationAddedToFavorites,
+    this.onStationAddedToFavorites, // New parameter
   });
 
   /// Set up the tap handler
@@ -316,6 +316,19 @@ class MapTapHandler {
               ),
             ),
           );
+
+          // Wait briefly for the UI to update
+          await Future.delayed(const Duration(milliseconds: 100));
+
+          // Close the info panel
+          _removeInfoPanel();
+
+          // Navigate to favorites page after adding station
+          if (onStationAddedToFavorites != null) {
+            onStationAddedToFavorites!();
+            // Navigate back to favorites page
+            Navigator.of(context).pop();
+          }
         },
         onViewForecast: (reachId, stationName) {
           // Navigate to the forecast page
@@ -324,19 +337,6 @@ class MapTapHandler {
             '/forecast',
             arguments: {'reachId': reachId, 'stationName': stationName},
           );
-        },
-        onNavigateToFavorites: () {
-          // Navigate to favorites page after adding
-          if (onStationAddedToFavorites != null) {
-            onStationAddedToFavorites!();
-          } else {
-            // Default navigation if no callback provided
-            Navigator.pushNamedAndRemoveUntil(
-              context,
-              '/favorites',
-              (route) => false, // Clear the stack
-            );
-          }
         },
       );
 

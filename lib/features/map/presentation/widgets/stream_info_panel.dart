@@ -125,14 +125,19 @@ class _StreamInfoPanelState extends State<StreamInfoPanel> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Added ${station.name ?? "Station"} to favorites'),
+          duration: const Duration(
+            seconds: 1,
+          ), // Short duration since we're navigating away
         ),
       );
 
-      // Close info panel
+      // Close the info panel
       widget.onClose();
 
-      // Navigate to favorites page if callback provided
+      // Navigate to favorites if callback provided
       if (widget.onNavigateToFavorites != null) {
+        // Small delay to let the UI update
+        await Future.delayed(const Duration(milliseconds: 300));
         widget.onNavigateToFavorites!();
       }
     } else {

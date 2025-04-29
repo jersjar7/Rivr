@@ -12,8 +12,13 @@ import 'package:lottie/lottie.dart'; // New package for animations
 
 class RegisterPage extends StatefulWidget {
   final VoidCallback onLoginTap;
+  final VoidCallback? onRegisterSuccess; // Add callback parameter
 
-  const RegisterPage({super.key, required this.onLoginTap});
+  const RegisterPage({
+    super.key,
+    required this.onLoginTap,
+    this.onRegisterSuccess, // Optional parameter
+  });
 
   @override
   RegisterPageState createState() => RegisterPageState();
@@ -270,12 +275,15 @@ class RegisterPageState extends State<RegisterPage>
         // Delay navigation to show success animation
         Future.delayed(const Duration(seconds: 3), () {
           if (mounted) {
-            // Navigate to map page
-            Navigator.of(context).pushNamedAndRemoveUntil(
-              '/map',
-              (route) => false,
-              arguments: {'lat': 0.0, 'lon': 0.0},
-            );
+            // Use the success callback if provided
+            if (widget.onRegisterSuccess != null) {
+              widget.onRegisterSuccess!();
+            } else {
+              // Navigate to favorites page as default
+              Navigator.of(
+                context,
+              ).pushNamedAndRemoveUntil('/favorites', (route) => false);
+            }
           }
         });
       } else {

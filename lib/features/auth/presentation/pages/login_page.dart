@@ -13,8 +13,13 @@ import '../../../../core/theme/app_theme.dart';
 
 class LoginPage extends StatefulWidget {
   final VoidCallback onRegisterTap;
+  final VoidCallback? onLoginSuccess; // Add callback for successful login
 
-  const LoginPage({super.key, required this.onRegisterTap});
+  const LoginPage({
+    super.key,
+    required this.onRegisterTap,
+    this.onLoginSuccess, // Optional parameter
+  });
 
   @override
   LoginPageState createState() => LoginPageState();
@@ -252,14 +257,16 @@ class LoginPageState extends State<LoginPage> {
       );
       print("LOGIN: SnackBar shown, about to navigate");
 
-      // Try with explicit arguments for the map
-      print("LOGIN: Attempting navigation with explicit route arguments");
-      Navigator.of(context).pushNamedAndRemoveUntil(
-        '/map',
-        (route) => false,
-        arguments: {'lat': 0.0, 'lon': 0.0},
-      );
-      print("LOGIN: Navigation called - this may not show if navigation works");
+      // Use the success callback if provided
+      if (widget.onLoginSuccess != null) {
+        widget.onLoginSuccess!();
+      } else {
+        // Default navigation to favorites page
+        print("LOGIN: Navigating to favorites page");
+        Navigator.of(
+          context,
+        ).pushNamedAndRemoveUntil('/favorites', (route) => false);
+      }
     } else {
       print("LOGIN: User is null or component unmounted");
       if (user == null) {
@@ -298,8 +305,15 @@ class LoginPageState extends State<LoginPage> {
           ),
         );
 
-        // Navigate to favorites page
-        Navigator.of(context).pushReplacementNamed('/map');
+        // Use the success callback if provided
+        if (widget.onLoginSuccess != null) {
+          widget.onLoginSuccess!();
+        } else {
+          // Default navigation to favorites page
+          Navigator.of(
+            context,
+          ).pushNamedAndRemoveUntil('/favorites', (route) => false);
+        }
       }
     } catch (e) {
       if (mounted) {

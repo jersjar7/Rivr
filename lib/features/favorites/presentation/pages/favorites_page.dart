@@ -1,5 +1,4 @@
 // lib/features/favorites/presentation/pages/favorites_page.dart
-
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/favorites_provider.dart';
@@ -45,8 +44,8 @@ class _FavoritesPageState extends State<FavoritesPage> {
         'lat': widget.lat,
         'lon': widget.lon,
         'onStationAddedToFavorites': () {
-          // When a station is added from map, reload favorites
-          _loadFavorites();
+          // When a station is added to favorites from map, this callback will run
+          _loadFavorites(); // Reload the favorites list
         },
       },
     );
@@ -65,7 +64,16 @@ class _FavoritesPageState extends State<FavoritesPage> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('My Rivers'),
-        // Remove map action since we have a FAB now
+        actions: [
+          // Optional: Add logout or settings action
+          IconButton(
+            icon: const Icon(Icons.settings),
+            onPressed: () {
+              // Handle settings navigation
+            },
+            tooltip: 'Settings',
+          ),
+        ],
       ),
       body: Consumer<FavoritesProvider>(
         builder: (context, favoritesProvider, child) {
@@ -99,38 +107,43 @@ class _FavoritesPageState extends State<FavoritesPage> {
             return EmptyFavoritesView(onExploreMap: _navigateToMap);
           }
 
-          return ReorderableListView.builder(
-            padding: const EdgeInsets.all(8.0),
-            itemCount: favorites.length,
-            onReorder: favoritesProvider.reorderFavorites,
-            itemBuilder: (context, index) {
-              final favorite = favorites[index];
+          return RefreshIndicator(
+            onRefresh: _loadFavorites,
+            child: ReorderableListView.builder(
+              padding: const EdgeInsets.all(8.0),
+              itemCount: favorites.length,
+              onReorder: favoritesProvider.reorderFavorites,
+              itemBuilder: (context, index) {
+                final favorite = favorites[index];
 
-              return FavoriteItem(
-                key: Key('favorite_${favorite.stationId}'),
-                favorite: favorite,
-                onTap:
-                    () =>
-                        _navigateToForecast(favorite.stationId, favorite.name),
-                onDelete: () {
-                  final authProvider = Provider.of<AuthProvider>(
-                    context,
-                    listen: false,
-                  );
-                  final user = authProvider.currentUser;
-                  if (user != null) {
-                    favoritesProvider.deleteFavorite(
-                      user.uid,
-                      favorite.stationId,
+                return FavoriteItem(
+                  key: Key('favorite_${favorite.stationId}'),
+                  favorite: favorite,
+                  onTap:
+                      () => _navigateToForecast(
+                        favorite.stationId,
+                        favorite.name,
+                      ),
+                  onDelete: () {
+                    final authProvider = Provider.of<AuthProvider>(
+                      context,
+                      listen: false,
                     );
-                  }
-                },
-              );
-            },
+                    final user = authProvider.currentUser;
+                    if (user != null) {
+                      favoritesProvider.deleteFavorite(
+                        user.uid,
+                        favorite.stationId,
+                      );
+                    }
+                  },
+                );
+              },
+            ),
           );
         },
       ),
-      // Add FAB to navigate to map
+      // Add Floating Action Button to navigate to map
       floatingActionButton: FloatingActionButton(
         onPressed: _navigateToMap,
         tooltip: 'Add River',

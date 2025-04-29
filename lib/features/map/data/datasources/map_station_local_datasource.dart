@@ -46,21 +46,15 @@ class MapStationLocalDataSourceImpl implements MapStationLocalDataSource {
       final db = await _databaseHelper.database;
 
       // Check if Geolocations table exists
-      final tables = await db.rawQuery(
-        "SELECT name FROM sqlite_master WHERE type='table' AND name='Geolocations'",
-      );
-
-      if (tables.isEmpty) {
+      final tableExists = await _databaseHelper.tableExists('Geolocations');
+      if (!tableExists) {
         print("ERROR: Geolocations table not found in database!");
         throw DatabaseException(
           message: "Geolocations table not found in database!",
         );
       }
 
-      // Check table structure
-      final columns = await db.rawQuery("PRAGMA table_info(Geolocations)");
-      print("DEBUG: Geolocations table columns: $columns");
-
+      // Now perform the query
       final List<Map<String, dynamic>> result = await db.query(
         'Geolocations',
         where: 'lat >= ? AND lat <= ? AND lon >= ? AND lon <= ?',
@@ -97,20 +91,24 @@ class MapStationLocalDataSourceImpl implements MapStationLocalDataSource {
       final db = await _databaseHelper.database;
 
       // Check if Geolocations table exists
-      final tables = await db.rawQuery(
-        "SELECT name FROM sqlite_master WHERE type='table' AND name='Geolocations'",
-      );
-
-      if (tables.isEmpty) {
+      final tableExists = await _databaseHelper.tableExists('Geolocations');
+      if (!tableExists) {
         print("ERROR: Geolocations table not found in database!");
         throw DatabaseException(
           message: "Geolocations table not found in database!",
         );
       }
 
-      final List<Map<String, dynamic>> result = await db.rawQuery('''
-        SELECT stationId, lat, lon FROM Geolocations ORDER BY RANDOM() LIMIT $limit
-      ''');
+      // Query for sample stations
+      List<Map<String, dynamic>> result;
+      try {
+        result = await db.rawQuery('''
+          SELECT * FROM Geolocations ORDER BY RANDOM() LIMIT $limit
+        ''');
+      } catch (e) {
+        print("WARNING: RANDOM() query failed, using simple query: $e");
+        result = await db.query('Geolocations', limit: limit);
+      }
 
       print("DEBUG: Retrieved ${result.length} sample stations");
       if (result.isNotEmpty) {
@@ -162,6 +160,15 @@ class MapStationLocalDataSourceImpl implements MapStationLocalDataSource {
         "DEBUG: Getting nearest stations to ($lat, $lon) with radius=$radius, limit=$limit",
       );
       final db = await _databaseHelper.database;
+
+      // Check if Geolocations table exists
+      final tableExists = await _databaseHelper.tableExists('Geolocations');
+      if (!tableExists) {
+        print("ERROR: Geolocations table not found in database!");
+        throw DatabaseException(
+          message: "Geolocations table not found in database!",
+        );
+      }
 
       // Using Haversine formula to calculate distance
       final String haversineFormula = '''

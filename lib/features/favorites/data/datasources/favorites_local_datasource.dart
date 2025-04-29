@@ -22,16 +22,28 @@ class FavoritesLocalDataSourceImpl implements FavoritesLocalDataSource {
 
   FavoritesLocalDataSourceImpl({required DatabaseHelper databaseHelper})
     : _databaseHelper = databaseHelper {
-    // Ensure the favorites table exists when the data source is created
-    _databaseHelper.ensureFavoritesTableExists();
+    // Create favorites table if needed, but don't await it
+    _databaseHelper.createFavoritesTable();
   }
 
   @override
   Future<List<FavoriteModel>> getFavorites(String userId) async {
     try {
       final db = await _databaseHelper.database;
+
+      // Check if favorites table exists
+      final tableExists = await _databaseHelper.tableExists(
+        DatabaseHelper.tableFavorites,
+      );
+      if (!tableExists) {
+        // Create the table if it doesn't exist
+        await _databaseHelper.createFavoritesTable();
+        // Return empty list since it's a new table
+        return [];
+      }
+
       final List<Map<String, dynamic>> results = await db.query(
-        DatabaseHelper.tableFavorites, // Use the constant from DatabaseHelper
+        DatabaseHelper.tableFavorites,
         where: 'userId = ?',
         whereArgs: [userId],
         orderBy: 'position ASC',
@@ -49,6 +61,15 @@ class FavoritesLocalDataSourceImpl implements FavoritesLocalDataSource {
   Future<void> addFavorite(FavoriteModel favorite) async {
     try {
       final db = await _databaseHelper.database;
+
+      // Check if favorites table exists
+      final tableExists = await _databaseHelper.tableExists(
+        DatabaseHelper.tableFavorites,
+      );
+      if (!tableExists) {
+        // Create the table if it doesn't exist
+        await _databaseHelper.createFavoritesTable();
+      }
 
       // Get the highest position for this user
       final maxPositionResult = await db.rawQuery(
@@ -83,6 +104,16 @@ class FavoritesLocalDataSourceImpl implements FavoritesLocalDataSource {
   Future<void> removeFavorite(String userId, String stationId) async {
     try {
       final db = await _databaseHelper.database;
+
+      // Check if favorites table exists
+      final tableExists = await _databaseHelper.tableExists(
+        DatabaseHelper.tableFavorites,
+      );
+      if (!tableExists) {
+        // If table doesn't exist, there's nothing to remove
+        return;
+      }
+
       await db.delete(
         DatabaseHelper.tableFavorites,
         where: 'userId = ? AND stationId = ?',
@@ -103,6 +134,18 @@ class FavoritesLocalDataSourceImpl implements FavoritesLocalDataSource {
   ) async {
     try {
       final db = await _databaseHelper.database;
+
+      // Check if favorites table exists
+      final tableExists = await _databaseHelper.tableExists(
+        DatabaseHelper.tableFavorites,
+      );
+      if (!tableExists) {
+        // Create the table if it doesn't exist
+        await _databaseHelper.createFavoritesTable();
+        // Nothing to update if table was just created
+        return;
+      }
+
       await db.update(
         DatabaseHelper.tableFavorites,
         {
@@ -123,6 +166,18 @@ class FavoritesLocalDataSourceImpl implements FavoritesLocalDataSource {
   Future<bool> isFavorite(String userId, String stationId) async {
     try {
       final db = await _databaseHelper.database;
+
+      // Check if favorites table exists
+      final tableExists = await _databaseHelper.tableExists(
+        DatabaseHelper.tableFavorites,
+      );
+      if (!tableExists) {
+        // Create the table if it doesn't exist
+        await _databaseHelper.createFavoritesTable();
+        // Not a favorite if table was just created
+        return false;
+      }
+
       final List<Map<String, dynamic>> results = await db.query(
         DatabaseHelper.tableFavorites,
         where: 'userId = ? AND stationId = ?',

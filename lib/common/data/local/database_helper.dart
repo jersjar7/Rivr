@@ -18,10 +18,11 @@ class DatabaseHelper {
   static const int _databaseVersion = 1;
 
   // Table names with consistent casing
-  static const String tableGeolocations = 'geolocations';
+  static const String tableGeolocations = 'Geolocations';
   static const String tableFavorites = 'favorites';
   static const String tableForecastCache = 'forecast_cache';
   static const String tableReturnPeriodCache = 'return_period_cache';
+  static const String tableCachedForecasts = 'CachedForecasts';
 
   Future<Database> get database async {
     if (_database != null) return _database!;
@@ -80,28 +81,12 @@ class DatabaseHelper {
     print(
       "DEBUG: Tables in database: ${tables.map((t) => t['name']).toList().join(', ')}",
     );
-
-    // Ensure all required tables exist
-    await ensureAllTablesExist(db);
   }
 
   // Create tables if database is newly created
   Future<void> _onCreate(Database db, int version) async {
     print("DEBUG: Creating database tables");
-
-    // Create all required tables
-    await ensureAllTablesExist(db);
-  }
-
-  // Central method to ensure all tables exist
-  Future<void> ensureAllTablesExist([Database? providedDb]) async {
-    final db = providedDb ?? await database;
-
-    // Ensure each table exists
-    await ensureGeolocationsTableExists(db);
-    await ensureFavoritesTableExists(db);
-    await ensureForecastCacheTableExists(db);
-    await ensureReturnPeriodCacheTableExists(db);
+    // No need to create tables here, as they should exist in the copied database
   }
 
   // Check if a table exists
@@ -114,78 +99,114 @@ class DatabaseHelper {
     return tableInfo.isNotEmpty;
   }
 
-  // Methods for each table
-  Future<void> ensureGeolocationsTableExists([Database? providedDb]) async {
-    final db = providedDb ?? await database;
+  // Create favorites table if it doesn't exist - can be called on demand
+  Future<void> createFavoritesTable() async {
+    final db = await database;
 
-    if (!await tableExists(tableGeolocations, db)) {
-      print("DEBUG: Creating geolocations table");
-      await db.execute('''
-        CREATE TABLE $tableGeolocations (
-          stationId INTEGER PRIMARY KEY,
-          lat REAL NOT NULL,
-          lon REAL NOT NULL
-        )
-      ''');
-    }
-  }
-
-  Future<void> ensureFavoritesTableExists([Database? providedDb]) async {
-    final db = providedDb ?? await database;
-
-    if (!await tableExists(tableFavorites, db)) {
+    if (!await tableExists(tableFavorites)) {
       print("DEBUG: Creating favorites table");
-      await db.execute('''
-        CREATE TABLE $tableFavorites (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          stationId TEXT NOT NULL,
-          name TEXT NOT NULL,
-          userId TEXT NOT NULL,
-          position INTEGER NOT NULL,
-          color TEXT,
-          description TEXT,
-          imgNumber INTEGER,
-          lastUpdated INTEGER NOT NULL,
-          UNIQUE(stationId, userId)
-        )
-      ''');
+      try {
+        await db.execute('''
+          CREATE TABLE $tableFavorites (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            stationId TEXT NOT NULL,
+            name TEXT NOT NULL,
+            userId TEXT NOT NULL,
+            position INTEGER NOT NULL,
+            color TEXT,
+            description TEXT,
+            imgNumber INTEGER,
+            lastUpdated INTEGER NOT NULL,
+            UNIQUE(stationId, userId)
+          )
+        ''');
+        print("DEBUG: Favorites table created successfully");
+      } catch (e) {
+        print("ERROR: Failed to create favorites table: $e");
+        // Don't throw an exception - just log the error
+      }
+    } else {
+      print("DEBUG: Favorites table already exists");
     }
   }
 
-  Future<void> ensureForecastCacheTableExists([Database? providedDb]) async {
-    final db = providedDb ?? await database;
+  // Create forecast cache table if it doesn't exist - can be called on demand
+  Future<void> createForecastCacheTable() async {
+    final db = await database;
 
-    if (!await tableExists(tableForecastCache, db)) {
+    if (!await tableExists(tableForecastCache)) {
       print("DEBUG: Creating forecast cache table");
-      await db.execute('''
-        CREATE TABLE $tableForecastCache (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          reach_id TEXT NOT NULL,
-          forecast_type TEXT NOT NULL,
-          data TEXT NOT NULL,
-          timestamp INTEGER NOT NULL,
-          UNIQUE(reach_id, forecast_type)
-        )
-      ''');
+      try {
+        await db.execute('''
+          CREATE TABLE $tableForecastCache (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            reach_id TEXT NOT NULL,
+            forecast_type TEXT NOT NULL,
+            data TEXT NOT NULL,
+            timestamp INTEGER NOT NULL,
+            UNIQUE(reach_id, forecast_type)
+          )
+        ''');
+        print("DEBUG: Forecast cache table created successfully");
+      } catch (e) {
+        print("ERROR: Failed to create forecast cache table: $e");
+        // Don't throw an exception - just log the error
+      }
+    } else {
+      print("DEBUG: Forecast cache table already exists");
     }
   }
 
-  Future<void> ensureReturnPeriodCacheTableExists([
-    Database? providedDb,
-  ]) async {
-    final db = providedDb ?? await database;
+  // Create return period cache table if it doesn't exist - can be called on demand
+  Future<void> createReturnPeriodCacheTable() async {
+    final db = await database;
 
-    if (!await tableExists(tableReturnPeriodCache, db)) {
+    if (!await tableExists(tableReturnPeriodCache)) {
       print("DEBUG: Creating return period cache table");
-      await db.execute('''
-        CREATE TABLE $tableReturnPeriodCache (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          reach_id TEXT NOT NULL,
-          data TEXT NOT NULL,
-          timestamp INTEGER NOT NULL,
-          UNIQUE(reach_id)
-        )
-      ''');
+      try {
+        await db.execute('''
+          CREATE TABLE $tableReturnPeriodCache (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            reach_id TEXT NOT NULL,
+            data TEXT NOT NULL,
+            timestamp INTEGER NOT NULL,
+            UNIQUE(reach_id)
+          )
+        ''');
+        print("DEBUG: Return period cache table created successfully");
+      } catch (e) {
+        print("ERROR: Failed to create return period cache table: $e");
+        // Don't throw an exception - just log the error
+      }
+    } else {
+      print("DEBUG: Return period cache table already exists");
+    }
+  }
+
+  // Create cached forecasts table if it doesn't exist - can be called on demand
+  Future<void> createCachedForecastsTable() async {
+    final db = await database;
+
+    if (!await tableExists(tableCachedForecasts)) {
+      print("DEBUG: Creating cached forecasts table");
+      try {
+        await db.execute('''
+          CREATE TABLE $tableCachedForecasts (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            reachId TEXT NOT NULL,
+            forecastType TEXT NOT NULL,
+            data TEXT NOT NULL,
+            timestamp INTEGER NOT NULL,
+            UNIQUE(reachId, forecastType)
+          )
+        ''');
+        print("DEBUG: Cached forecasts table created successfully");
+      } catch (e) {
+        print("ERROR: Failed to create cached forecasts table: $e");
+        // Don't throw an exception - just log the error
+      }
+    } else {
+      print("DEBUG: Cached forecasts table already exists");
     }
   }
 

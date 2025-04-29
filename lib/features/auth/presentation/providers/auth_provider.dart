@@ -110,7 +110,7 @@ class AuthProvider with ChangeNotifier {
           _authStorage.clearAuthData();
         },
         (user) {
-          print("AUTH PROVIDER: Got user from repository: ${user?.id}");
+          print("AUTH PROVIDER: Got user from repository: ${user?.uid}");
           _currentUser = user;
         },
       );
@@ -145,7 +145,7 @@ class AuthProvider with ChangeNotifier {
 
     try {
       final result = await _biometricAuthService
-          .enableBiometric(_currentUser!.id, _currentUser!.email)
+          .enableBiometric(_currentUser!.uid, _currentUser!.email)
           .timeout(
             const Duration(seconds: 30), // Biometric setup can take time
             onTimeout: () {
@@ -280,14 +280,17 @@ class AuthProvider with ChangeNotifier {
           return null;
         },
         (user) async {
-          print("AUTH PROVIDER: login success, got user with id: ${user.id}");
+          print("AUTH PROVIDER: login success, got user with id: ${user.uid}");
           _currentUser = user;
           _isLoading = false;
 
           // Save auth data to secure storage
           print("AUTH PROVIDER: Saving auth data to storage");
           try {
-            await _authStorage.saveAuthData(userId: user.id, email: user.email);
+            await _authStorage.saveAuthData(
+              userId: user.uid,
+              email: user.email,
+            );
             print("AUTH PROVIDER: Auth data saved successfully");
           } catch (e) {
             print("AUTH PROVIDER: Error saving auth data: $e");
@@ -361,7 +364,7 @@ class AuthProvider with ChangeNotifier {
         },
         (user) async {
           print(
-            "AUTH PROVIDER: register success, got user with id: ${user.id}",
+            "AUTH PROVIDER: register success, got user with id: ${user.uid}",
           );
           _currentUser = user;
           _isLoading = false;
@@ -369,7 +372,10 @@ class AuthProvider with ChangeNotifier {
           // Save auth data to secure storage
           print("AUTH PROVIDER: Saving auth data to storage");
           try {
-            await _authStorage.saveAuthData(userId: user.id, email: user.email);
+            await _authStorage.saveAuthData(
+              userId: user.uid,
+              email: user.email,
+            );
             print("AUTH PROVIDER: Auth data saved successfully");
           } catch (e) {
             print("AUTH PROVIDER: Error saving auth data: $e");
@@ -550,7 +556,7 @@ class AuthProvider with ChangeNotifier {
 
     // Use the injected UpdateUserProfile use case
     final result = await _updateUserProfile(
-      _currentUser!.id,
+      _currentUser!.uid,
       firstName: firstName,
       lastName: lastName,
       profession: profession,

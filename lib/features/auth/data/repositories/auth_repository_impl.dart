@@ -38,7 +38,7 @@ class AuthRepositoryImpl implements AuthRepository {
         // Sync user activity in the background
         print("AUTH REPO: Scheduling user activity sync in background");
         // Use a fire-and-forget approach for non-critical operation
-        userProfileService.syncUserActivity(user.id).catchError((e) {
+        userProfileService.syncUserActivity(user.uid).catchError((e) {
           print("AUTH REPO: Background sync error: $e");
         });
 
@@ -115,7 +115,7 @@ class AuthRepositoryImpl implements AuthRepository {
         try {
           print("AUTH_REPO: Getting latest profile from Firestore");
           final latestProfile = await userProfileService.getUserProfile(
-            user.id,
+            user.uid,
           );
           print("AUTH_REPO: getUserProfile returned: ${latestProfile != null}");
 
@@ -201,7 +201,7 @@ class AuthRepositoryImpl implements AuthRepository {
         print("AUTH REPO: Setting up initial profile in background");
         userProfileService
             .setupInitialProfile(
-              userId: user.id,
+              userId: user.uid,
               email: email,
               firstName: firstName,
               lastName: lastName,

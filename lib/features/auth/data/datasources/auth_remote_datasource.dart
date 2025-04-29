@@ -67,7 +67,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       if (userData != null) {
         print("REMOTE DS: Creating UserModel with Firestore data");
         return UserModel(
-          id: userCredential.user!.uid,
+          uid: userCredential.user!.uid,
           email: userCredential.user!.email ?? '',
           firstName: userData['first_name'],
           lastName: userData['last_name'],
@@ -116,7 +116,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       print("REMOTE_DS: Got user from Firebase: ${userCredential.user!.uid}");
 
       final user = UserModel(
-        id: userCredential.user!.uid,
+        uid: userCredential.user!.uid,
         email: email,
         firstName: firstName,
         lastName: lastName,
@@ -128,7 +128,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       try {
         await firestore
             .collection('users')
-            .doc(user.id)
+            .doc(user.uid)
             .set({
               'first_name': firstName,
               'last_name': lastName,
@@ -275,7 +275,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
 
         print("REMOTE_DS: Creating UserModel with Firestore data");
         return UserModel(
-          id: firebaseUser.uid,
+          uid: firebaseUser.uid,
           email: firebaseUser.email ?? '',
           firstName: userData['first_name'],
           lastName: userData['last_name'],

@@ -4,7 +4,7 @@ import '../../domain/entities/user.dart';
 
 class UserModel extends User {
   UserModel({
-    required super.id,
+    required super.uid,
     required super.email,
     super.firstName,
     super.lastName,
@@ -13,7 +13,7 @@ class UserModel extends User {
 
   factory UserModel.fromFirebase(firebase.User firebaseUser) {
     return UserModel(
-      id: firebaseUser.uid,
+      uid: firebaseUser.uid,
       email: firebaseUser.email ?? '',
       firstName: '',
       lastName: '',
@@ -23,7 +23,7 @@ class UserModel extends User {
 
   factory UserModel.fromJson(Map<String, dynamic> json) {
     return UserModel(
-      id: json['id'],
+      uid: json['id'],
       email: json['email'],
       firstName: json['first_name'],
       lastName: json['last_name'],
@@ -33,7 +33,7 @@ class UserModel extends User {
 
   Map<String, dynamic> toJson() {
     return {
-      'id': id,
+      'id': uid,
       'email': email,
       'first_name': firstName,
       'last_name': lastName,

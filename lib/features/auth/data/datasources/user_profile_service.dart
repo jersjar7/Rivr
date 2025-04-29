@@ -23,7 +23,7 @@ class UserProfileService {
       final data = docSnapshot.data()!;
 
       return UserModel(
-        id: userId,
+        uid: userId,
         email: data['email'] ?? '',
         firstName: data['first_name'],
         lastName: data['last_name'],
@@ -70,7 +70,7 @@ class UserProfileService {
 
       // Return updated user model
       return UserModel(
-        id: userId,
+        uid: userId,
         email: email ?? currentData?['email'] ?? '',
         firstName: firstName ?? currentData?['first_name'],
         lastName: lastName ?? currentData?['last_name'],

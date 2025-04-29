@@ -33,52 +33,77 @@ class _StreamInfoPanelState extends State<StreamInfoPanel> {
   @override
   void initState() {
     super.initState();
+    print(
+      "StreamInfoPanel: initializing for station ID: ${widget.station.stationId}",
+    );
     _fetchReachData();
   }
 
   Future<void> _fetchReachData() async {
+    if (!mounted) return;
+
     setState(() {
       _isLoading = true;
       _hasError = false;
     });
 
     try {
+      print("Fetching reach data for station ID: ${widget.station.stationId}");
       final reachService = ReachService();
       final reachId = widget.station.stationId.toString();
 
+      print("Making API request to NOAA API for reach ID: $reachId");
       final data = await reachService.fetchReach(reachId);
+      print("API response received for reach ID $reachId");
+
+      if (!mounted) return;
 
       setState(() {
         _reachData = data;
         _isLoading = false;
       });
+
+      print("StreamInfoPanel: Data loaded successfully");
     } catch (e) {
+      print("Error fetching reach data for ${widget.station.stationId}: $e");
+
+      if (!mounted) return;
+
       setState(() {
         _isLoading = false;
         _hasError = true;
         _errorMessage = 'Failed to load stream data: $e';
       });
-      print('Error fetching reach data: $e');
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    print(
+      "StreamInfoPanel: Building UI with isLoading=$_isLoading, hasError=$_hasError",
+    );
     final theme = Theme.of(context);
 
     return Positioned(
       bottom: 100,
       left: 16,
       right: 16,
-      child: Card(
+      child: Material(
         elevation: 4,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        child:
-            _isLoading
-                ? _buildLoadingState()
-                : _hasError
-                ? _buildErrorState()
-                : _buildInfoPanel(theme),
+        borderRadius: BorderRadius.circular(12),
+        child: Card(
+          elevation: 0, // No additional elevation needed
+          margin: EdgeInsets.zero,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child:
+              _isLoading
+                  ? _buildLoadingState()
+                  : _hasError
+                  ? _buildErrorState()
+                  : _buildInfoPanel(theme),
+        ),
       ),
     );
   }
@@ -190,7 +215,7 @@ class _StreamInfoPanelState extends State<StreamInfoPanel> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               decoration: BoxDecoration(
-                color: theme.primaryColor.withValues(alpha: 0.1),
+                color: theme.primaryColor.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(4),
               ),
               child: Row(
@@ -248,6 +273,17 @@ class _StreamInfoPanelState extends State<StreamInfoPanel> {
               Icons.info_outline,
               _reachData!['description'] as String,
               isMultiLine: true,
+            ),
+          ],
+
+          // Show latitude and longitude from API if available
+          if (_reachData != null &&
+              _reachData!.containsKey('latitude') &&
+              _reachData!.containsKey('longitude')) ...[
+            const SizedBox(height: 8),
+            _buildDetailRow(
+              Icons.place,
+              'API Coordinates: ${_reachData!['latitude']}, ${_reachData!['longitude']}',
             ),
           ],
 

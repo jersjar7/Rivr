@@ -1,4 +1,5 @@
-// lib/features/map/presentation/utils/map_tap_handler.dart - Updated
+// lib/features/map/presentation/utils/map_tap_handler.dart
+
 import 'dart:math' as Math;
 import 'package:flutter/material.dart';
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
@@ -120,12 +121,11 @@ class MapTapHandler {
     if (feature == null) return;
 
     try {
-      // Safely cast the feature to Map<String, dynamic>
+      // Safely extract properties from the feature
       final Map<String, dynamic> properties = {};
 
-      // Get the feature safely
+      // Extract properties from the feature
       final queryFeature = feature.queriedFeature.feature;
-      // Convert all keys to strings
       queryFeature.forEach((key, value) {
         if (key is String) {
           properties[key] = value;
@@ -142,11 +142,21 @@ class MapTapHandler {
         return;
       }
 
-      // Handle station tap
+      // Handle station tap - check for 'id' or 'properties.id'
+      String? stationId;
       if (properties.containsKey('id')) {
+        stationId = properties['id'].toString();
+      } else if (properties.containsKey('properties') &&
+          properties['properties'] is Map &&
+          (properties['properties'] as Map).containsKey('id')) {
+        stationId = properties['properties']['id'].toString();
+      }
+
+      if (stationId != null) {
         await handleStationTap(
-          properties,
+          stationId,
           mapCoord,
+          properties,
           clusteredMapProvider,
           stationProvider,
           mapProvider,
@@ -180,47 +190,60 @@ class MapTapHandler {
 
   /// Handle tap on an individual station
   Future<void> handleStationTap(
-    Map<String, dynamic> properties,
+    String stationId,
     Point mapCoord,
+    Map<String, dynamic> properties,
     EnhancedClusteredMapProvider clusteredMapProvider,
     StationProvider stationProvider,
     MapProvider mapProvider,
   ) async {
-    final stationId = properties['id'].toString();
     print("Tapped on station with ID: $stationId");
+    print(
+      "Attempting to find station with ID: $stationId in ${stationProvider.stations.length} stations",
+    );
 
-    // Find matching station in our list
     try {
-      final stations = stationProvider.stations;
-      final stationId = properties['id'].toString();
-      print("Looking up station with ID: $stationId");
-      print(
-        "Attempting to find station with ID: $stationId in ${stations.length} stations",
-      );
-
-      // Convert stationId to int if necessary
+      // Try to parse the station ID as an integer
       final int stationIdInt = int.parse(stationId);
-      print("Converted to int: $stationIdInt");
 
-      print("Current stations in provider: ${stations.length}");
-      print(
-        "First few station IDs: ${stations.take(5).map((s) => s.stationId).toList()}",
-      );
+      // Variables for station information
+      MapStation? tappedStation;
+      String? stationName;
 
-      // Find the tapped station
-      final tappedStation = stations.firstWhere(
-        (station) => station.stationId == stationIdInt,
-        orElse: () {
-          print("Station with ID $stationIdInt not found in provider");
-          throw Exception("Station not found in provider");
-        },
-      );
+      // Extract station name from properties if available
+      if (properties.containsKey('name')) {
+        stationName = properties['name'].toString();
+      } else if (properties.containsKey('properties') &&
+          properties['properties'] is Map &&
+          (properties['properties'] as Map).containsKey('name')) {
+        stationName = properties['properties']['name'].toString();
+      } else {
+        stationName = "Station $stationId";
+      }
 
-      print(
-        "Found matching station: ${tappedStation.stationId}, name: ${tappedStation.name}",
-      );
+      print("Station name from properties: $stationName");
 
-      // Select this station in the provider
+      // Try to find the station in the provider's list
+      try {
+        tappedStation = stationProvider.stations.firstWhere(
+          (station) => station.stationId == stationIdInt,
+        );
+        print(
+          "Found matching station in provider: ${tappedStation.stationId}, name: ${tappedStation.name}",
+        );
+      } catch (e) {
+        // Station not found in provider's list, create a temporary one
+        print("Station not found in provider, creating temporary station");
+        tappedStation = MapStation(
+          stationId: stationIdInt,
+          lat: mapCoord.coordinates.lat.toDouble(),
+          lon: mapCoord.coordinates.lng.toDouble(),
+          name: stationName,
+          // Set other properties as needed
+        );
+      }
+
+      // Set this station as selected in the provider
       clusteredMapProvider.selectStation(tappedStation);
 
       // Center map on the selected station with a nice zoom level
@@ -242,6 +265,7 @@ class MapTapHandler {
       );
 
       // Show the info panel for the selected station
+      print("Showing info panel for station: ${tappedStation.stationId}");
       _showInfoPanel(
         tappedStation,
         clusteredMapProvider,
@@ -249,7 +273,7 @@ class MapTapHandler {
         mapProvider,
       );
     } catch (e) {
-      print("Error finding station with ID $stationId: $e");
+      print("Error handling station tap: $e");
     }
   }
 
@@ -260,53 +284,67 @@ class MapTapHandler {
     StationProvider stationProvider,
     MapProvider mapProvider,
   ) {
-    // Remove existing panel first
-    _removeInfoPanel();
+    try {
+      // Remove existing panel first
+      _removeInfoPanel();
 
-    // Find the overlay to add our widget to
-    final overlay = Overlay.of(context);
+      print("Creating info panel for station: ${station.stationId}");
 
-    // Create a new info panel
-    _currentInfoPanel = StreamInfoPanel(
-      station: station,
-      onClose: () {
-        // When closed, deselect the station and remove the panel
-        clusteredMapProvider.deselectStation();
-        _removeInfoPanel();
-      },
-      onAddToFavorites: (station) async {
-        // Handle adding to favorites - you can implement this later
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'Added ${station.name ?? "Station ${station.stationId}"} to favorites',
+      // Find the overlay to add our widget to
+      final overlay = Overlay.of(context);
+
+      // Create a new info panel
+      _currentInfoPanel = StreamInfoPanel(
+        station: station,
+        onClose: () {
+          // When closed, deselect the station and remove the panel
+          print("Closing info panel");
+          clusteredMapProvider.deselectStation();
+          _removeInfoPanel();
+        },
+        onAddToFavorites: (station) async {
+          // Handle adding to favorites
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'Added ${station.name ?? "Station ${station.stationId}"} to favorites',
+              ),
             ),
-          ),
-        );
-      },
-      onViewForecast: (reachId, stationName) {
-        // Navigate to the forecast page
-        Navigator.pushNamed(
-          context,
-          '/forecast',
-          arguments: {'reachId': reachId, 'stationName': stationName},
-        );
-      },
-    );
+          );
+        },
+        onViewForecast: (reachId, stationName) {
+          // Navigate to the forecast page
+          Navigator.pushNamed(
+            context,
+            '/forecast',
+            arguments: {'reachId': reachId, 'stationName': stationName},
+          );
+        },
+      );
 
-    // Create an overlay entry to show the panel
-    _overlayEntry = OverlayEntry(builder: (context) => _currentInfoPanel!);
+      // Create an overlay entry to show the panel
+      _overlayEntry = OverlayEntry(builder: (context) => _currentInfoPanel!);
 
-    // Add the entry to the overlay
-    overlay.insert(_overlayEntry!);
+      // Add the entry to the overlay
+      overlay.insert(_overlayEntry!);
+      print("Info panel inserted into overlay");
+    } catch (e) {
+      print("Error showing info panel: $e");
+    }
   }
 
   /// Remove the current info panel if it exists
   void _removeInfoPanel() {
     if (_overlayEntry != null) {
-      _overlayEntry!.remove();
-      _overlayEntry = null;
-      _currentInfoPanel = null;
+      try {
+        _overlayEntry!.remove();
+        print("Info panel removed from overlay");
+      } catch (e) {
+        print("Error removing info panel: $e");
+      } finally {
+        _overlayEntry = null;
+        _currentInfoPanel = null;
+      }
     }
   }
 

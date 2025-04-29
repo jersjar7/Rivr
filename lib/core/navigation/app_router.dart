@@ -13,6 +13,10 @@ import '../../features/map/presentation/providers/station_provider.dart';
 import '../../features/splash/presentation/pages/splash_page.dart';
 import '../../features/forecast/presentation/pages/forecast_page.dart';
 import '../../features/settings/presentation/pages/biometric_settings_page.dart';
+import '../../features/favorites/presentation/providers/favorites_provider.dart';
+import '../../features/auth/presentation/providers/auth_provider.dart';
+import '../../features/forecast/presentation/providers/forecast_provider.dart';
+import '../../features/forecast/presentation/providers/return_period_provider.dart';
 
 class AppRouter {
   static Route<dynamic> generateRoute(RouteSettings settings) {
@@ -33,9 +37,20 @@ class AppRouter {
         final args = settings.arguments as Map<String, dynamic>?;
         return MaterialPageRoute(
           builder:
-              (_) => FavoritesPage(
-                lat: args?['lat'] ?? 0.0,
-                lon: args?['lon'] ?? 0.0,
+              (context) => MultiProvider(
+                providers: [
+                  ChangeNotifierProvider<FavoritesProvider>(
+                    create: (_) => sl<FavoritesProvider>(),
+                  ),
+                  // Add any other providers needed by FavoritesPage
+                  ChangeNotifierProvider<AuthProvider>(
+                    create: (_) => sl<AuthProvider>(),
+                  ),
+                ],
+                child: FavoritesPage(
+                  lat: args?['lat'] ?? 0.0,
+                  lon: args?['lon'] ?? 0.0,
+                ),
               ),
         );
 
@@ -58,6 +73,10 @@ class AppRouter {
                   ChangeNotifierProvider<EnhancedClusteredMapProvider>(
                     create: (context) => sl<EnhancedClusteredMapProvider>(),
                   ),
+                  // Also add FavoritesProvider if the map page accesses it
+                  ChangeNotifierProvider<FavoritesProvider>(
+                    create: (context) => sl<FavoritesProvider>(),
+                  ),
                 ],
                 child: OptimizedMapPage(
                   key: UniqueKey(),
@@ -72,15 +91,45 @@ class AppRouter {
         final args = settings.arguments as Map<String, dynamic>;
         return MaterialPageRoute(
           builder:
-              (_) => ForecastPage(
-                reachId: args['reachId'],
-                stationName: args['stationName'],
+              (context) => MultiProvider(
+                providers: [
+                  ChangeNotifierProvider<ForecastProvider>(
+                    create: (_) => sl<ForecastProvider>(),
+                  ),
+                  ChangeNotifierProxyProvider<
+                    ForecastProvider,
+                    ReturnPeriodProvider
+                  >(
+                    create: (_) => sl<ReturnPeriodProvider>(),
+                    update:
+                        (_, forecastProvider, previousReturnPeriodProvider) =>
+                            previousReturnPeriodProvider!
+                              ..updateForecastProvider(forecastProvider),
+                  ),
+                ],
+                child: ForecastPage(
+                  reachId: args['reachId'],
+                  stationName: args['stationName'],
+                ),
               ),
         );
 
       // Add a route for after successful authentication - goes to favorites
       case '/auth_success':
-        return MaterialPageRoute(builder: (_) => const FavoritesPage());
+        return MaterialPageRoute(
+          builder:
+              (context) => MultiProvider(
+                providers: [
+                  ChangeNotifierProvider<FavoritesProvider>(
+                    create: (_) => sl<FavoritesProvider>(),
+                  ),
+                  ChangeNotifierProvider<AuthProvider>(
+                    create: (_) => sl<AuthProvider>(),
+                  ),
+                ],
+                child: const FavoritesPage(),
+              ),
+        );
 
       default:
         return MaterialPageRoute(

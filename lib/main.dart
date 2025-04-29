@@ -2,11 +2,16 @@
 
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'firebase_options.dart';
 import 'app.dart';
 import 'core/di/service_locator.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
-import 'common/data/local/database_helper.dart'; // Import DatabaseHelper
+import 'common/data/local/database_helper.dart';
+import 'features/auth/presentation/providers/auth_provider.dart';
+import 'features/favorites/presentation/providers/favorites_provider.dart';
+import 'features/forecast/presentation/providers/forecast_provider.dart';
+import 'features/forecast/presentation/providers/return_period_provider.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -73,5 +78,27 @@ Future<void> main() async {
   }
 
   await setupServiceLocator();
-  runApp(const RivrApp());
+
+  runApp(
+    MultiProvider(
+      providers: [
+        // Provide global providers here that need to be accessible throughout the app
+        ChangeNotifierProvider<AuthProvider>(create: (_) => sl<AuthProvider>()),
+        ChangeNotifierProvider<FavoritesProvider>(
+          create: (_) => sl<FavoritesProvider>(),
+        ),
+        ChangeNotifierProvider<ForecastProvider>(
+          create: (_) => sl<ForecastProvider>(),
+        ),
+        ChangeNotifierProxyProvider<ForecastProvider, ReturnPeriodProvider>(
+          create: (_) => sl<ReturnPeriodProvider>(),
+          update:
+              (_, forecastProvider, previousReturnPeriodProvider) =>
+                  previousReturnPeriodProvider!
+                    ..updateForecastProvider(forecastProvider),
+        ),
+      ],
+      child: const RivrApp(),
+    ),
+  );
 }

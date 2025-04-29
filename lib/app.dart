@@ -4,9 +4,6 @@ import 'package:provider/provider.dart';
 import 'core/di/service_locator.dart';
 import 'core/navigation/app_router.dart';
 import 'core/network/connection_monitor.dart';
-import 'features/auth/presentation/providers/auth_provider.dart';
-import 'features/forecast/presentation/providers/forecast_provider.dart';
-import 'features/forecast/presentation/providers/return_period_provider.dart';
 import 'common/providers/reach_provider.dart';
 
 class RivrApp extends StatelessWidget {
@@ -20,17 +17,12 @@ class RivrApp extends StatelessWidget {
         ChangeNotifierProvider(
           create: (_) => ConnectionMonitor(networkInfo: sl()),
         ),
-        ChangeNotifierProvider(create: (_) => sl<AuthProvider>()),
-        ChangeNotifierProvider(create: (_) => sl<ForecastProvider>()),
-        ChangeNotifierProxyProvider<ForecastProvider, ReturnPeriodProvider>(
-          create: (_) => sl<ReturnPeriodProvider>(),
-          update:
-              (_, forecastProvider, previousReturnPeriodProvider) =>
-                  previousReturnPeriodProvider!
-                    ..updateForecastProvider(forecastProvider),
-        ),
+        // Note: We don't need to register AuthProvider, FavoritesProvider, ForecastProvider,
+        // or ReturnPeriodProvider here because they are already provided in main.dart
+
+        // Add ReachProvider which isn't a global provider
         ChangeNotifierProvider(create: (_) => ReachProvider()),
-        // Add other providers here
+        // Any other providers that are not registered in main.dart
       ],
       child: MaterialApp(
         title: 'Rivr',

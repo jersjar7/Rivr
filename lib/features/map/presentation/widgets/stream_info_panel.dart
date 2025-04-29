@@ -97,7 +97,7 @@ class _StreamInfoPanelState extends State<StreamInfoPanel> {
     final theme = Theme.of(context);
 
     return Positioned(
-      bottom: 85,
+      bottom: 80,
       left: 16,
       right: 16,
       child: Material(
@@ -392,7 +392,7 @@ class _StreamInfoPanelState extends State<StreamInfoPanel> {
             const SizedBox(height: 8),
             _buildDetailRow(
               Icons.place,
-              'API Coordinates: ${_reachData!['latitude']}, ${_reachData!['longitude']}',
+              'Coordinates: ${_reachData!['latitude']}, ${_reachData!['longitude']}',
             ),
           ],
 

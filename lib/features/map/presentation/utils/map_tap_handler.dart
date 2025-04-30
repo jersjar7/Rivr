@@ -5,6 +5,8 @@ import 'package:flutter/material.dart';
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
 import 'package:provider/provider.dart';
 import 'package:rivr/features/map/domain/entities/map_station.dart';
+import 'package:rivr/features/auth/presentation/providers/auth_provider.dart';
+import 'package:rivr/features/favorites/presentation/providers/favorites_provider.dart';
 
 import '../providers/enhanced_clustered_map_provider.dart';
 import '../providers/station_provider.dart';
@@ -308,26 +310,80 @@ class MapTapHandler {
           _removeInfoPanel();
         },
         onAddToFavorites: (station) async {
-          // Handle adding to favorites
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                'Added ${station.name ?? "Station ${station.stationId}"} to favorites',
-              ),
-            ),
+          // Get auth provider to check if user is logged in
+          final authProvider = Provider.of<AuthProvider>(
+            context,
+            listen: false,
+          );
+          final favoritesProvider = Provider.of<FavoritesProvider>(
+            context,
+            listen: false,
           );
 
-          // Wait briefly for the UI to update
-          await Future.delayed(const Duration(milliseconds: 100));
+          // Check if user is logged in
+          final user = authProvider.currentUser;
+          if (user == null) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('You need to be logged in to add favorites'),
+                duration: Duration(seconds: 2),
+              ),
+            );
+            return;
+          }
 
-          // Close the info panel
-          _removeInfoPanel();
+          try {
+            // Add station to favorites
+            print("Adding station ${station.stationId} to favorites");
+            final success = await favoritesProvider.addFavoriteFromStation(
+              user.uid,
+              station,
+              description: "Added from map view",
+            );
 
-          // Navigate to favorites page after adding station
-          if (onStationAddedToFavorites != null) {
-            onStationAddedToFavorites!();
-            // Navigate back to favorites page
-            Navigator.of(context).pop();
+            if (success) {
+              // Show success message
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(
+                    'Added ${station.name ?? "Station ${station.stationId}"} to favorites',
+                  ),
+                  duration: const Duration(seconds: 2),
+                ),
+              );
+
+              // Close the info panel
+              _removeInfoPanel();
+
+              // Wait a moment before calling the callback
+              await Future.delayed(const Duration(milliseconds: 300));
+
+              // Execute callback if provided
+              if (onStationAddedToFavorites != null) {
+                print("Executing onStationAddedToFavorites callback");
+                onStationAddedToFavorites!();
+
+                // Navigate back to favorites page
+                Navigator.of(context).pop();
+              }
+            } else {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text(
+                    'Failed to add to favorites. Please try again.',
+                  ),
+                  duration: Duration(seconds: 2),
+                ),
+              );
+            }
+          } catch (e) {
+            print("Error adding station to favorites: $e");
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Error: ${e.toString()}'),
+                duration: const Duration(seconds: 3),
+              ),
+            );
           }
         },
         onViewForecast: (reachId, stationName) {

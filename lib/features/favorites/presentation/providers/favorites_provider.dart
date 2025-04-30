@@ -8,6 +8,7 @@ import '../../domain/usecases/is_favorite.dart';
 import '../../domain/usecases/remove_favorite.dart';
 import '../../domain/usecases/update_favorite_position.dart';
 import '../../../../features/map/domain/entities/map_station.dart';
+import '../../../../common/data/local/database_helper.dart';
 
 enum FavoritesStatus { initial, loading, loaded, error }
 
@@ -28,6 +29,9 @@ class FavoritesProvider with ChangeNotifier {
   // Recently deleted favorites for undo functionality
   final Map<String, Favorite> _recentlyDeleted = {};
 
+  // Database helper
+  final DatabaseHelper _databaseHelper = DatabaseHelper();
+
   // Getters
   FavoritesStatus get status => _status;
   List<Favorite> get favorites => _favorites;
@@ -44,7 +48,19 @@ class FavoritesProvider with ChangeNotifier {
        addFavoriteUseCase = addFavorite,
        removeFavoriteUseCase = removeFavorite,
        updateFavoritePositionUseCase = updateFavoritePosition,
-       isFavoriteUseCase = isFavorite;
+       isFavoriteUseCase = isFavorite {
+    // Initialize database tables when provider is created
+    _initTables();
+  }
+
+  // Initialize database tables
+  Future<void> _initTables() async {
+    try {
+      await _databaseHelper.createFavoritesTable();
+    } catch (e) {
+      print("ERROR in FavoritesProvider: Failed to initialize tables: $e");
+    }
+  }
 
   // Load favorites for user with error handling and retry logic
   Future<void> loadFavorites(String userId) async {
@@ -54,25 +70,22 @@ class FavoritesProvider with ChangeNotifier {
       _isProcessing = true;
       _setStatus(FavoritesStatus.loading);
 
+      // Ensure favorites table exists
+      await _databaseHelper.createFavoritesTable();
+
       final result = await getFavoritesUseCase(userId);
 
       result.fold(
         (failure) {
-          _status = FavoritesStatus.error;
-          _errorMessage = failure.message;
-          notifyListeners();
+          _setError(failure.message);
         },
         (loadedFavorites) {
           _favorites = loadedFavorites;
-          _status = FavoritesStatus.loaded;
-          _errorMessage = null;
-          notifyListeners();
+          _setStatus(FavoritesStatus.loaded);
         },
       );
     } catch (e) {
-      _status = FavoritesStatus.error;
-      _errorMessage = 'Unexpected error: ${e.toString()}';
-      notifyListeners();
+      _setError('Unexpected error: ${e.toString()}');
     } finally {
       _isProcessing = false;
     }
@@ -89,44 +102,63 @@ class FavoritesProvider with ChangeNotifier {
     try {
       _isProcessing = true;
 
+      print("Adding station to favorites: ${station.stationId}");
+
+      // Ensure favorites table exists
+      await _databaseHelper.createFavoritesTable();
+
       // Check if already a favorite
       final isAlreadyFavorite = await checkIsFavorite(
         userId,
         station.stationId.toString(),
       );
+
+      print(
+        "Station ${station.stationId} already favorited: $isAlreadyFavorite",
+      );
+
       if (isAlreadyFavorite) {
         return true; // Already a favorite, no need to add again
       }
+
+      // Get the next position
+      final nextPosition = _favorites.length;
 
       // Create favorite from station
       final favorite = Favorite(
         stationId: station.stationId.toString(),
         name: station.name ?? 'Station ${station.stationId}',
         userId: userId,
-        position: _favorites.length, // Add to end of list
+        position: nextPosition,
         color: station.color,
         description: description,
         imgNumber: station.stationId % 5 + 1, // Derive image from station ID
         lastUpdated: DateTime.now().millisecondsSinceEpoch,
       );
 
+      print(
+        "Created favorite object: ${favorite.stationId}, position: ${favorite.position}",
+      );
+
       final result = await addFavoriteUseCase(favorite);
 
       return result.fold(
         (failure) {
-          _errorMessage = failure.message;
-          notifyListeners();
+          print("Failed to add favorite: ${failure.message}");
+          _setError(failure.message);
           return false;
         },
         (_) {
+          print("Successfully added favorite: ${favorite.stationId}");
           _favorites.add(favorite);
+          _sortFavoritesByPosition();
           notifyListeners();
           return true;
         },
       );
     } catch (e) {
-      _errorMessage = 'Failed to add favorite: ${e.toString()}';
-      notifyListeners();
+      print("Error in addFavoriteFromStation: $e");
+      _setError('Failed to add favorite: ${e.toString()}');
       return false;
     } finally {
       _isProcessing = false;
@@ -140,12 +172,14 @@ class FavoritesProvider with ChangeNotifier {
     try {
       _isProcessing = true;
 
+      // Ensure favorites table exists
+      await _databaseHelper.createFavoritesTable();
+
       final result = await addFavoriteUseCase(favorite);
 
       result.fold(
         (failure) {
-          _errorMessage = failure.message;
-          notifyListeners();
+          _setError(failure.message);
         },
         (_) {
           _favorites.add(favorite);
@@ -154,8 +188,7 @@ class FavoritesProvider with ChangeNotifier {
         },
       );
     } catch (e) {
-      _errorMessage = 'Failed to add favorite: ${e.toString()}';
-      notifyListeners();
+      _setError('Failed to add favorite: ${e.toString()}');
     } finally {
       _isProcessing = false;
     }
@@ -193,8 +226,7 @@ class FavoritesProvider with ChangeNotifier {
         (failure) {
           // If deletion failed, restore the favorite
           _favorites.insert(favoriteIndex, deletedFavorite);
-          _errorMessage = failure.message;
-          notifyListeners();
+          _setError(failure.message);
         },
         (_) {
           // Success - already removed from the list
@@ -205,8 +237,7 @@ class FavoritesProvider with ChangeNotifier {
         },
       );
     } catch (e) {
-      _errorMessage = 'Failed to delete favorite: ${e.toString()}';
-      notifyListeners();
+      _setError('Failed to delete favorite: ${e.toString()}');
     } finally {
       _isProcessing = false;
     }
@@ -269,7 +300,7 @@ class FavoritesProvider with ChangeNotifier {
       // Wait for all updates to complete
       await Future.wait(updatePromises);
     } catch (e) {
-      _errorMessage = 'Failed to reorder favorites: ${e.toString()}';
+      _setError('Failed to reorder favorites: ${e.toString()}');
       // Refresh the list from database to ensure consistency
       if (_favorites.isNotEmpty) {
         loadFavorites(_favorites.first.userId);
@@ -311,10 +342,24 @@ class FavoritesProvider with ChangeNotifier {
 
   // Helper to update status with notification
   void _setStatus(FavoritesStatus status) {
+    // Only notify if status actually changed
     if (_status != status) {
       _status = status;
-      notifyListeners();
+      // Use microtask to avoid setState during build
+      Future.microtask(() {
+        notifyListeners();
+      });
     }
+  }
+
+  // Helper to set error state
+  void _setError(String message) {
+    _errorMessage = message;
+    _status = FavoritesStatus.error;
+    // Use microtask to avoid setState during build
+    Future.microtask(() {
+      notifyListeners();
+    });
   }
 
   // Clear error

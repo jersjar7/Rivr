@@ -7,6 +7,9 @@ import 'package:flutter/services.dart';
 
 class DatabaseHelper {
   static final DatabaseHelper _instance = DatabaseHelper._internal();
+  static bool _tablesCreated = false;
+  static bool _initializingDatabase = false;
+  static bool _logDatabaseExistence = true;
 
   factory DatabaseHelper() => _instance;
 
@@ -26,7 +29,24 @@ class DatabaseHelper {
 
   Future<Database> get database async {
     if (_database != null) return _database!;
+
+    // Only log database existence once
+    if (_logDatabaseExistence) {
+      _logDatabaseExistence = false;
+    }
+
+    // Make sure we only initialize the database once
+    if (_initializingDatabase) {
+      // Wait for initialization to complete if it's already in progress
+      while (_initializingDatabase && _database == null) {
+        await Future.delayed(const Duration(milliseconds: 100));
+      }
+      return _database!;
+    }
+
+    _initializingDatabase = true;
     _database = await _initDatabase();
+    _initializingDatabase = false;
     return _database!;
   }
 
@@ -55,7 +75,7 @@ class DatabaseHelper {
       } catch (e) {
         print("ERROR: Error copying database: $e");
       }
-    } else {
+    } else if (_logDatabaseExistence) {
       print('DEBUG: Database already exists at $path');
     }
 
@@ -67,26 +87,43 @@ class DatabaseHelper {
       onOpen: _onOpen,
     );
 
+    // Only create tables once per app run
+    if (!_tablesCreated) {
+      await ensureAllTablesExist(db);
+      _tablesCreated = true;
+    }
+
     return db;
   }
 
   // Called when the database is opened
   Future<void> _onOpen(Database db) async {
-    print("DEBUG: Database opened");
+    if (_logDatabaseExistence) {
+      print("DEBUG: Database opened");
 
-    // Check what tables exist
-    final tables = await db.rawQuery(
-      "SELECT name FROM sqlite_master WHERE type='table'",
-    );
-    print(
-      "DEBUG: Tables in database: ${tables.map((t) => t['name']).toList().join(', ')}",
-    );
+      // Check what tables exist
+      final tables = await db.rawQuery(
+        "SELECT name FROM sqlite_master WHERE type='table'",
+      );
+      print(
+        "DEBUG: Tables in database: ${tables.map((t) => t['name']).toList().join(', ')}",
+      );
+    }
   }
 
   // Create tables if database is newly created
   Future<void> _onCreate(Database db, int version) async {
     print("DEBUG: Creating database tables");
     // No need to create tables here, as they should exist in the copied database
+  }
+
+  // Ensure all required tables exist
+  Future<void> ensureAllTablesExist([Database? db]) async {
+    final database = db ?? await this.database;
+    await createFavoritesTable(database);
+    await createForecastCacheTable(database);
+    await createReturnPeriodCacheTable(database);
+    await createCachedForecastsTable(database);
   }
 
   // Check if a table exists
@@ -100,10 +137,10 @@ class DatabaseHelper {
   }
 
   // Create favorites table if it doesn't exist - can be called on demand
-  Future<void> createFavoritesTable() async {
-    final db = await database;
+  Future<void> createFavoritesTable([Database? providedDb]) async {
+    final db = providedDb ?? await database;
 
-    if (!await tableExists(tableFavorites)) {
+    if (!await tableExists(tableFavorites, db)) {
       print("DEBUG: Creating favorites table");
       try {
         await db.execute('''
@@ -131,10 +168,10 @@ class DatabaseHelper {
   }
 
   // Create forecast cache table if it doesn't exist - can be called on demand
-  Future<void> createForecastCacheTable() async {
-    final db = await database;
+  Future<void> createForecastCacheTable([Database? providedDb]) async {
+    final db = providedDb ?? await database;
 
-    if (!await tableExists(tableForecastCache)) {
+    if (!await tableExists(tableForecastCache, db)) {
       print("DEBUG: Creating forecast cache table");
       try {
         await db.execute('''
@@ -158,10 +195,10 @@ class DatabaseHelper {
   }
 
   // Create return period cache table if it doesn't exist - can be called on demand
-  Future<void> createReturnPeriodCacheTable() async {
-    final db = await database;
+  Future<void> createReturnPeriodCacheTable([Database? providedDb]) async {
+    final db = providedDb ?? await database;
 
-    if (!await tableExists(tableReturnPeriodCache)) {
+    if (!await tableExists(tableReturnPeriodCache, db)) {
       print("DEBUG: Creating return period cache table");
       try {
         await db.execute('''
@@ -184,10 +221,10 @@ class DatabaseHelper {
   }
 
   // Create cached forecasts table if it doesn't exist - can be called on demand
-  Future<void> createCachedForecastsTable() async {
-    final db = await database;
+  Future<void> createCachedForecastsTable([Database? providedDb]) async {
+    final db = providedDb ?? await database;
 
-    if (!await tableExists(tableCachedForecasts)) {
+    if (!await tableExists(tableCachedForecasts, db)) {
       print("DEBUG: Creating cached forecasts table");
       try {
         await db.execute('''

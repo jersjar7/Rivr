@@ -18,7 +18,7 @@ class FavoriteCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Default image if none specified
+    // Default image if none specified - use direct image from assets/img instead of river_images subfolder
     final imgNumber =
         favorite.imgNumber ?? (favorite.stationId.hashCode % 5 + 1);
 
@@ -53,7 +53,7 @@ class FavoriteCard extends StatelessWidget {
               // Hero Image with Gradient Overlay
               Stack(
                 children: [
-                  // River Image
+                  // River Image - using assets/img folder directly instead of river_images subfolder
                   Hero(
                     tag: 'river_image_${favorite.stationId}',
                     child: Image.asset(
@@ -61,6 +61,16 @@ class FavoriteCard extends StatelessWidget {
                       height: 160,
                       width: double.infinity,
                       fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) {
+                        print("Error loading river image: $error");
+                        // Fallback image when the asset fails to load
+                        return Container(
+                          height: 160,
+                          width: double.infinity,
+                          color: cardColor.withValues(alpha: 0.3),
+                          child: Icon(Icons.water, size: 80, color: cardColor),
+                        );
+                      },
                     ),
                   ),
 

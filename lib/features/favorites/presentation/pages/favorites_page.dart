@@ -33,7 +33,11 @@ class _FavoritesPageState extends State<FavoritesPage>
       vsync: this,
       duration: const Duration(milliseconds: 300),
     );
-    _loadFavorites();
+
+    // Use post-frame callback to avoid setState during build
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadFavorites();
+    });
   }
 
   @override
@@ -43,6 +47,8 @@ class _FavoritesPageState extends State<FavoritesPage>
   }
 
   Future<void> _loadFavorites() async {
+    if (!mounted) return;
+
     setState(() {
       _isRefreshing = true;
     });

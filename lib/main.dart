@@ -41,10 +41,13 @@ Future<void> main() async {
 
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
-  // Initialize database first and check for Geolocations table
+  // Initialize database first and ensure all tables exist
   final databaseHelper = DatabaseHelper();
   try {
     final db = await databaseHelper.database;
+
+    // Ensure all required tables are created
+    await databaseHelper.ensureAllTablesExist();
 
     // Check for Geolocations table
     final tables = await db.rawQuery(

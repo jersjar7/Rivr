@@ -6,7 +6,7 @@ import 'dart:convert';
 import 'dart:math' as math;
 import 'package:crypto/crypto.dart';
 import 'package:http/http.dart' as http;
-import '../data/repository/offline_storage_repository.dart';
+import 'package:rivr/features/offline/data/repositories/offline_storage_repository.dart';
 
 class MapboxOfflineService {
   static final MapboxOfflineService _instance =
@@ -166,7 +166,7 @@ class MapboxOfflineService {
     return md5.convert(utf8.encode(input)).toString();
   }
 
-  /// Calculate all tiles in a bounding box across zoom levels
+  // Calculate all tiles in a bounding box across zoom levels
   List<TileCoordinate> _calculateTilesForBounds(
     CoordinateBounds bounds,
     int minZoom,
@@ -176,10 +176,23 @@ class MapboxOfflineService {
 
     for (int z = minZoom; z <= maxZoom; z++) {
       // Calculate tile X,Y coordinates for the bounding box at this zoom level
-      final minX = _longitudeToTileX(bounds.southwest.coordinates.lng, z);
-      final maxX = _longitudeToTileX(bounds.northeast.coordinates.lng, z);
-      final minY = _latitudeToTileY(bounds.northeast.coordinates.lat, z);
-      final maxY = _latitudeToTileY(bounds.southwest.coordinates.lat, z);
+      // Explicitly convert num to double
+      final int minX = _longitudeToTileX(
+        bounds.southwest.coordinates.lng.toDouble(),
+        z,
+      );
+      final int maxX = _longitudeToTileX(
+        bounds.northeast.coordinates.lng.toDouble(),
+        z,
+      );
+      final int minY = _latitudeToTileY(
+        bounds.northeast.coordinates.lat.toDouble(),
+        z,
+      );
+      final int maxY = _latitudeToTileY(
+        bounds.southwest.coordinates.lat.toDouble(),
+        z,
+      );
 
       // Add all tiles in this range to the list
       for (int x = minX; x <= maxX; x++) {
@@ -192,14 +205,14 @@ class MapboxOfflineService {
     return tiles;
   }
 
-  /// Convert longitude to tile X coordinate
+  // Convert longitude to tile X coordinate
   int _longitudeToTileX(double lon, int z) {
     return ((lon + 180.0) / 360.0 * (1 << z)).floor();
   }
 
-  /// Convert latitude to tile Y coordinate
+  // Convert latitude to tile Y coordinate
   int _latitudeToTileY(double lat, int z) {
-    double latRad = lat * math.pi / 180.0;
+    final latRad = lat * (math.pi / 180.0);
     return ((1.0 -
                 math.log(math.tan(latRad) + 1.0 / math.cos(latRad)) / math.pi) /
             2.0 *

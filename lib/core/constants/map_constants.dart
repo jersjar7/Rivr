@@ -42,8 +42,8 @@ class MapConstants {
   static const double terrainExaggeration = 1.5;
 
   // Marker clustering
-  static const int clusterRadius = 50; // pixels
-  static const int clusterMaxZoom = 12; // max zoom to cluster points
+  static const int clusterRadius = 40; // pixels
+  static const int clusterMaxZoom = 13; // max zoom to cluster points
   static const int maxMarkersForPerformance =
       1300000; // maximum markers to display
 

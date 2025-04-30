@@ -17,17 +17,25 @@ import '../../../../core/constants/map_constants.dart';
 class MapTapHandler {
   final MapboxMap mapboxMap;
   final BuildContext context;
-  final Function? onStationAddedToFavorites; // Add this parameter
+  final Function? onStationAddedToFavorites;
 
   // Track the currently displayed info panel
   StreamInfoPanel? _currentInfoPanel;
   OverlayEntry? _overlayEntry;
 
+  // Store provider references to avoid context issues
+  late final AuthProvider _authProvider;
+  late final FavoritesProvider _favoritesProvider;
+
   MapTapHandler({
     required this.mapboxMap,
     required this.context,
-    this.onStationAddedToFavorites, // New parameter
-  });
+    this.onStationAddedToFavorites,
+  }) {
+    // Initialize provider references immediately
+    _authProvider = Provider.of<AuthProvider>(context, listen: false);
+    _favoritesProvider = Provider.of<FavoritesProvider>(context, listen: false);
+  }
 
   /// Set up the tap handler
   Future<void> setupTapHandlers() async {
@@ -310,18 +318,8 @@ class MapTapHandler {
           _removeInfoPanel();
         },
         onAddToFavorites: (station) async {
-          // Get auth provider to check if user is logged in
-          final authProvider = Provider.of<AuthProvider>(
-            context,
-            listen: false,
-          );
-          final favoritesProvider = Provider.of<FavoritesProvider>(
-            context,
-            listen: false,
-          );
-
-          // Check if user is logged in
-          final user = authProvider.currentUser;
+          // Check if user is logged in using the stored provider reference
+          final user = _authProvider.currentUser;
           if (user == null) {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
@@ -333,9 +331,11 @@ class MapTapHandler {
           }
 
           try {
-            // Add station to favorites
+            // Add station to favorites using the stored provider reference
             print("Adding station ${station.stationId} to favorites");
-            final success = await favoritesProvider.addFavoriteFromStation(
+
+            // Create a FavoriteModel instead of a Favorite
+            final success = await _favoritesProvider.addFavoriteFromStation(
               user.uid,
               station,
               description: "Added from map view",

@@ -44,6 +44,11 @@ class _OptimizedMapPageState extends State<OptimizedMapPage>
   MapboxMap? _mapboxMap;
   Key _mapKey = UniqueKey();
 
+  // Store provider references to avoid accessing context during dispose
+  MapProvider? _mapProvider;
+  StationProvider? _stationProvider;
+  EnhancedClusteredMapProvider? _clusteredMapProvider;
+
   // State management
   bool _isMapCreated = false;
   bool _isResetting = false;
@@ -74,6 +79,19 @@ class _OptimizedMapPageState extends State<OptimizedMapPage>
     _initHelper = MapInitializationHelper();
 
     print("OPTIMIZED MAP PAGE: initState completed");
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+
+    // Cache provider references when the widget is active
+    _mapProvider = Provider.of<MapProvider>(context, listen: false);
+    _stationProvider = Provider.of<StationProvider>(context, listen: false);
+    _clusteredMapProvider = Provider.of<EnhancedClusteredMapProvider>(
+      context,
+      listen: false,
+    );
   }
 
   @override
@@ -108,23 +126,29 @@ class _OptimizedMapPageState extends State<OptimizedMapPage>
   // Clean up map resources properly
   void _cleanupMapResources() {
     if (_mapboxMap != null) {
-      final mapProvider = Provider.of<MapProvider>(context, listen: false);
-      final clusteredMapProvider = Provider.of<EnhancedClusteredMapProvider>(
-        context,
-        listen: false,
-      );
-
       // Clean up the map tap handler
       if (_mapTapHandler != null) {
         _mapTapHandler!.dispose();
         _mapTapHandler = null;
       }
 
-      // Clean up clustering resources first
-      clusteredMapProvider.cleanupClustering(_mapboxMap!);
+      // Clean up clustering resources first using the cached provider reference
+      if (_clusteredMapProvider != null) {
+        try {
+          _clusteredMapProvider!.cleanupClustering(_mapboxMap!);
+        } catch (e) {
+          print("Error cleaning up clustering resources: $e");
+        }
+      }
 
-      // Then dispose the map
-      mapProvider.disposeMap();
+      // Then dispose the map using the cached provider reference
+      if (_mapProvider != null) {
+        try {
+          _mapProvider!.disposeMap();
+        } catch (e) {
+          print("Error disposing map provider: $e");
+        }
+      }
 
       _mapboxMap = null;
       _isMapCreated = false;
@@ -307,12 +331,10 @@ class _OptimizedMapPageState extends State<OptimizedMapPage>
     _isMapCreated = true;
     _mapboxMap = mapboxMap;
 
-    // Get providers
-    final stationProvider = Provider.of<StationProvider>(
-      context,
-      listen: false,
-    );
-    final clusteredMapProvider = Provider.of<EnhancedClusteredMapProvider>(
+    // Get providers (update our cached references)
+    _mapProvider = mapProvider;
+    _stationProvider = Provider.of<StationProvider>(context, listen: false);
+    _clusteredMapProvider = Provider.of<EnhancedClusteredMapProvider>(
       context,
       listen: false,
     );
@@ -330,8 +352,8 @@ class _OptimizedMapPageState extends State<OptimizedMapPage>
       context: context,
       mapboxMap: mapboxMap,
       mapProvider: mapProvider,
-      stationProvider: stationProvider,
-      clusteredMapProvider: clusteredMapProvider,
+      stationProvider: _stationProvider!,
+      clusteredMapProvider: _clusteredMapProvider!,
       is3DMode: _is3DMode,
     );
   }

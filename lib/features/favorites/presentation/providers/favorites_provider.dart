@@ -2,6 +2,7 @@
 
 import 'package:flutter/material.dart';
 import '../../domain/entities/favorite.dart';
+import '../../data/models/favorite_model.dart';
 import '../../domain/usecases/add_favorite.dart';
 import '../../domain/usecases/get_favorites.dart';
 import '../../domain/usecases/is_favorite.dart';
@@ -124,8 +125,8 @@ class FavoritesProvider with ChangeNotifier {
       // Get the next position
       final nextPosition = _favorites.length;
 
-      // Create favorite from station
-      final favorite = Favorite(
+      // Create favorite model from station - Use FavoriteModel instead of Favorite
+      final favorite = FavoriteModel(
         stationId: station.stationId.toString(),
         name: station.name ?? 'Station ${station.stationId}',
         userId: userId,
@@ -175,14 +176,29 @@ class FavoritesProvider with ChangeNotifier {
       // Ensure favorites table exists
       await _databaseHelper.createFavoritesTable();
 
-      final result = await addFavoriteUseCase(favorite);
+      // Convert favorite to FavoriteModel if it's not already
+      final favoriteModel =
+          favorite is FavoriteModel
+              ? favorite
+              : FavoriteModel(
+                stationId: favorite.stationId,
+                name: favorite.name,
+                userId: favorite.userId,
+                position: favorite.position,
+                color: favorite.color,
+                description: favorite.description,
+                imgNumber: favorite.imgNumber,
+                lastUpdated: favorite.lastUpdated,
+              );
+
+      final result = await addFavoriteUseCase(favoriteModel);
 
       result.fold(
         (failure) {
           _setError(failure.message);
         },
         (_) {
-          _favorites.add(favorite);
+          _favorites.add(favoriteModel);
           _sortFavoritesByPosition();
           notifyListeners();
         },

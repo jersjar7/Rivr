@@ -18,9 +18,9 @@ class FavoriteCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Default image if none specified - use direct image from assets/img instead of river_images subfolder
+    // Default image if none specified - use river_images subfolder
     final imgNumber =
-        favorite.imgNumber ?? (favorite.stationId.hashCode % 5 + 1);
+        favorite.imgNumber ?? (favorite.stationId.hashCode % 30 + 1);
 
     // Parse color or use default
     Color cardColor;

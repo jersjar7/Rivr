@@ -1,5 +1,7 @@
 // lib/features/favorites/presentation/providers/favorites_provider.dart
 
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import '../../domain/entities/favorite.dart';
 import '../../data/models/favorite_model.dart';
@@ -125,6 +127,10 @@ class FavoritesProvider with ChangeNotifier {
       // Get the next position
       final nextPosition = _favorites.length;
 
+      final random = math.Random();
+      final randomImgNumber =
+          random.nextInt(30) + 1; // Random number between 1 and 30
+
       // Create favorite model from station - Use FavoriteModel instead of Favorite
       final favorite = FavoriteModel(
         stationId: station.stationId.toString(),
@@ -133,7 +139,7 @@ class FavoritesProvider with ChangeNotifier {
         position: nextPosition,
         color: station.color,
         description: description,
-        imgNumber: station.stationId % 5 + 1, // Derive image from station ID
+        imgNumber: randomImgNumber, // Derive image from station ID
         lastUpdated: DateTime.now().millisecondsSinceEpoch,
       );
 

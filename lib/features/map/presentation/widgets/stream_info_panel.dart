@@ -11,6 +11,7 @@ import '../../../../core/error/error_handler.dart';
 import '../../../../features/auth/presentation/providers/auth_provider.dart';
 import '../../../../features/favorites/presentation/providers/favorites_provider.dart';
 import '../../../../features/favorites/domain/entities/favorite.dart';
+import '../../../../core/theme/app_theme.dart';
 
 class StreamInfoPanel extends StatefulWidget {
   final MapStation station;
@@ -40,6 +41,10 @@ class _StreamInfoPanelState extends State<StreamInfoPanel> {
   String? _errorRecovery;
   Map<String, dynamic>? _reachData;
 
+  // For note
+  final TextEditingController _noteController = TextEditingController();
+  String? _note;
+
   @override
   void initState() {
     super.initState();
@@ -47,6 +52,12 @@ class _StreamInfoPanelState extends State<StreamInfoPanel> {
       "StreamInfoPanel: initializing for station ID: ${widget.station.stationId}",
     );
     _fetchReachData();
+  }
+
+  @override
+  void dispose() {
+    _noteController.dispose();
+    super.dispose();
   }
 
   Future<void> _fetchReachData() async {
@@ -96,6 +107,10 @@ class _StreamInfoPanelState extends State<StreamInfoPanel> {
   }
 
   Future<void> _addToFavorites(MapStation station) async {
+    // Show dialog to add a note first
+    await _showAddNoteDialog();
+
+    // After dialog is closed, proceed with adding to favorites
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
     final favoritesProvider = Provider.of<FavoritesProvider>(
       context,
@@ -111,9 +126,10 @@ class _StreamInfoPanelState extends State<StreamInfoPanel> {
         position: 0, // This will be updated by the provider
         color: station.color,
         description:
-            _reachData != null && _reachData!.containsKey('description')
+            _note ??
+            (_reachData != null && _reachData!.containsKey('description')
                 ? _reachData!['description'] as String?
-                : null,
+                : null),
         imgNumber:
             1, // Default image number, you can assign a random one if desired
         lastUpdated: DateTime.now().millisecondsSinceEpoch,
@@ -122,30 +138,86 @@ class _StreamInfoPanelState extends State<StreamInfoPanel> {
       await favoritesProvider.addNewFavorite(favorite);
 
       // Show confirmation snackbar
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Added ${station.name ?? "Station"} to favorites'),
-          duration: const Duration(
-            seconds: 1,
-          ), // Short duration since we're navigating away
-        ),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Added ${station.name ?? "Station"} to favorites'),
+            duration: const Duration(
+              seconds: 1,
+            ), // Short duration since we're navigating away
+          ),
+        );
 
-      // Close the info panel
-      widget.onClose();
+        // Close the info panel
+        widget.onClose();
 
-      // Navigate to favorites if callback provided
-      if (widget.onNavigateToFavorites != null) {
-        // Small delay to let the UI update
-        await Future.delayed(const Duration(milliseconds: 300));
-        widget.onNavigateToFavorites!();
+        // Navigate to favorites if callback provided
+        if (widget.onNavigateToFavorites != null) {
+          // Small delay to let the UI update
+          await Future.delayed(const Duration(milliseconds: 300));
+          widget.onNavigateToFavorites!();
+        }
       }
     } else {
       // Handle case where user is not logged in
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please log in to add favorites')),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Please log in to add favorites')),
+        );
+      }
     }
+  }
+
+  // Show dialog to add a note before adding to favorites
+  Future<void> _showAddNoteDialog() {
+    return showDialog(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+            title: const Text('Add a Note (Optional)'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'Add a personal note about this river:',
+                  style: TextStyle(color: Colors.grey[700], fontSize: 14),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: _noteController,
+                  decoration: const InputDecoration(
+                    hintText: 'e.g., Great fishing spot, Class III rapids...',
+                    border: OutlineInputBorder(),
+                  ),
+                  maxLines: 3,
+                  maxLength: 200,
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  // Cancel without setting note
+                  Navigator.of(context).pop();
+                },
+                child: const Text('Skip'),
+              ),
+              ElevatedButton(
+                onPressed: () {
+                  // Set note and close dialog
+                  setState(() {
+                    _note =
+                        _noteController.text.isNotEmpty
+                            ? _noteController.text
+                            : null;
+                  });
+                  Navigator.of(context).pop();
+                },
+                child: const Text('Save Note'),
+              ),
+            ],
+          ),
+    );
   }
 
   @override

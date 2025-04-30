@@ -55,6 +55,8 @@ dependencies:
   lottie: ^3.3.1
   mapbox_maps_flutter: ^2.7.0
   flutter_svg: ^2.0.17
+  crypto: ^3.0.6
+  path_provider: ^2.1.5
 
 dev_dependencies:
   flutter_test:

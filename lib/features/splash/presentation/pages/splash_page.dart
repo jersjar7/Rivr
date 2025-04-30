@@ -82,8 +82,11 @@ class _SplashPageState extends State<SplashPage> {
             ),
             const SizedBox(height: 30),
             const Text(
-              'Powered by the National Water Model',
+              'Developed by CIROH\nPowered by the National Water Model',
               style: TextStyle(color: Colors.white, fontSize: 16),
+              textAlign: TextAlign.center, // oto center both lines
+              maxLines: 2, // to limit it to 2 lines
+              softWrap: true,
             ),
           ],
         ),

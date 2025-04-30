@@ -139,7 +139,7 @@ class FavoritesProvider with ChangeNotifier {
         position: nextPosition,
         color: station.color,
         description: description,
-        imgNumber: randomImgNumber, // Derive image from station ID
+        imgNumber: randomImgNumber,
         lastUpdated: DateTime.now().millisecondsSinceEpoch,
       );
 

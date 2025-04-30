@@ -11,7 +11,6 @@ import '../../../../core/error/error_handler.dart';
 import '../../../../features/auth/presentation/providers/auth_provider.dart';
 import '../../../../features/favorites/presentation/providers/favorites_provider.dart';
 import '../../../../features/favorites/domain/entities/favorite.dart';
-import '../../../../core/theme/app_theme.dart';
 
 class StreamInfoPanel extends StatefulWidget {
   final MapStation station;

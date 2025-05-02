@@ -64,7 +64,7 @@ class StationMarkerManager {
                       : MapConstants.defaultMarkerSize / 10,
               iconOffset: [0, 0],
               symbolSortKey: isSelected ? 2.0 : 1.0,
-              textField: station.name ?? station.stationId.toString(),
+              textField: station.stationId.toString(),
               textOffset: [0, 1.5],
               textSize: isSelected ? 14.0 : 12.0,
               textColor: isSelected ? 0xFFFFFFFF : 0xFF000000,

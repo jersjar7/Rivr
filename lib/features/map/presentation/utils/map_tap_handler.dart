@@ -223,8 +223,8 @@ class MapTapHandler {
       // Try to parse the station ID as an integer
       final int stationIdInt = int.parse(stationId);
 
-      // Initialize with default name - FIXED: Use "Untitled Stream" as default
-      String stationName = "Untitled Stream";
+      // Initialize as empty - we'll only use "Untitled Stream" if we can't find a name
+      String stationName = "";
 
       // Extract station name from properties if available
       if (properties.containsKey('name') &&
@@ -241,22 +241,22 @@ class MapTapHandler {
         // Check if we have a cached name
         try {
           final cachedName = await _offlineStorage.getStationName(stationIdInt);
-          if (cachedName.isNotEmpty && cachedName != 'Untitled Stream') {
+          if (cachedName.isNotEmpty) {
             stationName = cachedName;
             print("Retrieved cached name for station $stationId: $cachedName");
           }
         } catch (e) {
           print("Error retrieving cached name: $e");
-          // Keep the default "Untitled Stream" name
+          // Keep the name empty for now
         }
       }
 
-      // IMPORTANT: Check if name starts with "Station" and replace with "Untitled Stream"
-      if (stationName.startsWith('Station ')) {
-        stationName = "Untitled Stream";
-      }
+      // REMOVED: Don't replace names that start with 'Station'
+      // if (stationName.startsWith('Station ')) {
+      //   stationName = "Untitled Stream";
+      // }
 
-      // If no name found or empty, ensure we use "Untitled Stream"
+      // If no name found or empty, ONLY THEN use "Untitled Stream"
       if (stationName.isEmpty) {
         stationName = "Untitled Stream";
       }
@@ -273,14 +273,13 @@ class MapTapHandler {
           "Found matching station in provider: ${tappedStation.stationId}, name: ${tappedStation.name}",
         );
 
-        // ALWAYS create a new station with our determined name
-        // This is the key fix - we always override the station with our display name
+        // Create a new station with our determined name
         tappedStation = MapStation(
           stationId: tappedStation.stationId,
           lat: tappedStation.lat,
           lon: tappedStation.lon,
           elevation: tappedStation.elevation,
-          name: stationName, // Always use our determined name
+          name: stationName, // Use our determined name
           type: tappedStation.type,
           description: tappedStation.description,
           color: tappedStation.color,

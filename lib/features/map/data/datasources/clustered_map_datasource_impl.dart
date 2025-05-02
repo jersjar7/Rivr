@@ -98,7 +98,7 @@ class ClusteredMapDataSourceImpl implements ClusteredMapDataSource {
           "icon-image": "marker-default",
           "icon-size": 0.1,
           "icon-allow-overlap": true,
-          "text-field": ["get", "name"],
+          "text-field": ["get", "id"],
           "text-font": ["Open Sans Regular"],
           "text-offset": [0, 1.25],
           "text-anchor": "top",

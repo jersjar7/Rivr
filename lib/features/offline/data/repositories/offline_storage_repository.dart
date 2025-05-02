@@ -517,10 +517,7 @@ class OfflineStorageRepository {
             cachedStation['apiData']['name'] != null) {
           final String name = cachedStation['apiData']['name'];
           if (name.isNotEmpty) {
-            // FIXED: Check if name starts with "Station" and replace with fallback
-            if (name.startsWith("Station ")) {
-              return fallback;
-            }
+            // REMOVED: No longer replacing names that start with "Station"
             return name;
           }
         }
@@ -529,10 +526,7 @@ class OfflineStorageRepository {
         if (cachedStation['name'] != null) {
           final String name = cachedStation['name'];
           if (name.isNotEmpty) {
-            // FIXED: Check if name starts with "Station" and replace with fallback
-            if (name.startsWith("Station ")) {
-              return fallback;
-            }
+            // REMOVED: No longer replacing names that start with "Station"
             return name;
           }
         }
@@ -558,11 +552,8 @@ class OfflineStorageRepository {
         return;
       }
 
-      // FIXED: Check for "Station ID" format and replace with "Untitled Stream"
+      // REMOVED: No longer replacing names that start with "Station"
       String updatedName = name;
-      if (updatedName.startsWith("Station ")) {
-        updatedName = "Untitled Stream";
-      }
 
       // Update the name in the cached station
       await _metadataDb!.update(

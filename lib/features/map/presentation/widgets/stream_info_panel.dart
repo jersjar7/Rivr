@@ -146,16 +146,12 @@ class _StreamInfoPanelState extends State<StreamInfoPanel> {
       }
     }
 
-    // If no API name, try station name but check if it's a "Station ID" format
+    // If no API name, try station name and check if it's empty
     if (widget.station.name != null && widget.station.name!.isNotEmpty) {
-      // FIXED: Check for "Station ID" pattern and replace with "Untitled Stream"
-      if (widget.station.name!.startsWith('Station ')) {
-        return 'Untitled Stream';
-      }
       return widget.station.name!;
     }
 
-    // If no station name, use "Untitled Stream" as fallback
+    // If no station name or empty name, use "Untitled Stream" as fallback
     return 'Untitled Stream';
   }
 

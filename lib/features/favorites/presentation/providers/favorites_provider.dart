@@ -154,12 +154,8 @@ class FavoritesProvider with ChangeNotifier {
 
         // Check if station has name from another source
         if (station.name != null && station.name!.isNotEmpty) {
-          // IMPORTANT FIX: Check if the name starts with "Station " and use "Untitled Stream" instead
-          if (station.name!.startsWith('Station ')) {
-            riverName = "Untitled Stream";
-          } else {
-            riverName = station.name!;
-          }
+          // Use the name as is, without sanitization
+          riverName = station.name!;
         }
         // Otherwise, keep the default "Untitled Stream"
       } catch (e) {

@@ -125,8 +125,11 @@ class MapStationLocalDataSourceImpl implements MapStationLocalDataSource {
         // Add default values for missing fields
         final enhancedMap = Map<String, dynamic>.from(map);
 
-        // IMPORTANT FIX: Use "Untitled Stream" instead of "Station [ID]"
-        enhancedMap['name'] ??= 'Untitled Stream';
+        // Only use "Untitled Stream" for null or empty names
+        if (enhancedMap['name'] == null ||
+            enhancedMap['name'].toString().isEmpty) {
+          enhancedMap['name'] = 'Untitled Stream';
+        }
         enhancedMap['type'] ??= 'river';
         enhancedMap['color'] ??= '#2389DA';
 
@@ -204,8 +207,11 @@ class MapStationLocalDataSourceImpl implements MapStationLocalDataSource {
         // Add default values for missing fields
         final enhancedMap = Map<String, dynamic>.from(map);
 
-        // IMPORTANT FIX: Use "Untitled Stream" instead of "Station [ID]"
-        enhancedMap['name'] ??= 'Untitled Stream';
+        // Only use "Untitled Stream" for null or empty names
+        if (enhancedMap['name'] == null ||
+            enhancedMap['name'].toString().isEmpty) {
+          enhancedMap['name'] = 'Untitled Stream';
+        }
         enhancedMap['type'] ??= 'river';
         enhancedMap['color'] ??= '#2389DA';
 

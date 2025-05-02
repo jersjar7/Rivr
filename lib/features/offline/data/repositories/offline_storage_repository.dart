@@ -92,16 +92,16 @@ class OfflineStorageRepository {
   ) async {
     if (_metadataDb == null) await initialize();
 
-    // FIXED: Ensure we're not caching "Station ID" format names
-    String stationName = station.name ?? "Untitled Stream";
-    if (stationName.startsWith("Station ")) {
-      stationName = "Untitled Stream";
-    }
+    // Only use "Untitled Stream" if name is null or empty
+    String stationName =
+        (station.name == null || station.name!.isEmpty)
+            ? "Untitled Stream"
+            : station.name!;
 
-    // Fix API data name too if it starts with "Station "
+    // Same for API data - only change if null or empty
     if (apiData != null && apiData.containsKey('name')) {
       final apiName = apiData['name'];
-      if (apiName != null && apiName.toString().startsWith("Station ")) {
+      if (apiName == null || apiName.toString().isEmpty) {
         apiData['name'] = "Untitled Stream";
       }
     }

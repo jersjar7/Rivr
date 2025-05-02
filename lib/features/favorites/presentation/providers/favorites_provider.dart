@@ -101,6 +101,7 @@ class FavoritesProvider with ChangeNotifier {
   Future<bool> addFavoriteFromStation(
     String userId,
     MapStation station, {
+    String? displayName, // New parameter to accept the displayed name
     String? description,
   }) async {
     if (_isProcessing) return false;
@@ -134,39 +135,45 @@ class FavoritesProvider with ChangeNotifier {
       final random = math.Random();
       final randomImgNumber = random.nextInt(30) + 1;
 
-      // Get proper name, with fallback to "Untitled Stream"
-      String riverName = "Untitled Stream"; // Start with default
-      try {
-        // First check cached API data
-        final cachedStation = await _offlineStorage.getCachedStation(
-          station.stationId,
-        );
+      // IMPORTANT CHANGE: Prioritize the displayName if provided
+      String riverName;
+      if (displayName != null && displayName.isNotEmpty) {
+        // Use the exact displayed name that was shown in the info panel
+        riverName = displayName;
+        print("Using provided displayName: $riverName");
+      } else {
+        // Only fall back to the old logic if no displayName was provided
+        riverName = "Untitled Stream"; // Default fallback
+        try {
+          // First check cached API data
+          final cachedStation = await _offlineStorage.getCachedStation(
+            station.stationId,
+          );
 
-        if (cachedStation != null && cachedStation['apiData'] != null) {
-          final apiData = cachedStation['apiData'];
-          if (apiData is Map<String, dynamic> &&
-              apiData.containsKey('name') &&
-              apiData['name'] != null &&
-              apiData['name'].toString().isNotEmpty) {
-            riverName = apiData['name'].toString();
+          if (cachedStation != null && cachedStation['apiData'] != null) {
+            final apiData = cachedStation['apiData'];
+            if (apiData is Map<String, dynamic> &&
+                apiData.containsKey('name') &&
+                apiData['name'] != null &&
+                apiData['name'].toString().isNotEmpty) {
+              riverName = apiData['name'].toString();
+            }
           }
-        }
 
-        // Check if station has name from another source
-        if (station.name != null && station.name!.isNotEmpty) {
-          // Use the name as is, without sanitization
-          riverName = station.name!;
+          // Check if station has name from another source
+          if (station.name != null && station.name!.isNotEmpty) {
+            riverName = station.name!;
+          }
+        } catch (e) {
+          print("Error getting proper station name: $e");
+          // Keep the default "Untitled Stream"
         }
-        // Otherwise, keep the default "Untitled Stream"
-      } catch (e) {
-        print("Error getting proper station name: $e");
-        // Already have the default "Untitled Stream"
       }
 
       // Create favorite model from station
       final favorite = FavoriteModel(
         stationId: station.stationId.toString(),
-        name: riverName, // Use our determined name with fallbacks
+        name: riverName, // Use our determined name
         userId: userId,
         position: nextPosition,
         color: station.color,

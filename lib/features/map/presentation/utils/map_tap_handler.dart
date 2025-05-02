@@ -251,11 +251,6 @@ class MapTapHandler {
         }
       }
 
-      // REMOVED: Don't replace names that start with 'Station'
-      // if (stationName.startsWith('Station ')) {
-      //   stationName = "Untitled Stream";
-      // }
-
       // If no name found or empty, ONLY THEN use "Untitled Stream"
       if (stationName.isEmpty) {
         stationName = "Untitled Stream";
@@ -348,9 +343,33 @@ class MapTapHandler {
       // Find the overlay to add our widget to
       final overlay = Overlay.of(context);
 
-      // Create a new info panel
+      // Determine the display name before creating the panel
+      String displayName = station.name ?? "";
+
+      // If station name is empty, try to get a name from offline storage
+      if (displayName.isEmpty) {
+        try {
+          // This is a simplified example - in reality you might want to do this asynchronously
+          // and update the UI after getting the name
+          final cachedName = _offlineStorage.getStationName(
+            station.stationId,
+            fallback: "Untitled Stream",
+          );
+          if (cachedName.isNotEmpty) {
+            displayName = cachedName;
+          } else {
+            displayName = "Untitled Stream";
+          }
+        } catch (e) {
+          print("Error getting station name: $e");
+          displayName = "Untitled Stream";
+        }
+      }
+
+      // Create a new info panel with the determined display name
       _currentInfoPanel = StreamInfoPanel(
         station: station,
+        displayName: displayName, // Pass the display name here
         onClose: () {
           // When closed, deselect the station and remove the panel
           print("Closing info panel");
@@ -374,10 +393,11 @@ class MapTapHandler {
             // Add station to favorites using the stored provider reference
             print("Adding station ${station.stationId} to favorites");
 
-            // Create a FavoriteModel instead of a Favorite
+            // Use the display name that was passed to the panel
             final success = await _favoritesProvider.addFavoriteFromStation(
               user.uid,
               station,
+              displayName: displayName, // Use the same display name
               description: "Added from map view",
             );
 
@@ -385,9 +405,7 @@ class MapTapHandler {
               // Show success message
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
-                  content: Text(
-                    'Added ${station.name ?? "Untitled Stream"} to favorites',
-                  ),
+                  content: Text('Added $displayName to favorites'),
                   duration: const Duration(seconds: 2),
                 ),
               );
@@ -431,7 +449,10 @@ class MapTapHandler {
           Navigator.pushNamed(
             context,
             '/forecast',
-            arguments: {'reachId': reachId, 'stationName': stationName},
+            arguments: {
+              'reachId': reachId,
+              'stationName': displayName,
+            }, // Use the same display name
           );
         },
       );

@@ -18,6 +18,7 @@ class StreamInfoPanel extends StatefulWidget {
   final Future<void> Function(MapStation)? onAddToFavorites;
   final Function(String, String)? onViewForecast;
   final Function? onNavigateToFavorites;
+  final String displayName; // Add this property
 
   const StreamInfoPanel({
     super.key,
@@ -26,6 +27,7 @@ class StreamInfoPanel extends StatefulWidget {
     this.onAddToFavorites,
     this.onViewForecast,
     this.onNavigateToFavorites,
+    required this.displayName, // Make it required
   });
 
   @override
@@ -169,10 +171,14 @@ class _StreamInfoPanelState extends State<StreamInfoPanel> {
     final user = authProvider.currentUser;
     if (user != null) {
       try {
-        // Add station to favorites, passing the description
+        // IMPORTANT CHANGE: Get the exact display name as shown in the panel
+        final displayName = _getDisplayName();
+
+        // Add station to favorites, passing the display name AND description
         final success = await favoritesProvider.addFavoriteFromStation(
           user.uid,
           station,
+          displayName: displayName, // Pass the exact displayed name!
           description: _note,
         );
 
@@ -181,7 +187,7 @@ class _StreamInfoPanelState extends State<StreamInfoPanel> {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content: Text('Added ${_getDisplayName()} to favorites'),
+                content: Text('Added $displayName to favorites'),
                 duration: const Duration(seconds: 1),
               ),
             );
@@ -326,7 +332,7 @@ class _StreamInfoPanelState extends State<StreamInfoPanel> {
             children: [
               Expanded(
                 child: Text(
-                  _getDisplayName(), // Use our display name helper
+                  widget.displayName,
                   style: const TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
@@ -451,8 +457,8 @@ class _StreamInfoPanelState extends State<StreamInfoPanel> {
   }
 
   Widget _buildInfoPanel(ThemeData theme) {
-    // Get display name using our helper function
-    final streamName = _getDisplayName();
+    // Use the display name from the widget directly
+    final streamName = widget.displayName;
 
     String? riverClass;
     String? difficulty;

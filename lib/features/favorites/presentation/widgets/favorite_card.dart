@@ -316,15 +316,8 @@ class FavoriteCard extends StatelessWidget {
 
   // Get a display name for the river, using fallbacks if needed
   String _getDisplayName(Favorite favorite) {
-    if (favorite.name.isEmpty) {
-      return 'Untitled Stream';
-    } else if (favorite.name.startsWith('Station ') &&
-        favorite.name.length <= 10) {
-      // This is likely just a default name with the station ID
-      return 'Untitled Stream';
-    } else {
-      return favorite.name;
-    }
+    // Simply return the name as-is if it exists, otherwise use a fallback
+    return favorite.name.isNotEmpty ? favorite.name : 'Untitled Stream';
   }
 
   // This would ideally come from real-time data

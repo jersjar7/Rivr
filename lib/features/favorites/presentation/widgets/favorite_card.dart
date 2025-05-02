@@ -318,9 +318,10 @@ class FavoriteCard extends StatelessWidget {
   String _getDisplayName(Favorite favorite) {
     if (favorite.name.isEmpty) {
       return 'Untitled Stream';
-    } else if (favorite.name.startsWith('Station ')) {
-      // For now, return as is, but we could use a better fallback
-      return favorite.name;
+    } else if (favorite.name.startsWith('Station ') &&
+        favorite.name.length <= 10) {
+      // This is likely just a default name with the station ID
+      return 'Untitled Stream';
     } else {
       return favorite.name;
     }

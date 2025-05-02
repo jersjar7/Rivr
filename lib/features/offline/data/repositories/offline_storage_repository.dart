@@ -485,4 +485,81 @@ class OfflineStorageRepository {
         throw ArgumentError('Invalid cache type: $cacheType');
     }
   }
+
+  /// Get station name from cached data or return fallback
+  Future<String> getStationName(
+    int stationId, {
+    String fallback = 'Untitled Stream',
+  }) async {
+    if (_metadataDb == null) await initialize();
+
+    try {
+      // First check if we have cached API data
+      final cachedStation = await getCachedStation(stationId);
+      if (cachedStation != null) {
+        // If we have cached API data with a name, use it
+        if (cachedStation['apiData'] != null &&
+            cachedStation['apiData'] is Map<String, dynamic> &&
+            cachedStation['apiData']['name'] != null) {
+          final String name = cachedStation['apiData']['name'];
+          if (name.isNotEmpty) {
+            return name;
+          }
+        }
+
+        // If we have a name in the cached station itself, use it
+        if (cachedStation['name'] != null) {
+          final String name = cachedStation['name'];
+          if (name.isNotEmpty) {
+            return name;
+          }
+        }
+      }
+
+      // If we couldn't find a name, return the fallback
+      return fallback;
+    } catch (e) {
+      print('Error getting cached station name: $e');
+      return fallback;
+    }
+  }
+
+  /// Update cached station with name
+  Future<void> updateStationName(int stationId, String name) async {
+    if (_metadataDb == null) await initialize();
+
+    try {
+      final cachedStation = await getCachedStation(stationId);
+      if (cachedStation == null) {
+        // If we don't have a cached station, we can't update it
+        print('No cached station found for ID: $stationId');
+        return;
+      }
+
+      // Update the name in the cached station
+      await _metadataDb!.update(
+        _stationsTable,
+        {'name': name},
+        where: 'stationId = ?',
+        whereArgs: [stationId],
+      );
+
+      // If there's API data, update the name there too
+      if (cachedStation['apiData'] != null) {
+        Map<String, dynamic> apiData = cachedStation['apiData'];
+        apiData['name'] = name;
+
+        await _metadataDb!.update(
+          _stationsTable,
+          {'apiData': jsonEncode(apiData)},
+          where: 'stationId = ?',
+          whereArgs: [stationId],
+        );
+      }
+
+      print('Updated cached station name for ID: $stationId to: $name');
+    } catch (e) {
+      print('Error updating cached station name: $e');
+    }
+  }
 }

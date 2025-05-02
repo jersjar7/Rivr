@@ -7,6 +7,7 @@ import 'package:provider/provider.dart';
 import 'package:rivr/features/map/domain/entities/map_station.dart';
 import 'package:rivr/features/auth/presentation/providers/auth_provider.dart';
 import 'package:rivr/features/favorites/presentation/providers/favorites_provider.dart';
+import 'package:rivr/features/offline/data/repositories/offline_storage_repository.dart';
 
 import '../providers/enhanced_clustered_map_provider.dart';
 import '../providers/station_provider.dart';
@@ -18,6 +19,7 @@ class MapTapHandler {
   final MapboxMap mapboxMap;
   final BuildContext context;
   final Function? onStationAddedToFavorites;
+  final OfflineStorageRepository _offlineStorage = OfflineStorageRepository();
 
   // Track the currently displayed info panel
   StreamInfoPanel? _currentInfoPanel;
@@ -35,6 +37,9 @@ class MapTapHandler {
     // Initialize provider references immediately
     _authProvider = Provider.of<AuthProvider>(context, listen: false);
     _favoritesProvider = Provider.of<FavoritesProvider>(context, listen: false);
+
+    // Initialize offline storage
+    _offlineStorage.initialize();
   }
 
   /// Set up the tap handler
@@ -213,9 +218,6 @@ class MapTapHandler {
     MapProvider mapProvider,
   ) async {
     print("Tapped on station with ID: $stationId");
-    print(
-      "Attempting to find station with ID: $stationId in ${stationProvider.stations.length} stations",
-    );
 
     try {
       // Try to parse the station ID as an integer
@@ -223,20 +225,38 @@ class MapTapHandler {
 
       // Variables for station information
       MapStation? tappedStation;
-      String? stationName;
+      String stationName = "Untitled Stream"; // Default to "Untitled Stream"
 
       // Extract station name from properties if available
-      if (properties.containsKey('name')) {
+      if (properties.containsKey('name') &&
+          properties['name'] != null &&
+          properties['name'].toString().isNotEmpty) {
         stationName = properties['name'].toString();
       } else if (properties.containsKey('properties') &&
           properties['properties'] is Map &&
-          (properties['properties'] as Map).containsKey('name')) {
-        stationName = properties['properties']['name'].toString();
+          (properties['properties'] as Map).containsKey('name') &&
+          (properties['properties'] as Map)['name'] != null &&
+          (properties['properties'] as Map)['name'].toString().isNotEmpty) {
+        stationName = (properties['properties'] as Map)['name'].toString();
       } else {
-        stationName = "Station $stationId";
+        // Check if we have a cached name
+        try {
+          final cachedName = await _offlineStorage.getStationName(stationIdInt);
+          if (cachedName != 'Untitled Stream') {
+            stationName = cachedName;
+            print("Retrieved cached name for station $stationId: $cachedName");
+          }
+        } catch (e) {
+          print("Error retrieving cached name: $e");
+        }
       }
 
-      print("Station name from properties: $stationName");
+      // If no name found, default to "Untitled Stream"
+      if (stationName.isEmpty) {
+        stationName = "Untitled Stream";
+      }
+
+      print("Station name determined: $stationName");
 
       // Try to find the station in the provider's list
       try {
@@ -246,6 +266,19 @@ class MapTapHandler {
         print(
           "Found matching station in provider: ${tappedStation.stationId}, name: ${tappedStation.name}",
         );
+
+        // ALWAYS create a new station with our determined name
+        // This is the key fix - we always override the station with our display name
+        tappedStation = MapStation(
+          stationId: tappedStation.stationId,
+          lat: tappedStation.lat,
+          lon: tappedStation.lon,
+          elevation: tappedStation.elevation,
+          name: stationName, // Always use our determined name
+          type: tappedStation.type,
+          description: tappedStation.description,
+          color: tappedStation.color,
+        );
       } catch (e) {
         // Station not found in provider's list, create a temporary one
         print("Station not found in provider, creating temporary station");
@@ -253,10 +286,13 @@ class MapTapHandler {
           stationId: stationIdInt,
           lat: mapCoord.coordinates.lat.toDouble(),
           lon: mapCoord.coordinates.lng.toDouble(),
-          name: stationName,
+          name: stationName, // Use our determined name
           // Set other properties as needed
         );
       }
+
+      // Save station info in offline storage for future use
+      await _offlineStorage.cacheStation(tappedStation, {'name': stationName});
 
       // Set this station as selected in the provider
       clusteredMapProvider.selectStation(tappedStation);

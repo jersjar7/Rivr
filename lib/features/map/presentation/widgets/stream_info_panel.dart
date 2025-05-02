@@ -10,7 +10,7 @@ import '../../../../core/error/app_exception.dart';
 import '../../../../core/error/error_handler.dart';
 import '../../../../features/auth/presentation/providers/auth_provider.dart';
 import '../../../../features/favorites/presentation/providers/favorites_provider.dart';
-import '../../../../features/favorites/domain/entities/favorite.dart';
+import '../../../../features/offline/data/repositories/offline_storage_repository.dart';
 
 class StreamInfoPanel extends StatefulWidget {
   final MapStation station;
@@ -44,6 +44,9 @@ class _StreamInfoPanelState extends State<StreamInfoPanel> {
   final TextEditingController _noteController = TextEditingController();
   String? _note;
 
+  // For offline storage
+  final OfflineStorageRepository _offlineStorage = OfflineStorageRepository();
+
   @override
   void initState() {
     super.initState();
@@ -70,6 +73,30 @@ class _StreamInfoPanelState extends State<StreamInfoPanel> {
       _errorRecovery = null;
     });
 
+    // First check if we have cached data for this station
+    try {
+      final cachedData = await _offlineStorage.getCachedStation(
+        widget.station.stationId,
+      );
+
+      if (cachedData != null && cachedData['apiData'] != null) {
+        if (mounted) {
+          setState(() {
+            _reachData = cachedData['apiData'];
+            _isLoading = false;
+          });
+
+          print(
+            "StreamInfoPanel: Using cached data for station ${widget.station.stationId}",
+          );
+          return;
+        }
+      }
+    } catch (e) {
+      print("Error checking cached data: $e");
+      // Continue to fetch from API if cache check fails
+    }
+
     try {
       print("Fetching reach data for station ID: ${widget.station.stationId}");
       final reachService = ReachService();
@@ -80,6 +107,10 @@ class _StreamInfoPanelState extends State<StreamInfoPanel> {
       print("API response received for reach ID $reachId");
 
       if (!mounted) return;
+
+      // Cache the data for offline use
+      await _offlineStorage.cacheStation(widget.station, data);
+      print("Cached data for station ${widget.station.stationId}");
 
       setState(() {
         _reachData = data;
@@ -105,6 +136,25 @@ class _StreamInfoPanelState extends State<StreamInfoPanel> {
     }
   }
 
+  // Get the display name for the station, with fallbacks
+  String _getDisplayName() {
+    // First try to get name from API data
+    if (_reachData != null && _reachData!.containsKey('name')) {
+      final name = _reachData!['name'] as String?;
+      if (name != null && name.isNotEmpty) {
+        return name;
+      }
+    }
+
+    // If no API name, try station name
+    if (widget.station.name != null && widget.station.name!.isNotEmpty) {
+      return widget.station.name!;
+    }
+
+    // If no station name, use "Untitled Stream" as fallback
+    return 'Untitled Stream';
+  }
+
   Future<void> _addToFavorites(MapStation station) async {
     // Show dialog to add a note first
     await _showAddNoteDialog();
@@ -118,43 +168,48 @@ class _StreamInfoPanelState extends State<StreamInfoPanel> {
 
     final user = authProvider.currentUser;
     if (user != null) {
-      final favorite = Favorite(
-        stationId: station.stationId.toString(),
-        name: station.name ?? 'Station ${station.stationId}',
-        userId: user.uid,
-        position: 0, // This will be updated by the provider
-        color: station.color,
-        description:
-            _note ??
-            (_reachData != null && _reachData!.containsKey('description')
-                ? _reachData!['description'] as String?
-                : null),
-        imgNumber:
-            1, // Default image number, you can assign a random one if desired
-        lastUpdated: DateTime.now().millisecondsSinceEpoch,
-      );
-
-      await favoritesProvider.addNewFavorite(favorite);
-
-      // Show confirmation snackbar
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Added ${station.name ?? "Station"} to favorites'),
-            duration: const Duration(
-              seconds: 1,
-            ), // Short duration since we're navigating away
-          ),
+      try {
+        // Add station to favorites, passing the description
+        final success = await favoritesProvider.addFavoriteFromStation(
+          user.uid,
+          station,
+          description: _note,
         );
 
-        // Close the info panel
-        widget.onClose();
+        if (success) {
+          // Show confirmation snackbar
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Added ${_getDisplayName()} to favorites'),
+                duration: const Duration(seconds: 1),
+              ),
+            );
 
-        // Navigate to favorites if callback provided
-        if (widget.onNavigateToFavorites != null) {
-          // Small delay to let the UI update
-          await Future.delayed(const Duration(milliseconds: 300));
-          widget.onNavigateToFavorites!();
+            // Close the info panel
+            widget.onClose();
+
+            // Navigate to favorites if callback provided
+            if (widget.onNavigateToFavorites != null) {
+              // Small delay to let the UI update
+              await Future.delayed(const Duration(milliseconds: 300));
+              widget.onNavigateToFavorites!();
+            }
+          }
+        } else {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Failed to add to favorites. Please try again.'),
+              ),
+            );
+          }
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text('Error: ${e.toString()}')));
         }
       }
     } else {
@@ -271,7 +326,7 @@ class _StreamInfoPanelState extends State<StreamInfoPanel> {
             children: [
               Expanded(
                 child: Text(
-                  widget.station.name ?? 'Station ${widget.station.stationId}',
+                  _getDisplayName(), // Use our display name helper
                   style: const TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
@@ -368,8 +423,7 @@ class _StreamInfoPanelState extends State<StreamInfoPanel> {
                     widget.onViewForecast != null
                         ? () => widget.onViewForecast!(
                           widget.station.stationId.toString(),
-                          widget.station.name ??
-                              'Station ${widget.station.stationId}',
+                          _getDisplayName(), // Use our display name helper
                         )
                         : () {
                           Navigator.pushNamed(
@@ -378,8 +432,7 @@ class _StreamInfoPanelState extends State<StreamInfoPanel> {
                             arguments: {
                               'reachId': widget.station.stationId.toString(),
                               'stationName':
-                                  widget.station.name ??
-                                  'Station ${widget.station.stationId}',
+                                  _getDisplayName(), // Use our helper
                             },
                           );
                         },
@@ -398,10 +451,8 @@ class _StreamInfoPanelState extends State<StreamInfoPanel> {
   }
 
   Widget _buildInfoPanel(ThemeData theme) {
-    final streamName =
-        _reachData != null && _reachData!.containsKey('name')
-            ? _reachData!['name'] as String
-            : (widget.station.name ?? 'Station ${widget.station.stationId}');
+    // Get display name using our helper function
+    final streamName = _getDisplayName();
 
     String? riverClass;
     String? difficulty;
@@ -427,7 +478,7 @@ class _StreamInfoPanelState extends State<StreamInfoPanel> {
             children: [
               Expanded(
                 child: Text(
-                  streamName,
+                  streamName, // Use our display name
                   style: const TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,

@@ -1,8 +1,11 @@
 // lib/features/favorites/presentation/widgets/favorite_card.dart
 
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../../domain/entities/favorite.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../providers/favorites_provider.dart';
+import '../widgets/edit_favorite_name_dialog.dart';
 
 class FavoriteCard extends StatelessWidget {
   final Favorite favorite;
@@ -36,6 +39,13 @@ class FavoriteCard extends StatelessWidget {
       cardColor = AppColors.primaryColor;
     }
 
+    // Display name - use "Untitled Stream" as fallback if empty or just station ID
+    final displayName = _getDisplayName(favorite);
+
+    // Check if this is a user-edited name or a default station ID name
+    final isDefaultName =
+        favorite.name.startsWith('Station ') || favorite.name.isEmpty;
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 16.0),
       child: Material(
@@ -53,7 +63,7 @@ class FavoriteCard extends StatelessWidget {
               // Hero Image with Gradient Overlay
               Stack(
                 children: [
-                  // River Image - using assets/img folder directly instead of river_images subfolder
+                  // River Image
                   Hero(
                     tag: 'river_image_${favorite.stationId}',
                     child: Image.asset(
@@ -62,7 +72,6 @@ class FavoriteCard extends StatelessWidget {
                       width: double.infinity,
                       fit: BoxFit.cover,
                       errorBuilder: (context, error, stackTrace) {
-                        print("Error loading river image: $error");
                         // Fallback image when the asset fails to load
                         return Container(
                           height: 160,
@@ -102,22 +111,40 @@ class FavoriteCard extends StatelessWidget {
                       children: [
                         // Title
                         Expanded(
-                          child: Text(
-                            favorite.name,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 20,
-                              fontWeight: FontWeight.bold,
-                              shadows: [
-                                Shadow(
-                                  offset: Offset(1, 1),
-                                  blurRadius: 3,
-                                  color: Colors.black54,
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  displayName,
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.bold,
+                                    shadows: [
+                                      Shadow(
+                                        offset: Offset(1, 1),
+                                        blurRadius: 3,
+                                        color: Colors.black54,
+                                      ),
+                                    ],
+                                  ),
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
                                 ),
-                              ],
-                            ),
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
+                              ),
+                              // Edit button next to the title
+                              IconButton(
+                                icon: const Icon(
+                                  Icons.edit,
+                                  color: Colors.white,
+                                  size: 18,
+                                ),
+                                onPressed: () => _showEditNameDialog(context),
+                                padding: EdgeInsets.zero,
+                                constraints: const BoxConstraints(),
+                                tooltip: 'Edit Name',
+                              ),
+                            ],
                           ),
                         ),
 
@@ -152,6 +179,42 @@ class FavoriteCard extends StatelessWidget {
                       ),
                     ),
                   ),
+
+                  // Optional: Show indicator for custom-named rivers
+                  if (!isDefaultName)
+                    Positioned(
+                      top: 8,
+                      left: 8,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.7),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.edit_attributes,
+                              size: 12,
+                              color: AppColors.primaryColor,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              'Custom Name',
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                                color: AppColors.primaryColor,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
                 ],
               ),
 
@@ -167,14 +230,14 @@ class FavoriteCard extends StatelessWidget {
                         Icon(
                           Icons.location_on,
                           size: 16,
-                          color: AppColors.textColor.withValues(alpha: 0.7),
+                          color: Colors.grey[600],
                         ),
                         const SizedBox(width: 6),
                         Text(
                           'Station ID: ${favorite.stationId}',
                           style: TextStyle(
                             fontSize: 14,
-                            color: AppColors.textColor.withValues(alpha: 0.7),
+                            color: Colors.grey[700],
                           ),
                         ),
                       ],
@@ -235,7 +298,7 @@ class FavoriteCard extends StatelessWidget {
                         favorite.description!,
                         style: TextStyle(
                           fontSize: 14,
-                          color: AppColors.textColor.withValues(alpha: 0.8),
+                          color: Colors.grey[700],
                           fontStyle: FontStyle.italic,
                         ),
                         maxLines: 2,
@@ -249,6 +312,18 @@ class FavoriteCard extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  // Get a display name for the river, using fallbacks if needed
+  String _getDisplayName(Favorite favorite) {
+    if (favorite.name.isEmpty) {
+      return 'Untitled Stream';
+    } else if (favorite.name.startsWith('Station ')) {
+      // For now, return as is, but we could use a better fallback
+      return favorite.name;
+    } else {
+      return favorite.name;
+    }
   }
 
   // This would ideally come from real-time data
@@ -278,14 +353,14 @@ class FavoriteCard extends StatelessWidget {
             ),
             title: const Text('Remove Favorite'),
             content: Text(
-              'Are you sure you want to remove ${favorite.name} from your favorites?',
+              'Are you sure you want to remove ${_getDisplayName(favorite)} from your favorites?',
             ),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(context),
                 child: Text(
                   'Cancel',
-                  style: TextStyle(color: AppColors.textColor),
+                  style: TextStyle(color: Colors.grey[700]),
                 ),
               ),
               ElevatedButton(
@@ -303,5 +378,42 @@ class FavoriteCard extends StatelessWidget {
             ],
           ),
     );
+  }
+
+  // Show dialog to edit the river name
+  void _showEditNameDialog(BuildContext context) async {
+    final favoritesProvider = Provider.of<FavoritesProvider>(
+      context,
+      listen: false,
+    );
+
+    final result = await showDialog<String>(
+      context: context,
+      builder:
+          (context) => EditFavoriteNameDialog(
+            currentName: favorite.name,
+            stationId: favorite.stationId,
+          ),
+    );
+
+    // If we got a new name and it's different from the current one
+    if (result != null && result != favorite.name) {
+      // Update the name
+      final success = await favoritesProvider.updateFavoriteName(
+        favorite.userId,
+        favorite.stationId,
+        result,
+      );
+
+      if (success) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('River name updated successfully')),
+        );
+      } else {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Failed to update river name')));
+      }
+    }
   }
 }

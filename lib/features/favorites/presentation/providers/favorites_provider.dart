@@ -3,6 +3,7 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:rivr/features/offline/data/repositories/offline_storage_repository.dart';
 import '../../domain/entities/favorite.dart';
 import '../../data/models/favorite_model.dart';
 import '../../domain/usecases/add_favorite.dart';
@@ -40,6 +41,8 @@ class FavoritesProvider with ChangeNotifier {
   List<Favorite> get favorites => _favorites;
   String? get errorMessage => _errorMessage;
   bool get isProcessing => _isProcessing;
+
+  final OfflineStorageRepository _offlineStorage = OfflineStorageRepository();
 
   FavoritesProvider({
     required GetFavorites getFavorites,
@@ -127,14 +130,43 @@ class FavoritesProvider with ChangeNotifier {
       // Get the next position
       final nextPosition = _favorites.length;
 
+      // Generate a random image number (or you could use a more deterministic approach)
       final random = math.Random();
       final randomImgNumber =
           random.nextInt(30) + 1; // Random number between 1 and 30
 
-      // Create favorite model from station - Use FavoriteModel instead of Favorite
+      // Try to get better name from cached data
+      String riverName = station.name ?? '';
+      try {
+        // Check if we have cached data for this station
+        final cachedStation = await _offlineStorage.getCachedStation(
+          station.stationId,
+        );
+        if (cachedStation != null && cachedStation['apiData'] != null) {
+          // Extract name from API data if available
+          final apiData = cachedStation['apiData'];
+          if (apiData is Map<String, dynamic> && apiData.containsKey('name')) {
+            final cachedName = apiData['name'];
+            if (cachedName != null && cachedName.toString().isNotEmpty) {
+              riverName = cachedName.toString();
+              print("Using name from cached data: $riverName");
+            }
+          }
+        }
+      } catch (e) {
+        print("Error accessing cached station data: $e");
+        // Continue with original name if there's an error
+      }
+
+      // If no name found, use "Untitled Stream" instead of "Station X"
+      if (riverName.isEmpty) {
+        riverName = 'Untitled Stream';
+      }
+
+      // Create favorite model from station
       final favorite = FavoriteModel(
         stationId: station.stationId.toString(),
-        name: station.name ?? 'Station ${station.stationId}',
+        name: riverName,
         userId: userId,
         position: nextPosition,
         color: station.color,
@@ -144,7 +176,7 @@ class FavoritesProvider with ChangeNotifier {
       );
 
       print(
-        "Created favorite object: ${favorite.stationId}, position: ${favorite.position}",
+        "Created favorite object: ${favorite.stationId}, position: ${favorite.position}, name: ${favorite.name}",
       );
 
       final result = await addFavoriteUseCase(favorite);
@@ -354,6 +386,64 @@ class FavoritesProvider with ChangeNotifier {
     } catch (e) {
       print('Exception checking favorite status: $e');
       return false;
+    }
+  }
+
+  /// Update favorite name
+  Future<bool> updateFavoriteName(
+    String userId,
+    String stationId,
+    String newName,
+  ) async {
+    if (_isProcessing) return false;
+
+    try {
+      _isProcessing = true;
+
+      // Find the favorite to update
+      final favoriteIndex = _favorites.indexWhere(
+        (f) => f.stationId == stationId && f.userId == userId,
+      );
+
+      if (favoriteIndex < 0) {
+        return false; // Not found
+      }
+
+      // Get the favorite
+      final favorite = _favorites[favoriteIndex];
+
+      // Create updated favorite
+      final updatedFavorite = FavoriteModel(
+        stationId: favorite.stationId,
+        name: newName,
+        userId: favorite.userId,
+        position: favorite.position,
+        color: favorite.color,
+        description: favorite.description,
+        imgNumber: favorite.imgNumber,
+        lastUpdated: DateTime.now().millisecondsSinceEpoch,
+      );
+
+      // Update in database (we'll reuse the add method with replace conflict strategy)
+      final result = await addFavoriteUseCase(updatedFavorite);
+
+      return result.fold(
+        (failure) {
+          _setError(failure.message);
+          return false;
+        },
+        (_) {
+          // Update local list
+          _favorites[favoriteIndex] = updatedFavorite;
+          notifyListeners();
+          return true;
+        },
+      );
+    } catch (e) {
+      _setError('Failed to update favorite name: ${e.toString()}');
+      return false;
+    } finally {
+      _isProcessing = false;
     }
   }
 

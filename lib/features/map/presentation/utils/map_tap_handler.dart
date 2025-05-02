@@ -223,9 +223,8 @@ class MapTapHandler {
       // Try to parse the station ID as an integer
       final int stationIdInt = int.parse(stationId);
 
-      // Variables for station information
-      MapStation? tappedStation;
-      String stationName = "Untitled Stream"; // Default to "Untitled Stream"
+      // Initialize with default name - FIXED: Use "Untitled Stream" as default
+      String stationName = "Untitled Stream";
 
       // Extract station name from properties if available
       if (properties.containsKey('name') &&
@@ -242,16 +241,22 @@ class MapTapHandler {
         // Check if we have a cached name
         try {
           final cachedName = await _offlineStorage.getStationName(stationIdInt);
-          if (cachedName != 'Untitled Stream') {
+          if (cachedName.isNotEmpty && cachedName != 'Untitled Stream') {
             stationName = cachedName;
             print("Retrieved cached name for station $stationId: $cachedName");
           }
         } catch (e) {
           print("Error retrieving cached name: $e");
+          // Keep the default "Untitled Stream" name
         }
       }
 
-      // If no name found, default to "Untitled Stream"
+      // IMPORTANT: Check if name starts with "Station" and replace with "Untitled Stream"
+      if (stationName.startsWith('Station ')) {
+        stationName = "Untitled Stream";
+      }
+
+      // If no name found or empty, ensure we use "Untitled Stream"
       if (stationName.isEmpty) {
         stationName = "Untitled Stream";
       }
@@ -259,6 +264,7 @@ class MapTapHandler {
       print("Station name determined: $stationName");
 
       // Try to find the station in the provider's list
+      MapStation? tappedStation;
       try {
         tappedStation = stationProvider.stations.firstWhere(
           (station) => station.stationId == stationIdInt,
@@ -287,7 +293,6 @@ class MapTapHandler {
           lat: mapCoord.coordinates.lat.toDouble(),
           lon: mapCoord.coordinates.lng.toDouble(),
           name: stationName, // Use our determined name
-          // Set other properties as needed
         );
       }
 
@@ -382,7 +387,7 @@ class MapTapHandler {
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
                   content: Text(
-                    'Added ${station.name ?? "Station ${station.stationId}"} to favorites',
+                    'Added ${station.name ?? "Untitled Stream"} to favorites',
                   ),
                   duration: const Duration(seconds: 2),
                 ),

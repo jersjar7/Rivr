@@ -150,8 +150,16 @@ class FavoritesProvider with ChangeNotifier {
               apiData['name'].toString().isNotEmpty) {
             riverName = apiData['name'].toString();
           }
-        } else if (station.name != null && station.name!.isNotEmpty) {
-          riverName = station.name!;
+        }
+
+        // Check if station has name from another source
+        if (station.name != null && station.name!.isNotEmpty) {
+          // IMPORTANT FIX: Check if the name starts with "Station " and use "Untitled Stream" instead
+          if (station.name!.startsWith('Station ')) {
+            riverName = "Untitled Stream";
+          } else {
+            riverName = station.name!;
+          }
         }
         // Otherwise, keep the default "Untitled Stream"
       } catch (e) {

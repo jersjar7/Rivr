@@ -92,11 +92,25 @@ class OfflineStorageRepository {
   ) async {
     if (_metadataDb == null) await initialize();
 
+    // FIXED: Ensure we're not caching "Station ID" format names
+    String stationName = station.name ?? "Untitled Stream";
+    if (stationName.startsWith("Station ")) {
+      stationName = "Untitled Stream";
+    }
+
+    // Fix API data name too if it starts with "Station "
+    if (apiData != null && apiData.containsKey('name')) {
+      final apiName = apiData['name'];
+      if (apiName != null && apiName.toString().startsWith("Station ")) {
+        apiData['name'] = "Untitled Stream";
+      }
+    }
+
     final apiDataJson = apiData != null ? jsonEncode(apiData) : null;
 
     await _metadataDb!.insert(_stationsTable, {
       'stationId': station.stationId,
-      'name': station.name,
+      'name': stationName, // Use our sanitized name
       'lat': station.lat,
       'lon': station.lon,
       'elevation': station.elevation,
@@ -503,6 +517,10 @@ class OfflineStorageRepository {
             cachedStation['apiData']['name'] != null) {
           final String name = cachedStation['apiData']['name'];
           if (name.isNotEmpty) {
+            // FIXED: Check if name starts with "Station" and replace with fallback
+            if (name.startsWith("Station ")) {
+              return fallback;
+            }
             return name;
           }
         }
@@ -511,6 +529,10 @@ class OfflineStorageRepository {
         if (cachedStation['name'] != null) {
           final String name = cachedStation['name'];
           if (name.isNotEmpty) {
+            // FIXED: Check if name starts with "Station" and replace with fallback
+            if (name.startsWith("Station ")) {
+              return fallback;
+            }
             return name;
           }
         }
@@ -536,10 +558,16 @@ class OfflineStorageRepository {
         return;
       }
 
+      // FIXED: Check for "Station ID" format and replace with "Untitled Stream"
+      String updatedName = name;
+      if (updatedName.startsWith("Station ")) {
+        updatedName = "Untitled Stream";
+      }
+
       // Update the name in the cached station
       await _metadataDb!.update(
         _stationsTable,
-        {'name': name},
+        {'name': updatedName},
         where: 'stationId = ?',
         whereArgs: [stationId],
       );
@@ -547,7 +575,7 @@ class OfflineStorageRepository {
       // If there's API data, update the name there too
       if (cachedStation['apiData'] != null) {
         Map<String, dynamic> apiData = cachedStation['apiData'];
-        apiData['name'] = name;
+        apiData['name'] = updatedName;
 
         await _metadataDb!.update(
           _stationsTable,
@@ -557,7 +585,7 @@ class OfflineStorageRepository {
         );
       }
 
-      print('Updated cached station name for ID: $stationId to: $name');
+      print('Updated cached station name for ID: $stationId to: $updatedName');
     } catch (e) {
       print('Error updating cached station name: $e');
     }

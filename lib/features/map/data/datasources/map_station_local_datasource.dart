@@ -70,7 +70,9 @@ class MapStationLocalDataSourceImpl implements MapStationLocalDataSource {
       return result.map((map) {
         // Add default values for missing fields
         final enhancedMap = Map<String, dynamic>.from(map);
-        enhancedMap['name'] ??= 'Station ${map['stationId']}';
+
+        // IMPORTANT FIX: Use "Untitled Stream" instead of "Station [ID]"
+        enhancedMap['name'] ??= 'Untitled Stream';
         enhancedMap['type'] ??= 'river';
         enhancedMap['color'] ??= '#2389DA';
 
@@ -118,7 +120,9 @@ class MapStationLocalDataSourceImpl implements MapStationLocalDataSource {
       return result.map((map) {
         // Add default values for missing fields
         final enhancedMap = Map<String, dynamic>.from(map);
-        enhancedMap['name'] ??= 'Station ${map['stationId']}';
+
+        // IMPORTANT FIX: Use "Untitled Stream" instead of "Station [ID]"
+        enhancedMap['name'] ??= 'Untitled Stream';
         enhancedMap['type'] ??= 'river';
         enhancedMap['color'] ??= '#2389DA';
 
@@ -195,7 +199,9 @@ class MapStationLocalDataSourceImpl implements MapStationLocalDataSource {
       return result.map((map) {
         // Add default values for missing fields
         final enhancedMap = Map<String, dynamic>.from(map);
-        enhancedMap['name'] ??= 'Station ${map['stationId']}';
+
+        // IMPORTANT FIX: Use "Untitled Stream" instead of "Station [ID]"
+        enhancedMap['name'] ??= 'Untitled Stream';
         enhancedMap['type'] ??= 'river';
         enhancedMap['color'] ??= '#2389DA';
 

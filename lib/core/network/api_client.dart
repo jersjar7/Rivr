@@ -4,37 +4,66 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:http/http.dart' as http;
+
 import '../error/app_exception.dart';
 import '../network/network_info.dart';
+import '../cache/storage/cache_database.dart';
+import 'caching_http_client.dart';
 
-/// A centralized API client for making HTTP requests
+/// A centralized API client for making HTTP requests (with optional caching)
 class ApiClient {
-  final http.Client _httpClient;
+  final CachingHttpClient _client;
   final NetworkInfo _networkInfo;
+  bool _offlineMode = false;
 
-  ApiClient({http.Client? httpClient, required NetworkInfo networkInfo})
-    : _httpClient = httpClient ?? http.Client(),
-      _networkInfo = networkInfo;
+  /// Creates an [ApiClient].
+  ///
+  /// If [innerClient] is provided, it's wrapped with caching;
+  /// otherwise a default [http.Client] is used.
+  ApiClient({
+    http.Client? innerClient,
+    required NetworkInfo networkInfo,
+    CacheDatabase? cacheDatabase,
+  }) : _networkInfo = networkInfo,
+       _client = CachingHttpClient(
+         inner: innerClient ?? http.Client(),
+         networkInfo: networkInfo,
+         cacheDatabase: cacheDatabase ?? CacheDatabase(),
+       );
 
-  /// Makes a GET request to the specified endpoint
+  /// Toggle offline mode (forces cache use even when online)
+  void setOfflineMode(bool enabled) {
+    _offlineMode = enabled;
+    _client.forceOfflineMode = enabled;
+  }
+
+  /// GET request
   Future<dynamic> get(
     String url, {
     Map<String, String>? headers,
     Map<String, dynamic>? queryParameters,
     Duration timeout = const Duration(seconds: 15),
     bool requiresConnection = true,
-  }) async {
+    bool forceFresh = false,
+  }) {
+    // If forcing fresh data, bypass cache while online
+    _client.forceOfflineMode = _offlineMode || !forceFresh;
+
     return _executeRequest(
-      () => _httpClient.get(
-        _buildUri(url, queryParameters),
-        headers: _buildHeaders(headers),
-      ),
+      () => _client
+          .get(_buildUri(url, queryParameters), headers: _buildHeaders(headers))
+          .timeout(
+            timeout,
+            onTimeout:
+                () =>
+                    throw NetworkException.timeout(seconds: timeout.inSeconds),
+          ),
       timeout: timeout,
       requiresConnection: requiresConnection,
     );
   }
 
-  /// Makes a POST request to the specified endpoint
+  /// POST request
   Future<dynamic> post(
     String url, {
     Map<String, String>? headers,
@@ -42,19 +71,28 @@ class ApiClient {
     dynamic body,
     Duration timeout = const Duration(seconds: 15),
     bool requiresConnection = true,
-  }) async {
+  }) {
+    _client.forceOfflineMode = _offlineMode;
+
     return _executeRequest(
-      () => _httpClient.post(
-        _buildUri(url, queryParameters),
-        headers: _buildHeaders(headers),
-        body: _encodeBody(body),
-      ),
+      () => _client
+          .post(
+            _buildUri(url, queryParameters),
+            headers: _buildHeaders(headers),
+            body: _encodeBody(body),
+          )
+          .timeout(
+            timeout,
+            onTimeout:
+                () =>
+                    throw NetworkException.timeout(seconds: timeout.inSeconds),
+          ),
       timeout: timeout,
       requiresConnection: requiresConnection,
     );
   }
 
-  /// Makes a PUT request to the specified endpoint
+  /// PUT request
   Future<dynamic> put(
     String url, {
     Map<String, String>? headers,
@@ -62,19 +100,28 @@ class ApiClient {
     dynamic body,
     Duration timeout = const Duration(seconds: 15),
     bool requiresConnection = true,
-  }) async {
+  }) {
+    _client.forceOfflineMode = _offlineMode;
+
     return _executeRequest(
-      () => _httpClient.put(
-        _buildUri(url, queryParameters),
-        headers: _buildHeaders(headers),
-        body: _encodeBody(body),
-      ),
+      () => _client
+          .put(
+            _buildUri(url, queryParameters),
+            headers: _buildHeaders(headers),
+            body: _encodeBody(body),
+          )
+          .timeout(
+            timeout,
+            onTimeout:
+                () =>
+                    throw NetworkException.timeout(seconds: timeout.inSeconds),
+          ),
       timeout: timeout,
       requiresConnection: requiresConnection,
     );
   }
 
-  /// Makes a DELETE request to the specified endpoint
+  /// DELETE request
   Future<dynamic> delete(
     String url, {
     Map<String, String>? headers,
@@ -82,53 +129,49 @@ class ApiClient {
     dynamic body,
     Duration timeout = const Duration(seconds: 15),
     bool requiresConnection = true,
-  }) async {
+  }) {
+    _client.forceOfflineMode = _offlineMode;
+
     return _executeRequest(
-      () => _httpClient.delete(
-        _buildUri(url, queryParameters),
-        headers: _buildHeaders(headers),
-        body: _encodeBody(body),
-      ),
+      () => _client
+          .delete(
+            _buildUri(url, queryParameters),
+            headers: _buildHeaders(headers),
+            body: _encodeBody(body),
+          )
+          .timeout(
+            timeout,
+            onTimeout:
+                () =>
+                    throw NetworkException.timeout(seconds: timeout.inSeconds),
+          ),
       timeout: timeout,
       requiresConnection: requiresConnection,
     );
   }
 
-  /// Executes the HTTP request with proper error handling
+  /// Executes the HTTP call with error handling
   Future<dynamic> _executeRequest(
     Future<http.Response> Function() requestFunction, {
     required Duration timeout,
     required bool requiresConnection,
   }) async {
     try {
-      // Check for network connection if required
-      if (requiresConnection) {
-        final hasConnection = await _networkInfo.isConnected;
-        if (!hasConnection) {
+      if (requiresConnection && !_client.forceOfflineMode) {
+        if (!await _networkInfo.isConnected) {
           throw NetworkException.noConnection();
         }
       }
 
-      // Execute the request with timeout
-      final response = await requestFunction().timeout(
-        timeout,
-        onTimeout: () {
-          throw NetworkException.timeout(seconds: timeout.inSeconds);
-        },
-      );
-
-      // Process the response
+      final response = await requestFunction();
       return _processResponse(response);
     } on SocketException catch (e) {
-      print('SocketException: ${e.message}');
       throw NetworkException.noConnection(originalError: e);
     } on TimeoutException catch (e) {
-      print('TimeoutException: ${e.message}');
       throw NetworkException.timeout(originalError: e);
     } on AppException {
-      rethrow; // Rethrow AppExceptions as they're already handled
+      rethrow;
     } catch (e) {
-      print('Unexpected error in API client: $e');
       throw UnexpectedException(
         message: 'Failed to complete request: ${e.toString()}',
         originalError: e,
@@ -136,16 +179,13 @@ class ApiClient {
     }
   }
 
-  /// Process API response and handle errors
+  /// Parses and handles HTTP responses
   dynamic _processResponse(http.Response response) {
     final statusCode = response.statusCode;
 
-    // Success responses (2xx)
     if (statusCode >= 200 && statusCode < 300) {
+      if (response.body.isEmpty) return null;
       try {
-        if (response.body.isEmpty) {
-          return null;
-        }
         return json.decode(response.body);
       } catch (e) {
         throw DataException.parseError(
@@ -155,7 +195,6 @@ class ApiClient {
       }
     }
 
-    // Error handling based on status code
     if (statusCode == 401) {
       throw AuthException.unauthorized(
         details: _getErrorMessage(response),
@@ -167,7 +206,6 @@ class ApiClient {
       throw DataException.notFound(originalError: response);
     }
 
-    // Handle other error codes
     throw NetworkException.httpError(
       statusCode: statusCode,
       message: _getErrorMessage(response),
@@ -175,83 +213,49 @@ class ApiClient {
     );
   }
 
-  /// Try to extract a meaningful error message from the response
+  /// Extracts error message from response body
   String _getErrorMessage(http.Response response) {
     try {
       final body = json.decode(response.body);
-
-      // Check common error message formats
       if (body is Map) {
-        if (body.containsKey('message')) {
-          return body['message'];
-        }
-
+        if (body.containsKey('message')) return body['message'];
         if (body.containsKey('error')) {
-          if (body['error'] is String) {
-            return body['error'];
-          }
-          if (body['error'] is Map && body['error'].containsKey('message')) {
-            return body['error']['message'];
-          }
+          final err = body['error'];
+          if (err is String) return err;
+          if (err is Map && err.containsKey('message')) return err['message'];
         }
       }
-    } catch (_) {
-      // If parsing fails, just return the status code
-    }
-
+    } catch (_) {}
     return 'HTTP Error: ${response.statusCode}';
   }
 
-  /// Encode the request body based on its type
+  /// Encodes request body
   dynamic _encodeBody(dynamic body) {
-    if (body == null) {
-      return null;
-    }
-
-    if (body is String) {
-      return body;
-    }
-
-    if (body is Map || body is List) {
-      return json.encode(body);
-    }
-
-    // For other types, try to use toString()
+    if (body == null) return null;
+    if (body is String) return body;
+    if (body is Map || body is List) return json.encode(body);
     return body.toString();
   }
 
-  /// Build headers with default content-type
+  /// Builds headers with defaults
   Map<String, String> _buildHeaders(Map<String, String>? headers) {
-    final defaultHeaders = {
+    const defaults = {
       'Content-Type': 'application/json',
       'Accept': 'application/json',
     };
-
-    return headers != null ? {...defaultHeaders, ...headers} : defaultHeaders;
+    return headers != null ? {...defaults, ...headers} : defaults;
   }
 
-  /// Construct URI with optional query parameters
+  /// Constructs URI with query parameters
   Uri _buildUri(String url, Map<String, dynamic>? queryParameters) {
     final uri = Uri.parse(url);
-
-    if (queryParameters == null || queryParameters.isEmpty) {
-      return uri;
-    }
-
-    // Convert all parameter values to strings
-    final stringParams = queryParameters.map(
-      (key, value) => MapEntry(key, value.toString()),
-    );
-
-    // Merge with existing parameters if any
-    final mergedParams = Map<String, String>.from(uri.queryParameters)
-      ..addAll(stringParams);
-
-    return uri.replace(queryParameters: mergedParams);
+    if (queryParameters == null || queryParameters.isEmpty) return uri;
+    final params = queryParameters.map((k, v) => MapEntry(k, v.toString()));
+    return uri.replace(queryParameters: {...uri.queryParameters, ...params});
   }
 
-  /// Dispose resources
+  /// Dispose underlying HTTP client
   void dispose() {
-    _httpClient.close();
+    _client.close();
   }
 }

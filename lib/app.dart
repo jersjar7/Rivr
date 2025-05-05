@@ -4,6 +4,8 @@ import 'package:provider/provider.dart';
 import 'core/di/service_locator.dart';
 import 'core/navigation/app_router.dart';
 import 'core/network/connection_monitor.dart';
+import 'core/services/offline_manager_service.dart';
+import 'core/widgets/offline_mode_banner.dart';
 import 'common/providers/reach_provider.dart';
 
 class RivrApp extends StatelessWidget {
@@ -17,6 +19,8 @@ class RivrApp extends StatelessWidget {
         ChangeNotifierProvider(
           create: (_) => ConnectionMonitor(networkInfo: sl()),
         ),
+        // Add OfflineManagerService
+        ChangeNotifierProvider(create: (_) => sl<OfflineManagerService>()),
         // Note: We don't need to register AuthProvider, FavoritesProvider, ForecastProvider,
         // or ReturnPeriodProvider here because they are already provided in main.dart
 
@@ -36,9 +40,16 @@ class RivrApp extends StatelessWidget {
         initialRoute: '/',
         onGenerateRoute: AppRouter.generateRoute,
         builder: (context, child) {
-          // Add global connection status banner at the top of the app
+          // Add global banners at the top of the app (connection status and offline mode)
           return Column(
-            children: [const ConnectionStatusBanner(), Expanded(child: child!)],
+            children: [
+              // Network connection banner
+              const ConnectionStatusBanner(),
+              // Offline mode banner
+              const OfflineModeBanner(),
+              // Main content
+              Expanded(child: child!),
+            ],
           );
         },
       ),

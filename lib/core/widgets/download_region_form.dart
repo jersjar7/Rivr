@@ -1,9 +1,9 @@
-// lib/features/offline/presentation/widgets/download_region_form.dart
+// lib/core/widgets/download_region_form.dart
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../providers/offline_manager_provider.dart';
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
+import '../services/offline_manager_service.dart';
 
 class DownloadRegionForm extends StatefulWidget {
   final MapboxMap mapboxMap;
@@ -59,11 +59,6 @@ class _DownloadRegionFormState extends State<DownloadRegionForm> {
     });
 
     try {
-      final provider = Provider.of<OfflineManagerProvider>(
-        context,
-        listen: false,
-      );
-
       // Get visible region
       final cameraState = await widget.mapboxMap.getCameraState();
       final visibleRegion = await widget.mapboxMap.coordinateBoundsForCamera(
@@ -75,18 +70,23 @@ class _DownloadRegionFormState extends State<DownloadRegionForm> {
         ),
       );
 
-      // Calculate estimated size
-      final sizeBytes = await provider.calculateDownloadSize(
-        minLat: visibleRegion.southwest.coordinates.lat.toDouble(),
-        maxLat: visibleRegion.northeast.coordinates.lat.toDouble(),
-        minLon: visibleRegion.southwest.coordinates.lng.toDouble(),
-        maxLon: visibleRegion.northeast.coordinates.lng.toDouble(),
-        minZoom: _minZoom,
-        maxZoom: _maxZoom,
-      );
+      // Calculate area in square degrees
+      final area =
+          (visibleRegion.northeast.coordinates.lat -
+              visibleRegion.southwest.coordinates.lat) *
+          (visibleRegion.northeast.coordinates.lng -
+              visibleRegion.southwest.coordinates.lng);
+
+      // Number of zoom levels
+      final zoomLevels = _maxZoom - _minZoom + 1;
+
+      // Estimate size based on area and zoom levels
+      // This is just a rough estimate
+      final sizeKb =
+          area * zoomLevels * 500; // 500KB per square degree per zoom level
 
       setState(() {
-        _estimatedSizeMb = (sizeBytes / (1024 * 1024)).ceil();
+        _estimatedSizeMb = (sizeKb / 1024).ceil(); // Convert to MB
         _isCalculating = false;
       });
     } catch (e) {
@@ -101,24 +101,10 @@ class _DownloadRegionFormState extends State<DownloadRegionForm> {
     }
   }
 
-  // Helper method to get the current map style URI
-  Future<String> _getMapStyle(MapboxMap mapboxMap) async {
-    // In newer versions of Mapbox SDK, we access style differently
-    try {
-      // Try to access style directly
-      final style = mapboxMap.style;
-      return await style.getStyleURI();
-    } catch (e) {
-      // Fallback to default style if we can't get the current one
-      print('Error getting map style: $e');
-      return MapboxStyles.STANDARD; // Use a default style
-    }
-  }
-
   Future<void> _downloadRegion() async {
     if (!_formKey.currentState!.validate()) return;
 
-    final provider = Provider.of<OfflineManagerProvider>(
+    final offlineManager = Provider.of<OfflineManagerService>(
       context,
       listen: false,
     );
@@ -127,40 +113,9 @@ class _DownloadRegionFormState extends State<DownloadRegionForm> {
     bool success = false;
 
     if (widget.regionType == 'current') {
-      success = await provider.downloadCurrentMapRegion(
+      success = await offlineManager.downloadCurrentMapRegion(
         mapboxMap: widget.mapboxMap,
         regionName: name,
-        minZoom: _minZoom,
-        maxZoom: _maxZoom,
-      );
-    } else if (widget.regionType == 'favorites') {
-      success = await provider.downloadFavoriteAreas(
-        mapboxMap: widget.mapboxMap,
-        minZoom: _minZoom,
-        maxZoom: _maxZoom,
-      );
-    } else {
-      // For custom area, we would need to get the bounds from the user
-      // This is simplified for this example
-      final cameraState = await widget.mapboxMap.getCameraState();
-      final visibleRegion = await widget.mapboxMap.coordinateBoundsForCamera(
-        CameraOptions(
-          center: cameraState.center,
-          zoom: cameraState.zoom,
-          bearing: cameraState.bearing,
-          pitch: cameraState.pitch,
-        ),
-      );
-
-      final styleUrl = await _getMapStyle(widget.mapboxMap);
-
-      success = await provider.downloadCustomArea(
-        areaName: name,
-        minLat: visibleRegion.southwest.coordinates.lat.toDouble(),
-        maxLat: visibleRegion.northeast.coordinates.lat.toDouble(),
-        minLon: visibleRegion.southwest.coordinates.lng.toDouble(),
-        maxLon: visibleRegion.northeast.coordinates.lng.toDouble(),
-        styleUrl: styleUrl,
         minZoom: _minZoom,
         maxZoom: _maxZoom,
       );
@@ -265,10 +220,11 @@ class _DownloadRegionFormState extends State<DownloadRegionForm> {
               ),
             ),
             const SizedBox(height: 24),
-            Consumer<OfflineManagerProvider>(
-              builder: (context, provider, child) {
+            Consumer<OfflineManagerService>(
+              builder: (context, offlineManager, child) {
                 return ElevatedButton(
-                  onPressed: provider.isDownloading ? null : _downloadRegion,
+                  onPressed:
+                      offlineManager.isDownloading ? null : _downloadRegion,
                   child: const Text('Download Region'),
                 );
               },

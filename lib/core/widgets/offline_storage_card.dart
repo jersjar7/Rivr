@@ -1,4 +1,4 @@
-// lib/features/offline/presentation/widgets/offline_storage_card.dart
+// lib/core/widgets/offline_storage_card.dart
 
 import 'package:flutter/material.dart';
 

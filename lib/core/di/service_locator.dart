@@ -1,12 +1,10 @@
-// lib/core/di/service_locator.dart - Updated with caching components
+// lib/core/di/service_locator.dart
 
 import 'package:get_it/get_it.dart';
 import 'package:firebase_auth/firebase_auth.dart'
     hide AuthProvider; // Hide Firebase's AuthProvider
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:http/http.dart' as http;
-import 'package:firebase_auth/firebase_auth.dart' hide AuthProvider;
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:rivr/core/di/map_di.dart';
 
@@ -18,6 +16,7 @@ import '../network/api_client.dart';
 import '../cache/storage/cache_database.dart';
 import '../cache/services/cache_service.dart';
 import '../services/offline_manager_service.dart';
+import '../services/mapbox_offline_service.dart';
 import '../config/api_config.dart';
 
 // Features
@@ -75,7 +74,7 @@ Future<void> setupServiceLocator() async {
   sl.registerLazySingleton<AppDatabase>(() => AppDatabaseImpl());
   sl.registerLazySingleton<SecureStorage>(() => SecureStorageImpl());
 
-  // New caching infrastructure
+  // Caching infrastructure
   sl.registerLazySingleton(() => CacheDatabase());
   sl.registerLazySingleton<CacheService>(
     () => CacheService(cacheDatabase: sl<CacheDatabase>()),
@@ -84,7 +83,7 @@ Future<void> setupServiceLocator() async {
   // API Client with caching
   sl.registerLazySingleton<ApiClient>(
     () => ApiClient(
-      httpClient: sl<http.Client>(),
+      innerClient: sl<http.Client>(),
       networkInfo: sl<NetworkInfo>(),
       cacheDatabase: sl<CacheDatabase>(),
     ),
@@ -99,7 +98,10 @@ Future<void> setupServiceLocator() async {
     ),
   );
 
-  // Legacy Database Helper - will be phased out as we transition to the new caching system
+  // Mapbox offline service
+  sl.registerLazySingleton<MapboxOfflineService>(() => MapboxOfflineService());
+
+  // Legacy Database Helper
   sl.registerLazySingleton(() => DatabaseHelper());
 
   // Validate API configuration during startup
@@ -112,7 +114,7 @@ Future<void> setupServiceLocator() async {
   // Register feature-specific dependencies
   _registerAuthDependencies();
   _registerFavoritesDependencies();
-  registerForecastDependencies(sl); // Forecast dependencies
+  _registerForecastDependencies(); // Forecast dependencies
   registerMapDependencies(sl); // Register map dependencies
   _registerProviders(); // Register all providers
 
@@ -174,21 +176,20 @@ void _registerFavoritesDependencies() {
   sl.registerLazySingleton(() => IsFavorite(sl()));
 }
 
-// Updated forecast dependencies registration
-void registerForecastDependencies(GetIt sl) {
+void _registerForecastDependencies() {
   // Data sources
   sl.registerLazySingleton<ForecastRemoteDataSource>(
-    () => ForecastRemoteDataSourceImpl(client: sl<ApiClient>()),
+    () => ForecastRemoteDataSourceImpl(client: sl<http.Client>()),
   );
   sl.registerLazySingleton<ForecastLocalDataSource>(
     () => ForecastLocalDataSourceImpl(databaseHelper: sl<DatabaseHelper>()),
   );
 
-  // Repositories - updated to use CacheService
+  // Repositories
   sl.registerLazySingleton<ForecastRepository>(
     () => ForecastRepositoryImpl(
       remoteDataSource: sl<ForecastRemoteDataSource>(),
-      cacheService: sl<CacheService>(), // Using new cache service
+      localDataSource: sl<ForecastLocalDataSource>(),
       networkInfo: sl<NetworkInfo>(),
     ),
   );

@@ -1,11 +1,12 @@
-// lib/features/offline/presentation/pages/offline_manager_page.dart
+// lib/core/pages/offline_manager_page.dart
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../providers/offline_manager_provider.dart';
+import '../services/offline_manager_service.dart';
+import '../widgets/offline_status_indicator.dart';
 import '../widgets/offline_storage_card.dart';
 import '../widgets/download_region_card.dart';
-import '../widgets/offline_status_indicator.dart';
+import 'download_current_region_page.dart';
 
 class OfflineManagerPage extends StatefulWidget {
   const OfflineManagerPage({super.key});
@@ -20,7 +21,7 @@ class _OfflineManagerPageState extends State<OfflineManagerPage> {
     super.initState();
     // Refresh cache stats when page loads
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      final provider = Provider.of<OfflineManagerProvider>(
+      final provider = Provider.of<OfflineManagerService>(
         context,
         listen: false,
       );
@@ -34,18 +35,18 @@ class _OfflineManagerPageState extends State<OfflineManagerPage> {
       appBar: AppBar(
         title: const Text('Offline Mode'),
         actions: [
-          Consumer<OfflineManagerProvider>(
+          Consumer<OfflineManagerService>(
             builder: (context, provider, child) {
               return Switch(
                 value: provider.offlineModeEnabled,
-                onChanged: provider.toggleOfflineMode,
+                onChanged: provider.setOfflineMode,
                 activeColor: Theme.of(context).primaryColor,
               );
             },
           ),
         ],
       ),
-      body: Consumer<OfflineManagerProvider>(
+      body: Consumer<OfflineManagerService>(
         builder: (context, provider, child) {
           if (provider.status == OfflineStatus.loading) {
             return const Center(child: CircularProgressIndicator());
@@ -80,7 +81,7 @@ class _OfflineManagerPageState extends State<OfflineManagerPage> {
                 // Offline Mode Status Card
                 OfflineStatusIndicator(
                   isEnabled: provider.offlineModeEnabled,
-                  onToggle: provider.toggleOfflineMode,
+                  onToggle: provider.setOfflineMode,
                 ),
 
                 const SizedBox(height: 16),
@@ -100,20 +101,14 @@ class _OfflineManagerPageState extends State<OfflineManagerPage> {
                 if (!provider.isDownloading)
                   DownloadRegionCard(
                     onDownloadCurrentRegion:
-                        () => Navigator.pushNamed(
-                          context,
-                          '/offline/download-current-region',
-                        ),
+                        () => _navigateToDownloadCurrentRegion(context),
                     onDownloadFavoriteAreas:
-                        () => Navigator.pushNamed(
+                        () => _showNotImplementedDialog(
                           context,
-                          '/offline/download-favorites',
+                          'Download Favorites',
                         ),
                     onDownloadCustomArea:
-                        () => Navigator.pushNamed(
-                          context,
-                          '/offline/download-custom-area',
-                        ),
+                        () => _showNotImplementedDialog(context, 'Custom Area'),
                   )
                 else
                   _buildDownloadProgressCard(provider),
@@ -166,7 +161,35 @@ class _OfflineManagerPageState extends State<OfflineManagerPage> {
     );
   }
 
-  Widget _buildDownloadProgressCard(OfflineManagerProvider provider) {
+  void _navigateToDownloadCurrentRegion(BuildContext context) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const DownloadCurrentRegionPage(),
+      ),
+    );
+  }
+
+  void _showNotImplementedDialog(BuildContext context, String feature) {
+    showDialog(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+            title: Text('$feature Not Implemented'),
+            content: Text(
+              'The $feature feature is not yet implemented in this version.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('OK'),
+              ),
+            ],
+          ),
+    );
+  }
+
+  Widget _buildDownloadProgressCard(OfflineManagerService provider) {
     String downloadTypeText = '';
     switch (provider.currentDownloadType) {
       case OfflineDownloadType.currentMapRegion:
@@ -328,10 +351,7 @@ class _OfflineManagerPageState extends State<OfflineManagerPage> {
     String title,
     String cacheType,
   ) {
-    final provider = Provider.of<OfflineManagerProvider>(
-      context,
-      listen: false,
-    );
+    final provider = Provider.of<OfflineManagerService>(context, listen: false);
 
     showDialog(
       context: context,

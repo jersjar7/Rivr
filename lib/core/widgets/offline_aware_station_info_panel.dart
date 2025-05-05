@@ -1,26 +1,26 @@
-// lib/features/map/presentation/widgets/offline_aware_stream_info_panel.dart
+// lib/core/widgets/offline_aware_station_info_panel.dart
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:rivr/features/map/domain/entities/map_station.dart';
-import '../../../../core/utils/location_utils.dart';
-import '../../../../core/widgets/loading_indicator.dart';
-import '../../../../common/data/remote/reach_service.dart';
-import '../../../../core/error/app_exception.dart';
-import '../../../../core/error/error_handler.dart';
-import '../../../../features/auth/presentation/providers/auth_provider.dart';
-import '../../../../features/favorites/presentation/providers/favorites_provider.dart';
-import '../../../../features/favorites/domain/entities/favorite.dart';
-import '../../../../features/offline/presentation/providers/offline_manager_provider.dart';
+import '../../features/map/domain/entities/map_station.dart';
+import '../utils/location_utils.dart';
+import '../widgets/loading_indicator.dart';
+import '../../common/data/remote/reach_service.dart';
+import '../error/app_exception.dart';
+import '../error/error_handler.dart';
+import '../../features/auth/presentation/providers/auth_provider.dart';
+import '../../features/favorites/presentation/providers/favorites_provider.dart';
+import '../../features/favorites/domain/entities/favorite.dart';
+import '../services/offline_manager_service.dart';
 
-class OfflineAwareStreamInfoPanel extends StatefulWidget {
+class OfflineAwareStationInfoPanel extends StatefulWidget {
   final MapStation station;
   final VoidCallback onClose;
   final Future<void> Function(MapStation)? onAddToFavorites;
   final Function(String, String)? onViewForecast;
   final Function? onNavigateToFavorites;
 
-  const OfflineAwareStreamInfoPanel({
+  const OfflineAwareStationInfoPanel({
     super.key,
     required this.station,
     required this.onClose,
@@ -30,12 +30,12 @@ class OfflineAwareStreamInfoPanel extends StatefulWidget {
   });
 
   @override
-  State<OfflineAwareStreamInfoPanel> createState() =>
-      _OfflineAwareStreamInfoPanelState();
+  State<OfflineAwareStationInfoPanel> createState() =>
+      _OfflineAwareStationInfoPanelState();
 }
 
-class _OfflineAwareStreamInfoPanelState
-    extends State<OfflineAwareStreamInfoPanel> {
+class _OfflineAwareStationInfoPanelState
+    extends State<OfflineAwareStationInfoPanel> {
   bool _isLoading = true;
   bool _hasError = false;
   bool _isNetworkError = false;
@@ -52,7 +52,7 @@ class _OfflineAwareStreamInfoPanelState
   void initState() {
     super.initState();
     print(
-      "OfflineAwareStreamInfoPanel: initializing for station ID: ${widget.station.stationId}",
+      "OfflineAwareStationInfoPanel: initializing for station ID: ${widget.station.stationId}",
     );
     _fetchReachData();
   }
@@ -75,14 +75,14 @@ class _OfflineAwareStreamInfoPanelState
       _usedOfflineData = false;
     });
 
-    // Get the offline manager provider
-    final offlineManagerProvider = Provider.of<OfflineManagerProvider>(
+    // Get the offline manager
+    final offlineManager = Provider.of<OfflineManagerService>(
       context,
       listen: false,
     );
 
     // Check for cached data first
-    final cachedData = await offlineManagerProvider.getCachedStation(
+    final cachedData = await offlineManager.getCachedStation(
       widget.station.stationId,
     );
 
@@ -96,7 +96,7 @@ class _OfflineAwareStreamInfoPanelState
         _usedOfflineData = true;
       });
 
-      print("StreamInfoPanel: Using cached data");
+      print("StationInfoPanel: Using cached data");
       return;
     }
 
@@ -113,14 +113,14 @@ class _OfflineAwareStreamInfoPanelState
       if (!mounted) return;
 
       // Cache the data for offline use
-      offlineManagerProvider.cacheStation(widget.station, data);
+      offlineManager.cacheStation(widget.station, data);
 
       setState(() {
         _reachData = data;
         _isLoading = false;
       });
 
-      print("StreamInfoPanel: Data loaded successfully");
+      print("StationInfoPanel: Data loaded successfully");
     } catch (e) {
       print("Error fetching reach data for ${widget.station.stationId}: $e");
 
@@ -256,7 +256,7 @@ class _OfflineAwareStreamInfoPanelState
   @override
   Widget build(BuildContext context) {
     print(
-      "StreamInfoPanel: Building UI with isLoading=$_isLoading, hasError=$_hasError, usedOfflineData=$_usedOfflineData",
+      "StationInfoPanel: Building UI with isLoading=$_isLoading, hasError=$_hasError, usedOfflineData=$_usedOfflineData",
     );
     final theme = Theme.of(context);
 
@@ -373,10 +373,10 @@ class _OfflineAwareStreamInfoPanelState
 
           const SizedBox(height: 16),
           Center(
-            child: Consumer<OfflineManagerProvider>(
-              builder: (context, offlineProvider, _) {
+            child: Consumer<OfflineManagerService>(
+              builder: (context, offlineManager, _) {
                 final bool offlineModeEnabled =
-                    offlineProvider.offlineModeEnabled;
+                    offlineManager.offlineModeEnabled;
 
                 return OutlinedButton.icon(
                   onPressed: _fetchReachData,

@@ -1,4 +1,4 @@
-// lib/features/offline/presentation/widgets/download_region_card.dart
+// lib/core/widgets/download_region_card.dart
 
 import 'package:flutter/material.dart';
 

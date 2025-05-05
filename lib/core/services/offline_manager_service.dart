@@ -1,322 +1,344 @@
 // lib/core/services/offline_manager_service.dart
 
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
-import 'package:rivr/core/cache/services/cache_service.dart';
-import 'package:rivr/core/di/service_locator.dart';
-import 'package:rivr/core/network/api_client.dart';
-import 'package:rivr/core/network/network_info.dart';
-import 'package:rivr/core/cache/storage/cache_database.dart';
+import 'package:flutter/material.dart';
+import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
+import '../cache/services/cache_service.dart';
+import '../network/api_client.dart';
+import '../network/network_info.dart';
+import '../../features/map/domain/entities/map_station.dart';
 
-/// Service for managing offline mode and cache settings
+enum OfflineStatus { initial, loading, ready, downloading, error }
+
+enum OfflineDownloadType { currentMapRegion, favoriteAreas, customArea }
+
+/// Central service for managing offline capabilities
 class OfflineManagerService extends ChangeNotifier {
   final CacheService _cacheService;
   final ApiClient _apiClient;
   final NetworkInfo _networkInfo;
 
-  // Cache statistics
-  int _cachedStationsCount = 0;
-  int _cachedForecastsCount = 0;
-  int _cachedMapTilesCount = 0;
-  int _cacheSizeInBytes = 0;
-
-  // Settings
-  bool _offlineModeEnabled = false;
-  bool _autoDownloadEnabled = false;
-  int _maxCacheSizeMb = 500; // 500 MB default
-
-  // Status
-  bool _isLoading = false;
-  bool _isDownloading = false;
+  // State
+  OfflineStatus _status = OfflineStatus.initial;
   String? _errorMessage;
   double _downloadProgress = 0.0;
+  bool _offlineModeEnabled = false;
+
+  // Cache statistics
+  Map<String, dynamic> _cacheStats = {
+    'stationCount': 0,
+    'forecastCount': 0,
+    'tileCount': 0,
+    'cacheSizeBytes': 0,
+    'cacheSizeMb': 0,
+  };
+
+  // Current download operation info
+  OfflineDownloadType? _currentDownloadType;
+  String? _currentDownloadName;
+  bool _isDownloading = false;
 
   // Getters
-  bool get offlineModeEnabled => _offlineModeEnabled;
-  bool get autoDownloadEnabled => _autoDownloadEnabled;
-  int get maxCacheSizeMb => _maxCacheSizeMb;
-  bool get isLoading => _isLoading;
-  bool get isDownloading => _isDownloading;
+  OfflineStatus get status => _status;
   String? get errorMessage => _errorMessage;
   double get downloadProgress => _downloadProgress;
-  int get cachedStationsCount => _cachedStationsCount;
-  int get cachedForecastsCount => _cachedForecastsCount;
-  int get cachedMapTilesCount => _cachedMapTilesCount;
-  int get cacheSizeInMb => (_cacheSizeInBytes / (1024 * 1024)).round();
+  bool get offlineModeEnabled => _offlineModeEnabled;
+  bool get isDownloading => _isDownloading;
+  int get cachedStationCount => _cacheStats['stationCount'] ?? 0;
+  int get cachedForecastCount => _cacheStats['forecastCount'] ?? 0;
+  int get cachedTileCount => _cacheStats['tileCount'] ?? 0;
+  int get cacheSizeInMb => _cacheStats['cacheSizeMb'] ?? 0;
+  OfflineDownloadType? get currentDownloadType => _currentDownloadType;
+  String? get currentDownloadName => _currentDownloadName;
 
   OfflineManagerService({
-    CacheService? cacheService,
-    ApiClient? apiClient,
-    NetworkInfo? networkInfo,
-  }) : _cacheService = cacheService ?? sl<CacheService>(),
-       _apiClient = apiClient ?? sl<ApiClient>(),
-       _networkInfo = networkInfo ?? sl<NetworkInfo>() {
-    // Initialize
-    _init();
+    required CacheService cacheService,
+    required ApiClient apiClient,
+    required NetworkInfo networkInfo,
+  }) : _cacheService = cacheService,
+       _apiClient = apiClient,
+       _networkInfo = networkInfo {
+    _initialize();
   }
 
-  /// Initialize the service
-  Future<void> _init() async {
-    await refreshCacheStats();
-    await _loadSettings();
-
-    // Set offline mode based on settings and connectivity
-    final isConnected = await _networkInfo.isConnected;
-    if (!isConnected && !_offlineModeEnabled) {
-      // Automatically enter offline mode when no connection
-      setOfflineMode(true, notify: false);
-    }
-  }
-
-  /// Load settings from persistent storage
-  Future<void> _loadSettings() async {
+  /// Initialize the offline manager service
+  Future<void> _initialize() async {
     try {
-      // Use CacheService to get settings
-      final settings = await _cacheService.get<Map<String, dynamic>>(
-        'offline_settings',
-      );
+      _setStatus(OfflineStatus.loading);
 
-      if (settings != null) {
-        _offlineModeEnabled = settings['offlineModeEnabled'] ?? false;
-        _autoDownloadEnabled = settings['autoDownloadEnabled'] ?? false;
-        _maxCacheSizeMb = settings['maxCacheSizeMb'] ?? 500;
-      }
-    } catch (e) {
-      print('Error loading offline settings: $e');
-      // Use defaults
-    }
-  }
+      // Perform initial setup
+      await _refreshCacheStats();
 
-  /// Save settings to persistent storage
-  Future<void> _saveSettings() async {
-    try {
-      await _cacheService.set(
-        'offline_settings',
-        {
-          'offlineModeEnabled': _offlineModeEnabled,
-          'autoDownloadEnabled': _autoDownloadEnabled,
-          'maxCacheSizeMb': _maxCacheSizeMb,
-        },
-        // Settings don't expire
-        duration: const Duration(days: 365),
-      );
+      _setStatus(OfflineStatus.ready);
     } catch (e) {
-      print('Error saving offline settings: $e');
+      _setError('Failed to initialize offline manager: $e');
     }
   }
 
   /// Toggle offline mode
-  Future<void> setOfflineMode(bool enabled, {bool notify = true}) async {
+  void setOfflineMode(bool enabled) {
     _offlineModeEnabled = enabled;
 
-    // Propagate to API client
+    // Update API client offline mode
     _apiClient.setOfflineMode(enabled);
 
-    // Save settings
-    await _saveSettings();
-
-    if (notify) {
-      notifyListeners();
-    }
-  }
-
-  /// Toggle auto-download
-  void setAutoDownload(bool enabled) {
-    _autoDownloadEnabled = enabled;
-    _saveSettings();
     notifyListeners();
   }
 
-  /// Set maximum cache size
-  void setMaxCacheSize(int sizeMb) {
-    _maxCacheSizeMb = sizeMb;
-    _saveSettings();
-    notifyListeners();
+  /// Cache a station data for offline use
+  Future<void> cacheStation(
+    MapStation station,
+    Map<String, dynamic>? apiData,
+  ) async {
+    if (apiData == null) return;
 
-    // Trigger cache cleanup if over limit
-    if (cacheSizeInMb > _maxCacheSizeMb) {
-      cleanupCache();
-    }
+    final stationKey = 'station_${station.stationId}';
+
+    // Save station metadata and API data
+    await _cacheService.set(stationKey, {
+      'station': {
+        'id': station.stationId,
+        'name': station.name,
+        'lat': station.lat,
+        'lon': station.lon,
+        'elevation': station.elevation,
+        'color': station.color,
+      },
+      'apiData': apiData,
+      'cachedAt': DateTime.now().millisecondsSinceEpoch,
+    }, duration: const Duration(days: 30));
+
+    await _refreshCacheStats();
   }
 
-  /// Refresh cache statistics
-  Future<void> refreshCacheStats() async {
-    if (_isLoading) return;
-
-    _isLoading = true;
-    if (_errorMessage != null) _errorMessage = null;
-    notifyListeners();
-
-    try {
-      // Get database instance
-      final cacheDb = CacheDatabase();
-      final db = await cacheDb.database;
-
-      // Count entries in each table
-      _cachedStationsCount = await _getTableCount(db, 'cached_stations');
-      _cachedForecastsCount = await _getTableCount(db, 'cached_forecasts');
-      _cachedMapTilesCount = await _getTableCount(db, 'file_cache');
-
-      // Get total cache size
-      _cacheSizeInBytes = await _cacheService.getCacheSize();
-
-      _isLoading = false;
-      notifyListeners();
-    } catch (e) {
-      _errorMessage = 'Failed to refresh cache stats: ${e.toString()}';
-      _isLoading = false;
-      notifyListeners();
-    }
+  /// Get cached station data
+  Future<Map<String, dynamic>?> getCachedStation(int stationId) async {
+    final stationKey = 'station_$stationId';
+    return await _cacheService.get<Map<String, dynamic>>(stationKey);
   }
 
-  /// Helper to get count from table
-  Future<int> _getTableCount(dynamic db, String tableName) async {
-    try {
-      final result = await db.rawQuery(
-        'SELECT COUNT(*) as count FROM $tableName',
-      );
-      return result.first['count'] as int? ?? 0;
-    } catch (e) {
-      print('Error counting $tableName: $e');
-      return 0;
-    }
+  /// Cache forecast data
+  Future<void> cacheForecast(
+    int stationId,
+    Map<String, dynamic> forecastData, {
+    int? expiryHours,
+  }) async {
+    final forecastKey = 'forecast_$stationId';
+
+    await _cacheService.set(forecastKey, {
+      'data': forecastData,
+      'cachedAt': DateTime.now().millisecondsSinceEpoch,
+    }, duration: Duration(hours: expiryHours ?? 24));
+
+    await _refreshCacheStats();
   }
 
-  /// Clean up cache to meet size limits
-  Future<void> cleanupCache() async {
-    if (_isLoading) return;
+  /// Get cached forecast data
+  Future<Map<String, dynamic>?> getCachedForecast(
+    int stationId, {
+    bool ignoreExpiry = false,
+  }) async {
+    final forecastKey = 'forecast_$stationId';
 
-    _isLoading = true;
-    notifyListeners();
-
-    try {
-      // Clean expired entries first
-      await _cacheService.cleanExpired();
-
-      // If still over limit, perform more aggressive cleanup
-      await refreshCacheStats();
-
-      if (cacheSizeInMb > _maxCacheSizeMb) {
-        // TODO: Implement more aggressive cleanup strategies
-        // This would include removing oldest accessed entries
-      }
-
-      _isLoading = false;
-      notifyListeners();
-    } catch (e) {
-      _errorMessage = 'Failed to clean cache: ${e.toString()}';
-      _isLoading = false;
-      notifyListeners();
+    if (ignoreExpiry) {
+      // TODO: Implement a way to get cached forecast even if expired
+      // This might require direct database access or a special method in CacheService
+      return await _cacheService.get<Map<String, dynamic>>(forecastKey);
     }
+
+    return await _cacheService.get<Map<String, dynamic>>(forecastKey);
   }
 
-  /// Clear all cache
-  Future<void> clearAllCache() async {
-    if (_isLoading) return;
-
-    _isLoading = true;
-    notifyListeners();
-
-    try {
-      await _cacheService.clearAll();
-      await refreshCacheStats();
-
-      _isLoading = false;
-      notifyListeners();
-    } catch (e) {
-      _errorMessage = 'Failed to clear cache: ${e.toString()}';
-      _isLoading = false;
-      notifyListeners();
-    }
-  }
-
-  /// Download station areas for offline use
-  Future<bool> downloadStationAreas(
-    List<String> stationIds, {
-    Function(double progress)? onProgress,
+  /// Download map region for offline use
+  Future<bool> downloadCurrentMapRegion({
+    required MapboxMap mapboxMap,
+    required String regionName,
+    double? minZoom,
+    double? maxZoom,
   }) async {
     if (_isDownloading) return false;
 
-    _isDownloading = true;
-    _downloadProgress = 0.0;
-    notifyListeners();
-
     try {
-      // Here you would implement the logic to:
-      // 1. Download station data
-      // 2. Download forecasts for each station
-      // 3. Download map tiles for station areas
+      _isDownloading = true;
+      _currentDownloadType = OfflineDownloadType.currentMapRegion;
+      _currentDownloadName = regionName;
+      _downloadProgress = 0.0;
+      notifyListeners();
 
-      // This would need to be implemented based on your data sources
-      // For now, we'll just simulate progress updates
+      // Get the current visible region from the map
+      final cameraState = await mapboxMap.getCameraState();
+      final visibleRegion = await mapboxMap.coordinateBoundsForCamera(
+        CameraOptions(
+          center: cameraState.center,
+          zoom: cameraState.zoom,
+          bearing: cameraState.bearing,
+          pitch: cameraState.pitch,
+        ),
+      );
 
-      final totalSteps = stationIds.length * 3; // 3 operations per station
-      int completedSteps = 0;
+      // Default zoom levels if not provided
+      final minZoomLevel = minZoom ?? cameraState.zoom - 2;
+      final maxZoomLevel = maxZoom ?? cameraState.zoom + 1;
 
-      for (final stationId in stationIds) {
-        // 1. Download station data
-        // await _downloadStationData(stationId);
-        completedSteps++;
-        _updateProgress(completedSteps / totalSteps, onProgress);
-
-        // 2. Download forecasts
-        // await _downloadStationForecasts(stationId);
-        completedSteps++;
-        _updateProgress(completedSteps / totalSteps, onProgress);
-
-        // 3. Download map tiles
-        // await _downloadStationMapArea(stationId);
-        completedSteps++;
-        _updateProgress(completedSteps / totalSteps, onProgress);
+      // Actually download map tiles here - for now this is a placeholder
+      // since implementation depends on a specific map tile service
+      // This would normally use Mapbox offline manager
+      for (int i = 0; i < 10; i++) {
+        // Simulate download progress
+        await Future.delayed(const Duration(milliseconds: 300));
+        _downloadProgress = (i + 1) / 10;
+        notifyListeners();
       }
 
-      // Update cache stats after download
-      await refreshCacheStats();
-
       _isDownloading = false;
-      _downloadProgress = 1.0;
+      _currentDownloadType = null;
+      _currentDownloadName = null;
+
+      // Store metadata about downloaded region
+      await _cacheService.set('map_region_$regionName', {
+        'name': regionName,
+        'bounds': {
+          'southwest': {
+            'lat': visibleRegion.southwest.coordinates.lat,
+            'lon': visibleRegion.southwest.coordinates.lng,
+          },
+          'northeast': {
+            'lat': visibleRegion.northeast.coordinates.lat,
+            'lon': visibleRegion.northeast.coordinates.lng,
+          },
+        },
+        'minZoom': minZoomLevel,
+        'maxZoom': maxZoomLevel,
+        'downloadedAt': DateTime.now().millisecondsSinceEpoch,
+      }, duration: const Duration(days: 90));
+
+      await _refreshCacheStats();
       notifyListeners();
 
       return true;
     } catch (e) {
-      _errorMessage = 'Failed to download station areas: ${e.toString()}';
+      _setError('Failed to download region: $e');
+
       _isDownloading = false;
+      _currentDownloadType = null;
+      _currentDownloadName = null;
       notifyListeners();
+
       return false;
     }
   }
 
-  /// Update download progress
-  void _updateProgress(double progress, Function(double)? onProgress) {
-    _downloadProgress = progress;
-    onProgress?.call(progress);
-    notifyListeners();
-  }
-
-  /// Cancel active downloads
+  /// Cancel current download
   void cancelDownload() {
-    if (!_isDownloading) return;
-
-    // In a real implementation, you would abort any active download operations
-
-    _isDownloading = false;
-    _downloadProgress = 0.0;
-    notifyListeners();
-  }
-
-  /// Check if there's enough space for a download of specified size
-  Future<bool> checkAvailableSpace(int requiredMb) async {
-    // Get available storage space
-    // This is a platform-specific operation and would require plugins
-    // For now, just check against our max cache size
-    final availableMb = _maxCacheSizeMb - cacheSizeInMb;
-    return availableMb >= requiredMb;
-  }
-
-  /// Clear error message
-  void clearError() {
-    if (_errorMessage != null) {
-      _errorMessage = null;
+    if (_isDownloading) {
+      _isDownloading = false;
+      _currentDownloadType = null;
+      _currentDownloadName = null;
+      _downloadProgress = 0.0;
       notifyListeners();
     }
+  }
+
+  /// Clear all cached data
+  Future<void> clearAllCache() async {
+    await _cacheService.clearAll();
+    await _refreshCacheStats();
+  }
+
+  /// Clear specific type of cached data
+  Future<void> clearCacheByType(String cacheType) async {
+    final db = await (_cacheService as dynamic)._cacheDatabase.database;
+
+    switch (cacheType) {
+      case 'map_tiles':
+        // Clear map tile cache - implementation depends on map service
+        break;
+      case 'forecasts':
+        // Delete all forecast cache entries
+        await db.delete(
+          'cache_entries',
+          where: 'key LIKE ?',
+          whereArgs: ['forecast_%'],
+        );
+        break;
+      case 'stations':
+        // Delete all station cache entries
+        await db.delete(
+          'cache_entries',
+          where: 'key LIKE ?',
+          whereArgs: ['station_%'],
+        );
+        break;
+    }
+
+    await _refreshCacheStats();
+  }
+
+  /// Refresh cache statistics
+  Future<void> _refreshCacheStats() async {
+    try {
+      final db = await (_cacheService as dynamic)._cacheDatabase.database;
+
+      // Count station entries
+      final stationCount = await db.rawQuery(
+        'SELECT COUNT(*) as count FROM cache_entries WHERE key LIKE ?',
+        ['station_%'],
+      );
+
+      // Count forecast entries
+      final forecastCount = await db.rawQuery(
+        'SELECT COUNT(*) as count FROM cache_entries WHERE key LIKE ?',
+        ['forecast_%'],
+      );
+
+      // Get total size
+      final cacheSize = await _cacheService.getCacheSize();
+
+      _cacheStats = {
+        'stationCount': stationCount.first['count'] ?? 0,
+        'forecastCount': forecastCount.first['count'] ?? 0,
+        'tileCount': 0, // Placeholder - implementation depends on map service
+        'cacheSizeBytes': cacheSize,
+        'cacheSizeMb': (cacheSize / (1024 * 1024)).ceil(),
+      };
+
+      notifyListeners();
+    } catch (e) {
+      print('Error refreshing cache stats: $e');
+    }
+  }
+
+  /// Get total cache size in MB
+  Future<int> getCacheSizeInMb() async {
+    final size = await _cacheService.getCacheSize();
+    return (size / (1024 * 1024)).ceil();
+  }
+
+  /// Public method to refresh cache stats
+  Future<void> refreshCacheStats() async {
+    await _refreshCacheStats();
+  }
+
+  /// Set status with notification
+  void _setStatus(OfflineStatus newStatus) {
+    _status = newStatus;
+    notifyListeners();
+  }
+
+  /// Set error state
+  void _setError(String message) {
+    _errorMessage = message;
+    _status = OfflineStatus.error;
+    notifyListeners();
+  }
+
+  /// Clear error state
+  void clearError() {
+    _errorMessage = null;
+    if (_status == OfflineStatus.error) {
+      _status = OfflineStatus.ready;
+    }
+    notifyListeners();
   }
 }

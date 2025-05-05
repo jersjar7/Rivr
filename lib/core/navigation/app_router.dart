@@ -1,5 +1,5 @@
 // lib/core/navigation/app_router.dart
-// Updated to include enhanced favorites components
+// Updated to include enhanced favorites components and offline capabilities
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -14,6 +14,8 @@ import '../../features/map/presentation/providers/station_provider.dart';
 import '../../features/splash/presentation/pages/splash_page.dart';
 import '../../features/forecast/presentation/pages/forecast_page.dart';
 import '../../features/settings/presentation/pages/biometric_settings_page.dart';
+import '../pages/offline_manager_page.dart';
+import '../pages/download_current_region_page.dart';
 
 class AppRouter {
   static Route<dynamic> generateRoute(RouteSettings settings) {

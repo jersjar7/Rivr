@@ -31,9 +31,14 @@ class ConnectionMonitor extends ChangeNotifier {
   bool _isPermanentlyOffline = false;
   Timer? _reconnectTimer;
   int _reconnectAttempts = 0;
-
-  // New field to track if we've just gone from offline to online
   bool _justReconnected = false;
+
+  // Debounce timer to prevent too frequent updates
+  Timer? _debounceTimer;
+  bool _processingConnectivityChange = false;
+
+  // Flag to prevent multiple simultaneous connectivity checks
+  bool _isCheckingConnection = false;
 
   ConnectionMonitor({
     required NetworkInfo networkInfo,
@@ -46,56 +51,86 @@ class ConnectionMonitor extends ChangeNotifier {
   ConnectionStatus get status => _status;
   bool get isConnected => _status.isConnected;
   bool get isPermanentlyOffline => _isPermanentlyOffline;
-  // New getter to check if we just reconnected
   bool get justReconnected => _justReconnected;
 
   void _initialize() async {
     // Check initial connection
     _checkConnection();
 
-    // Listen for connectivity changes
+    // Listen for connectivity changes with throttling
     _subscription = _connectivity.onConnectivityChanged.listen((results) {
-      // Handle result list
-      _checkConnectionWithResults(results);
+      // Only process if not already processing a change
+      if (!_processingConnectivityChange) {
+        _processingConnectivityChange = true;
+
+        // Debounce rapid connectivity changes
+        _debounceTimer?.cancel();
+        _debounceTimer = Timer(const Duration(milliseconds: 300), () {
+          _checkConnectionWithResults(results);
+          _processingConnectivityChange = false;
+        });
+      }
     });
   }
 
   Future<void> _checkConnection() async {
-    final isConnected = await _networkInfo.isConnected;
-    final connectivityResults = await _connectivity.checkConnectivity();
+    // Prevent multiple simultaneous connection checks
+    if (_isCheckingConnection) return;
 
-    final newStatus = ConnectionStatus(
-      isConnected: isConnected,
-      timestamp: DateTime.now(),
-      connectivityResults: connectivityResults,
-    );
+    _isCheckingConnection = true;
 
-    _updateStatus(newStatus);
+    try {
+      final isConnected = await _networkInfo.isConnected;
+      final connectivityResults = await _connectivity.checkConnectivity();
+
+      final newStatus = ConnectionStatus(
+        isConnected: isConnected,
+        timestamp: DateTime.now(),
+        connectivityResults: connectivityResults,
+      );
+
+      _updateStatus(newStatus);
+    } finally {
+      _isCheckingConnection = false;
+    }
   }
 
   void _checkConnectionWithResults(List<ConnectivityResult> results) async {
-    // Consider connected if any result is not "none"
-    final isConnected = results.any(
-      (result) => result != ConnectivityResult.none,
-    );
+    // Use a flag to prevent running multiple times simultaneously
+    if (_isCheckingConnection) return;
 
-    final newStatus = ConnectionStatus(
-      isConnected: isConnected,
-      timestamp: DateTime.now(),
-      connectivityResults: results,
-    );
+    _isCheckingConnection = true;
 
-    _updateStatus(newStatus);
+    try {
+      // Consider connected if any result is not "none"
+      final hasConnectivity = results.any(
+        (result) => result != ConnectivityResult.none,
+      );
+
+      // Always verify actual connectivity, don't just rely on the connectivity change event
+      final actuallyConnected =
+          hasConnectivity ? await _networkInfo.isConnected : false;
+
+      final newStatus = ConnectionStatus(
+        isConnected: actuallyConnected,
+        timestamp: DateTime.now(),
+        connectivityResults: results,
+      );
+
+      _updateStatus(newStatus);
+    } finally {
+      _isCheckingConnection = false;
+    }
   }
 
   void _updateStatus(ConnectionStatus newStatus) {
-    // Check if we're going from offline to online
-    _justReconnected = !_status.isConnected && newStatus.isConnected;
-
-    // Only notify if state changed
+    // Only update and notify if state actually changed
     if (newStatus.isConnected != _status.isConnected) {
+      final wasConnected = _status.isConnected;
       _status = newStatus;
-      notifyListeners();
+
+      // Update reconnection flags
+      _justReconnected = !wasConnected && newStatus.isConnected;
 
       if (newStatus.isConnected) {
         // Reset reconnect attempts when connection is restored
@@ -104,15 +139,19 @@ class ConnectionMonitor extends ChangeNotifier {
         _reconnectTimer?.cancel();
 
         // Schedule resetting of the justReconnected flag after a short delay
-        // This gives app components time to react to the reconnection
         Future.delayed(const Duration(seconds: 5), () {
-          _justReconnected = false;
-          notifyListeners();
+          if (_justReconnected) {
+            _justReconnected = false;
+            notifyListeners();
+          }
         });
       } else {
         // Start reconnect timer
         _scheduleReconnect();
       }
+
+      // Notify listeners of the change
+      notifyListeners();
     } else {
       // Update the status without notifying if only timestamp or results changed
       _status = newStatus;
@@ -130,7 +169,7 @@ class ConnectionMonitor extends ChangeNotifier {
       _checkConnection();
 
       // After certain number of attempts, consider permanently offline
-      if (_reconnectAttempts > 5) {
+      if (_reconnectAttempts > 5 && !_isPermanentlyOffline) {
         _isPermanentlyOffline = true;
         notifyListeners();
       }
@@ -156,9 +195,12 @@ class ConnectionMonitor extends ChangeNotifier {
     _checkConnection();
   }
 
-  // Force a connection check and process callbacks if needed
+  // Force a connection check, but don't unnecessarily trigger UI updates
   Future<void> checkConnectionAndProcess() async {
-    await _checkConnection();
+    // Only check if we're not already checking
+    if (!_isCheckingConnection) {
+      await _checkConnection();
+    }
     return;
   }
 
@@ -166,6 +208,7 @@ class ConnectionMonitor extends ChangeNotifier {
   void dispose() {
     _subscription?.cancel();
     _reconnectTimer?.cancel();
+    _debounceTimer?.cancel();
     super.dispose();
   }
 }
@@ -189,17 +232,25 @@ class ConnectionAwareWidget extends StatefulWidget {
 }
 
 class _ConnectionAwareWidgetState extends State<ConnectionAwareWidget> {
+  bool _hasCalledReconnect = false;
+
   @override
   void initState() {
     super.initState();
-    // Listen for reconnection events
+
+    // Listen for reconnection events only once during init
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      final connectionMonitor = Provider.of<ConnectionMonitor>(
-        context,
-        listen: false,
-      );
-      if (connectionMonitor.justReconnected && widget.onReconnect != null) {
-        widget.onReconnect!();
+      if (mounted) {
+        final connectionMonitor = Provider.of<ConnectionMonitor>(
+          context,
+          listen: false,
+        );
+        if (connectionMonitor.justReconnected &&
+            widget.onReconnect != null &&
+            !_hasCalledReconnect) {
+          _hasCalledReconnect = true;
+          widget.onReconnect!();
+        }
       }
     });
   }
@@ -208,10 +259,15 @@ class _ConnectionAwareWidgetState extends State<ConnectionAwareWidget> {
   Widget build(BuildContext context) {
     return Consumer<ConnectionMonitor>(
       builder: (context, monitor, _) {
-        // If we've just reconnected and have a callback, execute it
-        if (monitor.justReconnected && widget.onReconnect != null) {
+        // Only call reconnect callback once when needed
+        if (monitor.justReconnected &&
+            widget.onReconnect != null &&
+            !_hasCalledReconnect) {
+          _hasCalledReconnect = true;
           WidgetsBinding.instance.addPostFrameCallback((_) {
-            widget.onReconnect!();
+            if (mounted) {
+              widget.onReconnect!();
+            }
           });
         }
 

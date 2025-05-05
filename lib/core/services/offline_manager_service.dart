@@ -1,5 +1,7 @@
 // lib/core/services/offline_manager_service.dart
 
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
@@ -16,6 +18,7 @@ enum OfflineDownloadType { currentMapRegion, favoriteAreas, customArea }
 class OfflineManagerService extends ChangeNotifier {
   final CacheService _cacheService;
   final ApiClient _apiClient;
+  final NetworkInfo _networkInfo;
 
   // State
   OfflineStatus _status = OfflineStatus.initial;
@@ -37,6 +40,12 @@ class OfflineManagerService extends ChangeNotifier {
   String? _currentDownloadName;
   bool _isDownloading = false;
 
+  // Flag to prevent redundant cache refreshes
+  bool _isRefreshingCacheStats = false;
+
+  // Debounce timer for non-critical operations
+  Timer? _debounceTimer;
+
   // Getters
   OfflineStatus get status => _status;
   String? get errorMessage => _errorMessage;
@@ -55,7 +64,8 @@ class OfflineManagerService extends ChangeNotifier {
     required ApiClient apiClient,
     required NetworkInfo networkInfo,
   }) : _cacheService = cacheService,
-       _apiClient = apiClient {
+       _apiClient = apiClient,
+       _networkInfo = networkInfo {
     _initialize();
   }
 
@@ -75,6 +85,9 @@ class OfflineManagerService extends ChangeNotifier {
 
   /// Toggle offline mode
   void setOfflineMode(bool enabled) {
+    // Only update if the value actually changes
+    if (_offlineModeEnabled == enabled) return;
+
     _offlineModeEnabled = enabled;
 
     // Update API client offline mode
@@ -106,7 +119,11 @@ class OfflineManagerService extends ChangeNotifier {
       'cachedAt': DateTime.now().millisecondsSinceEpoch,
     }, duration: const Duration(days: 30));
 
-    await _refreshCacheStats();
+    // Use a debounce for non-critical operations like updating stats
+    _debounceTimer?.cancel();
+    _debounceTimer = Timer(const Duration(milliseconds: 500), () {
+      _refreshCacheStats();
+    });
   }
 
   /// Get cached station data
@@ -128,7 +145,11 @@ class OfflineManagerService extends ChangeNotifier {
       'cachedAt': DateTime.now().millisecondsSinceEpoch,
     }, duration: Duration(hours: expiryHours ?? 24));
 
-    await _refreshCacheStats();
+    // Use a debounce for non-critical operations
+    _debounceTimer?.cancel();
+    _debounceTimer = Timer(const Duration(milliseconds: 500), () {
+      _refreshCacheStats();
+    });
   }
 
   /// Get cached forecast data
@@ -145,37 +166,6 @@ class OfflineManagerService extends ChangeNotifier {
     }
 
     return await _cacheService.get<Map<String, dynamic>>(forecastKey);
-  }
-
-  /// Store offline data with given key
-  Future<void> setOfflineData(
-    String key,
-    Map<String, dynamic> data, {
-    int expirationHours = 24,
-  }) async {
-    await _cacheService.set(
-      key,
-      data,
-      duration: Duration(hours: expirationHours),
-    );
-
-    await _refreshCacheStats();
-  }
-
-  /// Retrieve offline data for the given key
-  Future<Map<String, dynamic>?> getOfflineData(String key) async {
-    return await _cacheService.get<Map<String, dynamic>>(key);
-  }
-
-  /// Check if offline data exists for a given key
-  Future<bool> hasOfflineData(String key) async {
-    return await _cacheService.exists(key);
-  }
-
-  /// Remove offline data for a given key
-  Future<void> removeOfflineData(String key) async {
-    await _cacheService.remove(key);
-    await _refreshCacheStats();
   }
 
   /// Download map region for offline use
@@ -209,14 +199,16 @@ class OfflineManagerService extends ChangeNotifier {
       final minZoomLevel = minZoom ?? cameraState.zoom - 2;
       final maxZoomLevel = maxZoom ?? cameraState.zoom + 1;
 
-      // Actually download map tiles here - for now this is a placeholder
-      // since implementation depends on a specific map tile service
-      // This would normally use Mapbox offline manager
+      // Simulate download with less frequent updates
       for (int i = 0; i < 10; i++) {
-        // Simulate download progress
+        // Simulate download progress with fewer UI updates
         await Future.delayed(const Duration(milliseconds: 300));
-        _downloadProgress = (i + 1) / 10;
-        notifyListeners();
+
+        // Only update UI every other step or when complete
+        if (i % 2 == 0 || i == 9) {
+          _downloadProgress = (i + 1) / 10;
+          notifyListeners();
+        }
       }
 
       _isDownloading = false;
@@ -298,14 +290,6 @@ class OfflineManagerService extends ChangeNotifier {
           whereArgs: ['station_%'],
         );
         break;
-      case 'app_data':
-        // Delete application data (favorites, settings, etc.)
-        await db.delete(
-          'cache_entries',
-          where: 'key LIKE ? OR key LIKE ?',
-          whereArgs: ['favorites_%', '%_settings'],
-        );
-        break;
     }
 
     await _refreshCacheStats();
@@ -313,11 +297,48 @@ class OfflineManagerService extends ChangeNotifier {
 
   /// Refresh cache statistics
   Future<void> _refreshCacheStats() async {
+    // Prevent multiple simultaneous refreshes
+    if (_isRefreshingCacheStats) return;
+
+    _isRefreshingCacheStats = true;
+
     try {
-      _cacheStats = await _cacheService.getCacheStatistics();
-      notifyListeners();
+      final db = await (_cacheService as dynamic)._cacheDatabase.database;
+
+      // Count station entries
+      final stationCount = await db.rawQuery(
+        'SELECT COUNT(*) as count FROM cache_entries WHERE key LIKE ?',
+        ['station_%'],
+      );
+
+      // Count forecast entries
+      final forecastCount = await db.rawQuery(
+        'SELECT COUNT(*) as count FROM cache_entries WHERE key LIKE ?',
+        ['forecast_%'],
+      );
+
+      // Get total size
+      final cacheSize = await _cacheService.getCacheSize();
+
+      final newStats = {
+        'stationCount': stationCount.first['count'] ?? 0,
+        'forecastCount': forecastCount.first['count'] ?? 0,
+        'tileCount': 0, // Placeholder - implementation depends on map service
+        'cacheSizeBytes': cacheSize,
+        'cacheSizeMb': (cacheSize / (1024 * 1024)).ceil(),
+      };
+
+      // Only update and notify if stats have changed
+      if (_cacheStats['stationCount'] != newStats['stationCount'] ||
+          _cacheStats['forecastCount'] != newStats['forecastCount'] ||
+          _cacheStats['cacheSizeBytes'] != newStats['cacheSizeBytes']) {
+        _cacheStats = newStats;
+        notifyListeners();
+      }
     } catch (e) {
       print('Error refreshing cache stats: $e');
+    } finally {
+      _isRefreshingCacheStats = false;
     }
   }
 
@@ -334,6 +355,8 @@ class OfflineManagerService extends ChangeNotifier {
 
   /// Set status with notification
   void _setStatus(OfflineStatus newStatus) {
+    if (_status == newStatus) return;
+
     _status = newStatus;
     notifyListeners();
   }
@@ -352,5 +375,11 @@ class OfflineManagerService extends ChangeNotifier {
       _status = OfflineStatus.ready;
     }
     notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    _debounceTimer?.cancel();
+    super.dispose();
   }
 }

@@ -21,47 +21,60 @@ class RivrApp extends StatelessWidget {
         ),
         // Add OfflineManagerService
         ChangeNotifierProvider(create: (_) => sl<OfflineManagerService>()),
-        // Note: We don't need to register AuthProvider, FavoritesProvider, ForecastProvider,
-        // or ReturnPeriodProvider here because they are already provided in main.dart
-
         // Add ReachProvider which isn't a global provider
         ChangeNotifierProvider(create: (_) => ReachProvider()),
-        // Any other providers that are not registered in main.dart
       ],
-      child: Consumer<OfflineManagerService>(
-        builder: (context, offlineManager, child) {
-          // Initialize offline manager on first build
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            offlineManager.refreshCacheStats();
-          });
-
-          return MaterialApp(
-            title: 'Rivr',
-            theme: ThemeData(
-              primaryColor: const Color(0xFF2B5876),
-              colorScheme: ColorScheme.fromSwatch().copyWith(
-                primary: const Color(0xFF2B5876),
-                secondary: const Color(0xFF4E4376),
-              ),
-            ),
-            initialRoute: '/',
-            onGenerateRoute: AppRouter.generateRoute,
-            builder: (context, child) {
-              // Add global banners at the top of the app (connection status and offline mode)
-              return Column(
-                children: [
-                  // Network connection banner
-                  const ConnectionStatusBanner(),
-                  // Offline mode banner
-                  const OfflineModeBanner(),
-                  // Main content
-                  Expanded(child: child!),
-                ],
-              );
-            },
-          );
+      child: MaterialApp(
+        title: 'Rivr',
+        theme: ThemeData(
+          primaryColor: const Color(0xFF2B5876),
+          colorScheme: ColorScheme.fromSwatch().copyWith(
+            primary: const Color(0xFF2B5876),
+            secondary: const Color(0xFF4E4376),
+          ),
+        ),
+        initialRoute: '/',
+        onGenerateRoute: AppRouter.generateRoute,
+        builder: (context, child) {
+          // Optimize the app layout by using a more efficient structure
+          return _OptimizedAppLayout(child: child!);
         },
       ),
+    );
+  }
+}
+
+/// An optimized layout wrapper that minimizes rebuilds
+class _OptimizedAppLayout extends StatelessWidget {
+  final Widget child;
+
+  const _OptimizedAppLayout({required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    // Use a Column with a stack to avoid rebuilding the entire app when connection status changes
+    return Column(
+      children: [
+        // Stack for showing banners without causing full rebuilds
+        _ConnectionBannersBar(),
+        // Main content
+        Expanded(child: child),
+      ],
+    );
+  }
+}
+
+/// A dedicated widget for connection banners to isolate rebuilds
+class _ConnectionBannersBar extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: const [
+        // Optimized banners with state preservation logic
+        ConnectionStatusBanner(),
+        OfflineModeBanner(),
+      ],
     );
   }
 }

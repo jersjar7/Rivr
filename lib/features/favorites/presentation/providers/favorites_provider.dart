@@ -3,7 +3,6 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
-import 'package:rivr/features/offline/data/repositories/offline_storage_repository.dart';
 import '../../domain/entities/favorite.dart';
 import '../../data/models/favorite_model.dart';
 import '../../domain/usecases/add_favorite.dart';
@@ -13,8 +12,10 @@ import '../../domain/usecases/remove_favorite.dart';
 import '../../domain/usecases/update_favorite_position.dart';
 import '../../../../features/map/domain/entities/map_station.dart';
 import '../../../../common/data/local/database_helper.dart';
+import '../../../../core/services/offline_manager_service.dart';
+import '../../../../core/network/network_info.dart';
 
-enum FavoritesStatus { initial, loading, loaded, error }
+enum FavoritesStatus { initial, loading, loaded, error, noConnection }
 
 class FavoritesProvider with ChangeNotifier {
   // Use cases
@@ -24,11 +25,17 @@ class FavoritesProvider with ChangeNotifier {
   final UpdateFavoritePosition updateFavoritePositionUseCase;
   final IsFavorite isFavoriteUseCase;
 
+  // Services for offline functionality
+  final OfflineManagerService _offlineManager;
+  final NetworkInfo _networkInfo;
+
   // State
   FavoritesStatus _status = FavoritesStatus.initial;
   List<Favorite> _favorites = [];
   String? _errorMessage;
   bool _isProcessing = false;
+  bool _isUsingOfflineData = false;
+  DateTime? _lastSyncTime;
 
   // Recently deleted favorites for undo functionality
   final Map<String, Favorite> _recentlyDeleted = {};
@@ -41,8 +48,8 @@ class FavoritesProvider with ChangeNotifier {
   List<Favorite> get favorites => _favorites;
   String? get errorMessage => _errorMessage;
   bool get isProcessing => _isProcessing;
-
-  final OfflineStorageRepository _offlineStorage = OfflineStorageRepository();
+  bool get isUsingOfflineData => _isUsingOfflineData;
+  DateTime? get lastSyncTime => _lastSyncTime;
 
   FavoritesProvider({
     required GetFavorites getFavorites,
@@ -50,11 +57,15 @@ class FavoritesProvider with ChangeNotifier {
     required RemoveFavorite removeFavorite,
     required UpdateFavoritePosition updateFavoritePosition,
     required IsFavorite isFavorite,
+    required OfflineManagerService offlineManager,
+    required NetworkInfo networkInfo,
   }) : getFavoritesUseCase = getFavorites,
        addFavoriteUseCase = addFavorite,
        removeFavoriteUseCase = removeFavorite,
        updateFavoritePositionUseCase = updateFavoritePosition,
-       isFavoriteUseCase = isFavorite {
+       isFavoriteUseCase = isFavorite,
+       _offlineManager = offlineManager,
+       _networkInfo = networkInfo {
     // Initialize database tables when provider is created
     _initTables();
   }
@@ -68,7 +79,7 @@ class FavoritesProvider with ChangeNotifier {
     }
   }
 
-  // Load favorites for user with error handling and retry logic
+  // Load favorites for user with offline handling
   Future<void> loadFavorites(String userId) async {
     if (_isProcessing) return;
 
@@ -79,6 +90,28 @@ class FavoritesProvider with ChangeNotifier {
       // Ensure favorites table exists
       await _databaseHelper.createFavoritesTable();
 
+      // Check network connectivity and offline mode
+      final bool isConnected = await _networkInfo.isConnected;
+      final bool isOfflineMode = _offlineManager.offlineModeEnabled;
+
+      // If offline mode is enabled or there's no connection, try to use cached data
+      if (isOfflineMode || !isConnected) {
+        // Get cached favorites
+        final cachedFavorites = await _getCachedFavorites(userId);
+        if (cachedFavorites.isNotEmpty) {
+          _favorites = cachedFavorites;
+          _isUsingOfflineData = true;
+          _setStatus(FavoritesStatus.loaded);
+          return;
+        } else if (!isConnected) {
+          // No cached data and no connection
+          _setStatus(FavoritesStatus.noConnection);
+          return;
+        }
+        // If we're in offline mode but no cache found, try online anyway
+      }
+
+      // If we have a connection and not in forced offline mode, load from repository
       final result = await getFavoritesUseCase(userId);
 
       result.fold(
@@ -87,7 +120,12 @@ class FavoritesProvider with ChangeNotifier {
         },
         (loadedFavorites) {
           _favorites = loadedFavorites;
+          _isUsingOfflineData = false;
+          _lastSyncTime = DateTime.now();
           _setStatus(FavoritesStatus.loaded);
+
+          // Cache favorites for offline use
+          _cacheFavorites(userId, loadedFavorites);
         },
       );
     } catch (e) {
@@ -97,11 +135,86 @@ class FavoritesProvider with ChangeNotifier {
     }
   }
 
-  // Add a new favorite from a MapStation
+  // Cache favorites for offline use
+  Future<void> _cacheFavorites(String userId, List<Favorite> favorites) async {
+    try {
+      final Map<String, dynamic> favoritesData = {
+        'userId': userId,
+        'timestamp': DateTime.now().millisecondsSinceEpoch,
+        'favorites': favorites.map((f) => _favoriteToJson(f)).toList(),
+      };
+
+      // Store in the offline manager cache
+      await _offlineManager.setOfflineData(
+        'favorites_$userId',
+        favoritesData,
+        expirationHours: 168, // Cache for 7 days
+      );
+    } catch (e) {
+      print("Error caching favorites: $e");
+      // Non-critical error, don't disrupt the UI
+    }
+  }
+
+  // Retrieve cached favorites
+  Future<List<Favorite>> _getCachedFavorites(String userId) async {
+    try {
+      final cachedData = await _offlineManager.getOfflineData(
+        'favorites_$userId',
+      );
+      if (cachedData != null && cachedData['favorites'] != null) {
+        final List<dynamic> favoritesJson = cachedData['favorites'];
+        final List<Favorite> favorites =
+            favoritesJson.map((json) => _favoriteFromJson(json)).toList();
+
+        // Get cache timestamp
+        if (cachedData['timestamp'] != null) {
+          _lastSyncTime = DateTime.fromMillisecondsSinceEpoch(
+            cachedData['timestamp'],
+          );
+        }
+
+        return favorites;
+      }
+    } catch (e) {
+      print("Error retrieving cached favorites: $e");
+    }
+    return [];
+  }
+
+  // Convert Favorite to JSON
+  Map<String, dynamic> _favoriteToJson(Favorite favorite) {
+    return {
+      'stationId': favorite.stationId,
+      'name': favorite.name,
+      'userId': favorite.userId,
+      'position': favorite.position,
+      'color': favorite.color,
+      'description': favorite.description,
+      'imgNumber': favorite.imgNumber,
+      'lastUpdated': favorite.lastUpdated,
+    };
+  }
+
+  // Create Favorite from JSON
+  Favorite _favoriteFromJson(Map<String, dynamic> json) {
+    return FavoriteModel(
+      stationId: json['stationId'],
+      name: json['name'],
+      userId: json['userId'],
+      position: json['position'],
+      color: json['color'],
+      description: json['description'],
+      imgNumber: json['imgNumber'] ?? 1,
+      lastUpdated: json['lastUpdated'],
+    );
+  }
+
+  // Add a new favorite from a MapStation with offline awareness
   Future<bool> addFavoriteFromStation(
     String userId,
     MapStation station, {
-    String? displayName, // New parameter to accept the displayed name
+    String? displayName,
     String? description,
   }) async {
     if (_isProcessing) return false;
@@ -135,18 +248,17 @@ class FavoritesProvider with ChangeNotifier {
       final random = math.Random();
       final randomImgNumber = random.nextInt(30) + 1;
 
-      // IMPORTANT CHANGE: Prioritize the displayName if provided
+      // Determine station name with priority to displayName
       String riverName;
       if (displayName != null && displayName.isNotEmpty) {
-        // Use the exact displayed name that was shown in the info panel
         riverName = displayName;
         print("Using provided displayName: $riverName");
       } else {
-        // Only fall back to the old logic if no displayName was provided
+        // Try to get name from offline cache
         riverName = "Untitled Stream"; // Default fallback
         try {
-          // First check cached API data
-          final cachedStation = await _offlineStorage.getCachedStation(
+          // Check cached station data
+          final cachedStation = await _offlineManager.getCachedStation(
             station.stationId,
           );
 
@@ -170,10 +282,10 @@ class FavoritesProvider with ChangeNotifier {
         }
       }
 
-      // Create favorite model from station
+      // Create favorite model
       final favorite = FavoriteModel(
         stationId: station.stationId.toString(),
-        name: riverName, // Use our determined name
+        name: riverName,
         userId: userId,
         position: nextPosition,
         color: station.color,
@@ -186,6 +298,23 @@ class FavoritesProvider with ChangeNotifier {
         "Created favorite object: ${favorite.stationId}, position: ${favorite.position}, name: ${favorite.name}",
       );
 
+      // Check if we're online or offline
+      final bool isConnected = await _networkInfo.isConnected;
+      final bool isOfflineMode = _offlineManager.offlineModeEnabled;
+
+      if (!isConnected || isOfflineMode) {
+        // In offline mode, add to local list and cache
+        _favorites.add(favorite);
+        _sortFavoritesByPosition();
+
+        // Add to pending operations queue for later sync
+        await _addToPendingOperations('ADD', favorite);
+
+        notifyListeners();
+        return true;
+      }
+
+      // If online, add directly to repository
       final result = await addFavoriteUseCase(favorite);
 
       return result.fold(
@@ -198,6 +327,10 @@ class FavoritesProvider with ChangeNotifier {
           print("Successfully added favorite: ${favorite.stationId}");
           _favorites.add(favorite);
           _sortFavoritesByPosition();
+
+          // Cache the updated favorites list
+          _cacheFavorites(userId, _favorites);
+
           notifyListeners();
           return true;
         },
@@ -221,7 +354,7 @@ class FavoritesProvider with ChangeNotifier {
       // Ensure favorites table exists
       await _databaseHelper.createFavoritesTable();
 
-      // Convert favorite to FavoriteModel if it's not already
+      // Convert favorite to FavoriteModel if needed
       final favoriteModel =
           favorite is FavoriteModel
               ? favorite
@@ -236,6 +369,23 @@ class FavoritesProvider with ChangeNotifier {
                 lastUpdated: favorite.lastUpdated,
               );
 
+      // Check connectivity before proceeding
+      final bool isConnected = await _networkInfo.isConnected;
+      final bool isOfflineMode = _offlineManager.offlineModeEnabled;
+
+      if (!isConnected || isOfflineMode) {
+        // Offline mode - add to local list and pending operations
+        _favorites.add(favoriteModel);
+        _sortFavoritesByPosition();
+
+        // Add to pending operations queue
+        await _addToPendingOperations('ADD', favoriteModel);
+
+        notifyListeners();
+        return;
+      }
+
+      // Online mode - add to repository
       final result = await addFavoriteUseCase(favoriteModel);
 
       result.fold(
@@ -245,6 +395,10 @@ class FavoritesProvider with ChangeNotifier {
         (_) {
           _favorites.add(favoriteModel);
           _sortFavoritesByPosition();
+
+          // Update cache
+          _cacheFavorites(favoriteModel.userId, _favorites);
+
           notifyListeners();
         },
       );
@@ -255,7 +409,7 @@ class FavoritesProvider with ChangeNotifier {
     }
   }
 
-  // Remove a favorite with undo capability
+  // Remove a favorite with offline awareness
   Future<void> deleteFavorite(String userId, String stationId) async {
     if (_isProcessing) return;
 
@@ -280,7 +434,26 @@ class FavoritesProvider with ChangeNotifier {
       _favorites.removeAt(favoriteIndex);
       notifyListeners();
 
-      // Then remove from database
+      // Check connectivity
+      final bool isConnected = await _networkInfo.isConnected;
+      final bool isOfflineMode = _offlineManager.offlineModeEnabled;
+
+      if (!isConnected || isOfflineMode) {
+        // Offline mode - add to pending operations
+        await _addToPendingOperations('DELETE', deletedFavorite);
+
+        // Update cached favorites
+        _cacheFavorites(userId, _favorites);
+
+        // Clean up the recently deleted after some time
+        Future.delayed(const Duration(minutes: 5), () {
+          _recentlyDeleted.remove(stationId);
+        });
+
+        return;
+      }
+
+      // Online mode - remove from database
       final result = await removeFavoriteUseCase(userId, stationId);
 
       result.fold(
@@ -291,6 +464,9 @@ class FavoritesProvider with ChangeNotifier {
         },
         (_) {
           // Success - already removed from the list
+          // Update cache
+          _cacheFavorites(userId, _favorites);
+
           // Clean up the recently deleted after some time
           Future.delayed(const Duration(minutes: 5), () {
             _recentlyDeleted.remove(stationId);
@@ -304,7 +480,7 @@ class FavoritesProvider with ChangeNotifier {
     }
   }
 
-  // Undo a recent deletion
+  // Undo a recent deletion with offline awareness
   Future<void> undoDelete(String stationId) async {
     if (!_recentlyDeleted.containsKey(stationId)) {
       return; // Nothing to undo
@@ -316,7 +492,7 @@ class FavoritesProvider with ChangeNotifier {
     }
   }
 
-  // Reorder favorites with proper position updates
+  // Reorder favorites with offline awareness
   Future<void> reorderFavorites(int oldIndex, int newIndex) async {
     if (_isProcessing ||
         oldIndex < 0 ||
@@ -338,7 +514,30 @@ class FavoritesProvider with ChangeNotifier {
       _favorites.insert(newIndex, favorite);
       notifyListeners();
 
-      // Then update positions in the database
+      // Check connectivity
+      final bool isConnected = await _networkInfo.isConnected;
+      final bool isOfflineMode = _offlineManager.offlineModeEnabled;
+
+      // Update positions in local list
+      for (int i = 0; i < _favorites.length; i++) {
+        if (_favorites[i] is FavoriteModel) {
+          (_favorites[i] as FavoriteModel).position = i;
+        }
+      }
+
+      if (!isConnected || isOfflineMode) {
+        // Offline mode - add to pending operations
+        await _addToPendingOperations('REORDER', null);
+
+        // Update cache with new positions
+        if (_favorites.isNotEmpty) {
+          _cacheFavorites(_favorites.first.userId, _favorites);
+        }
+
+        return;
+      }
+
+      // Online mode - update positions in database
       final updatePromises = <Future<void>>[];
       for (int i = 0; i < _favorites.length; i++) {
         final fav = _favorites[i];
@@ -360,6 +559,11 @@ class FavoritesProvider with ChangeNotifier {
 
       // Wait for all updates to complete
       await Future.wait(updatePromises);
+
+      // Update cache
+      if (_favorites.isNotEmpty) {
+        _cacheFavorites(_favorites.first.userId, _favorites);
+      }
     } catch (e) {
       _setError('Failed to reorder favorites: ${e.toString()}');
       // Refresh the list from database to ensure consistency
@@ -371,7 +575,7 @@ class FavoritesProvider with ChangeNotifier {
     }
   }
 
-  // Check if a station is favorited
+  // Check if a station is favorited with offline awareness
   Future<bool> checkIsFavorite(String userId, String stationId) async {
     try {
       // First check the local cache
@@ -383,7 +587,17 @@ class FavoritesProvider with ChangeNotifier {
         return true;
       }
 
-      // If not in cache, check database
+      // Check connectivity
+      final bool isConnected = await _networkInfo.isConnected;
+      final bool isOfflineMode = _offlineManager.offlineModeEnabled;
+
+      if (!isConnected || isOfflineMode) {
+        // In offline mode, if not in local list, check offline cache
+        final cachedFavorites = await _getCachedFavorites(userId);
+        return cachedFavorites.any((f) => f.stationId == stationId);
+      }
+
+      // If online, check database
       final result = await isFavoriteUseCase(userId, stationId);
 
       return result.fold((failure) {
@@ -396,7 +610,7 @@ class FavoritesProvider with ChangeNotifier {
     }
   }
 
-  /// Update favorite name
+  // Update favorite name with offline awareness
   Future<bool> updateFavoriteName(
     String userId,
     String stationId,
@@ -431,7 +645,25 @@ class FavoritesProvider with ChangeNotifier {
         lastUpdated: DateTime.now().millisecondsSinceEpoch,
       );
 
-      // Update in database (we'll reuse the add method with replace conflict strategy)
+      // Update local list first for responsive UI
+      _favorites[favoriteIndex] = updatedFavorite;
+      notifyListeners();
+
+      // Check connectivity
+      final bool isConnected = await _networkInfo.isConnected;
+      final bool isOfflineMode = _offlineManager.offlineModeEnabled;
+
+      if (!isConnected || isOfflineMode) {
+        // Offline mode - add to pending operations
+        await _addToPendingOperations('UPDATE', updatedFavorite);
+
+        // Update cache
+        _cacheFavorites(userId, _favorites);
+
+        return true;
+      }
+
+      // Update in database
       final result = await addFavoriteUseCase(updatedFavorite);
 
       return result.fold(
@@ -440,9 +672,8 @@ class FavoritesProvider with ChangeNotifier {
           return false;
         },
         (_) {
-          // Update local list
-          _favorites[favoriteIndex] = updatedFavorite;
-          notifyListeners();
+          // Update cache
+          _cacheFavorites(userId, _favorites);
           return true;
         },
       );
@@ -451,6 +682,185 @@ class FavoritesProvider with ChangeNotifier {
       return false;
     } finally {
       _isProcessing = false;
+    }
+  }
+
+  // Store pending operations for later sync
+  Future<void> _addToPendingOperations(
+    String operation,
+    Favorite? favorite,
+  ) async {
+    try {
+      final List<Map<String, dynamic>> pendingOps =
+          await _getPendingOperations();
+
+      pendingOps.add({
+        'operation': operation,
+        'timestamp': DateTime.now().millisecondsSinceEpoch,
+        'favorite': favorite != null ? _favoriteToJson(favorite) : null,
+      });
+
+      await _offlineManager.setOfflineData(
+        'favorites_pending_operations',
+        {'operations': pendingOps},
+        expirationHours: 240, // 10 days
+      );
+    } catch (e) {
+      print("Error adding to pending operations: $e");
+    }
+  }
+
+  // Get pending operations
+  Future<List<Map<String, dynamic>>> _getPendingOperations() async {
+    try {
+      final data = await _offlineManager.getOfflineData(
+        'favorites_pending_operations',
+      );
+
+      if (data != null && data['operations'] != null) {
+        return List<Map<String, dynamic>>.from(data['operations']);
+      }
+    } catch (e) {
+      print("Error getting pending operations: $e");
+    }
+
+    return [];
+  }
+
+  // Sync pending operations when back online
+  Future<void> syncPendingOperations() async {
+    if (_isProcessing) return;
+
+    // Check if we're online
+    final bool isConnected = await _networkInfo.isConnected;
+    if (!isConnected) return;
+
+    try {
+      _isProcessing = true;
+      final pendingOps = await _getPendingOperations();
+
+      if (pendingOps.isEmpty) {
+        // Nothing to sync
+        return;
+      }
+
+      // Sort by timestamp to process in order
+      pendingOps.sort((a, b) => a['timestamp'].compareTo(b['timestamp']));
+
+      // Track successfully processed operations to remove later
+      final List<int> processedIndices = [];
+
+      for (int i = 0; i < pendingOps.length; i++) {
+        final op = pendingOps[i];
+        final operation = op['operation'];
+
+        switch (operation) {
+          case 'ADD':
+            if (op['favorite'] != null) {
+              final favorite = _favoriteFromJson(op['favorite']);
+              final result = await addFavoriteUseCase(
+                favorite as FavoriteModel,
+              );
+
+              if (result.isRight()) {
+                processedIndices.add(i);
+              }
+            }
+            break;
+
+          case 'DELETE':
+            if (op['favorite'] != null) {
+              final favorite = _favoriteFromJson(op['favorite']);
+              final result = await removeFavoriteUseCase(
+                favorite.userId,
+                favorite.stationId,
+              );
+
+              if (result.isRight()) {
+                processedIndices.add(i);
+              }
+            }
+            break;
+
+          case 'UPDATE':
+            if (op['favorite'] != null) {
+              final favorite = _favoriteFromJson(op['favorite']);
+              final result = await addFavoriteUseCase(
+                favorite as FavoriteModel,
+              );
+
+              if (result.isRight()) {
+                processedIndices.add(i);
+              }
+            }
+            break;
+
+          case 'REORDER':
+            // For reorder, we need to update all positions
+            bool success = true;
+            for (final fav in _favorites) {
+              final result = await updateFavoritePositionUseCase(
+                fav.userId,
+                fav.stationId,
+                fav.position,
+              );
+
+              if (result.isLeft()) {
+                success = false;
+                break;
+              }
+            }
+
+            if (success) {
+              processedIndices.add(i);
+            }
+            break;
+        }
+      }
+
+      // Remove processed operations
+      if (processedIndices.isNotEmpty) {
+        // Process in reverse order to avoid index shifting
+        processedIndices.sort((a, b) => b.compareTo(a));
+
+        for (final index in processedIndices) {
+          pendingOps.removeAt(index);
+        }
+
+        // Update the pending operations cache
+        await _offlineManager.setOfflineData('favorites_pending_operations', {
+          'operations': pendingOps,
+        }, expirationHours: 240);
+      }
+
+      // Refresh favorites to ensure consistency
+      if (_favorites.isNotEmpty) {
+        await loadFavorites(_favorites.first.userId);
+      }
+
+      _lastSyncTime = DateTime.now();
+      _isUsingOfflineData = false;
+      notifyListeners();
+    } catch (e) {
+      print("Error syncing pending operations: $e");
+    } finally {
+      _isProcessing = false;
+    }
+  }
+
+  // Check for connectivity and try to sync if needed
+  Future<void> checkConnectionAndSync() async {
+    final bool isConnected = await _networkInfo.isConnected;
+    final bool wasUsingOfflineData = _isUsingOfflineData;
+
+    if (isConnected && wasUsingOfflineData) {
+      // We just got back online after using offline data
+      await syncPendingOperations();
+
+      // Refresh favorites
+      if (_favorites.isNotEmpty) {
+        await loadFavorites(_favorites.first.userId);
+      }
     }
   }
 

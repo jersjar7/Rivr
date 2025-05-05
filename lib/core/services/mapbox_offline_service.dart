@@ -19,8 +19,8 @@ class MapboxOfflineService {
       // Get Mapbox access token
       final accessToken = MapConstants.accessToken;
 
-      // Create offline manager
-      _offlineManager = await OfflineManager.create();
+      // Create offline manager - updated for current SDK
+      _offlineManager = await OfflineManager.getInstance();
 
       _initialized = true;
     } catch (e) {
@@ -47,7 +47,7 @@ class MapboxOfflineService {
     }
 
     try {
-      // Create regional geometry (bounding box)
+      // Create regional geometry (bounding box) - Updated for current SDK
       final coordinates = [
         [minLon, minLat], // Southwest
         [maxLon, minLat], // Southeast
@@ -56,29 +56,19 @@ class MapboxOfflineService {
         [minLon, minLat], // Close the polygon
       ];
 
-      final geometry = Feature(
-        id: 1,
-        geometry: Geometry(
-          type: GeometryType.POLYGON,
-          coordinates: coordinates,
-        ),
-      );
+      // Create a geometry object from coordinates
+      final geometry = {
+        "type": "Polygon",
+        "coordinates": [coordinates],
+      };
 
-      // Setup options for the tileset
-      final tilesetDescriptors = [
-        TilesetDescriptor(
+      // Setup options for the tileset descriptors
+      final descriptorsOptions = [
+        TilesetDescriptorOptions(
           styleURI: styleUrl,
-          zoomRange: TileZoomRange(
-            minZoom: minZoom.toInt(),
-            maxZoom: maxZoom.toInt(),
-          ),
+          zoomRange: TileZoomRange(min: minZoom.toInt(), max: maxZoom.toInt()),
         ),
       ];
-
-      // Create tileset options
-      final tilesetOptions = TilesetOptions(
-        tilesetDescriptors: tilesetDescriptors,
-      );
 
       // Create region metadata
       final metadata = {
@@ -86,12 +76,14 @@ class MapboxOfflineService {
         'timestamp': DateTime.now().toIso8601String(),
       };
 
-      // Create download options
+      // Create download options using the updated API
       final options = TileRegionLoadOptions(
         geometry: geometry,
-        descriptors: tilesetDescriptors,
+        descriptorsOptions: descriptorsOptions,
         metadata: metadata,
         acceptExpired: true,
+        // Required parameter for current SDK
+        networkRestriction: NetworkRestriction.NONE,
       );
 
       // Generate a unique ID for the region
@@ -100,33 +92,32 @@ class MapboxOfflineService {
       // Start the download
       final completer = Completer<void>();
 
-      // Create progress observer
-      final observer = OfflineRegionObserver(
-        onStatusChanged: (status) {
-          if (status.downloadState == OfflineRegionDownloadState.ACTIVE) {
-            final progress =
-                status.completedResourceCount /
-                (status.completedResourceCount + status.requiredResourceCount);
+      // Create progress observer with the updated API
+      final observer = TileRegionLoadProgressCallback(
+        onEvent: (TileRegionLoadProgress progress) {
+          if (progress.completedResourceCount > 0) {
+            final progressValue =
+                progress.completedResourceCount /
+                (progress.completedResourceCount +
+                    progress.requiredResourceCount);
 
             if (onProgress != null) {
-              onProgress(progress);
+              onProgress(progressValue);
             }
-          } else if (status.downloadState ==
-              OfflineRegionDownloadState.FINISHED) {
-            completer.complete();
-          } else if (status.downloadState == OfflineRegionDownloadState.ERROR) {
-            completer.completeError(
-              Exception('Download failed: ${status.error}'),
-            );
+
+            if (progress.completedResourceCount >=
+                progress.requiredResourceCount) {
+              completer.complete();
+            }
           }
         },
-        onErrorEvent: (error) {
+        onError: (Exception error) {
           completer.completeError(Exception('Download error: $error'));
         },
       );
 
-      // Load the region
-      await _offlineManager!.createTileRegion(regionId, options, observer);
+      // Load the region with the updated API
+      await _offlineManager!.loadTileRegion(regionId, options, observer);
 
       // Wait for download to complete
       await completer.future;
@@ -158,7 +149,7 @@ class MapboxOfflineService {
     final area = (maxLat - minLat) * (maxLon - minLon);
 
     // Number of zoom levels
-    final zoomLevels = maxZoom - minZoom + 1;
+    final zoomLevels = maxZoom - minLon + 1;
 
     // Approximate tile size (in bytes) factor
     const tileSizeFactor = 15000; // Average tile size
@@ -189,7 +180,8 @@ class MapboxOfflineService {
       throw Exception('Offline manager not initialized');
     }
 
-    final regions = await _offlineManager!.getAllTileRegions();
+    // Updated to use the current API
+    final regions = await _offlineManager!.getTileRegions();
 
     return regions.map((region) {
       return {

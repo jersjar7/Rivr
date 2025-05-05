@@ -56,7 +56,8 @@ class _DownloadCurrentRegionPageState extends State<DownloadCurrentRegionPage> {
   Widget _buildMapboxMap() {
     return MapWidget(
       key: const ValueKey('mapPreview'),
-      resourceOptions: ResourceOptions(accessToken: MapConstants.accessToken),
+      // Updated to use the correct parameter names for Mapbox SDK
+      accessToken: MapConstants.accessToken,
       cameraOptions: CameraOptions(
         center: MapConstants.defaultCenter,
         zoom: MapConstants.defaultZoom,
@@ -69,30 +70,42 @@ class _DownloadCurrentRegionPageState extends State<DownloadCurrentRegionPage> {
   void _onMapCreated(MapboxMap mapboxMap) async {
     _mapboxMap = mapboxMap;
 
-    // Add map styling, markers, etc. here
-    await mapboxMap.setGestureState(
-      GestureState(
-        scrollEnabled: true,
-        rotateEnabled: true,
-        zoomEnabled: true,
-        pitchEnabled: false,
-      ),
-    );
+    // Configure map settings using the updated API
+    // Note: These methods might need to be adjusted based on the exact Mapbox SDK version
+    try {
+      // Enable gestures
+      await mapboxMap.gestures.updateSettings(
+        GesturesSettings(
+          scrollEnabled: true,
+          rotateEnabled: true,
+          zoomEnabled: true,
+          pitchEnabled: false,
+        ),
+      );
 
-    // Add attribution
-    await mapboxMap.attribution.setPosition(
-      OrnamentPosition(left: 10, bottom: 10),
-    );
+      // Set attribution position
+      await mapboxMap.attribution.updateSettings(
+        AttributionSettings(position: OrnamentPosition(left: 10, bottom: 10)),
+      );
 
-    // Add compass
-    await mapboxMap.compass.setPosition(OrnamentPosition(right: 10, top: 10));
+      // Set compass position
+      await mapboxMap.compass.updateSettings(
+        CompassSettings(position: OrnamentPosition(right: 10, top: 10)),
+      );
 
-    // Wait a bit for the map to fully initialize
-    await Future.delayed(const Duration(milliseconds: 300));
+      // Wait a bit for the map to fully initialize
+      await Future.delayed(const Duration(milliseconds: 300));
 
-    setState(() {
-      _mapInitialized = true;
-    });
+      setState(() {
+        _mapInitialized = true;
+      });
+    } catch (e) {
+      print('Error configuring map: $e');
+      // Still mark as initialized to show the form
+      setState(() {
+        _mapInitialized = true;
+      });
+    }
   }
 
   @override

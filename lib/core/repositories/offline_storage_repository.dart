@@ -19,6 +19,7 @@ class OfflineStorageRepository {
 
   Database? _db;
   String? _cacheDirPath;
+  String? _dbPath;
 
   /// Initialize the repository
   Future<void> initialize() async {
@@ -31,10 +32,10 @@ class OfflineStorageRepository {
     if (_db != null) return;
 
     final documentsDir = await getApplicationDocumentsDirectory();
-    final dbPath = join(documentsDir.path, _dbName);
+    _dbPath = join(documentsDir.path, _dbName);
 
     _db = await openDatabase(
-      dbPath,
+      _dbPath!,
       version: _dbVersion,
       onCreate: _createDb,
       onUpgrade: _upgradeDb,
@@ -196,17 +197,19 @@ class OfflineStorageRepository {
 
     final now = DateTime.now().millisecondsSinceEpoch;
 
-    final Query query = _db!.query(
+    // Construct query parameters
+    final String whereClause =
+        ignoreExpiry ? 'station_id = ?' : 'station_id = ? AND expires_at > ?';
+    final List<dynamic> whereArgs =
+        ignoreExpiry ? [stationId.toString()] : [stationId.toString(), now];
+
+    final results = await _db!.query(
       _forecastsTable,
-      where:
-          ignoreExpiry ? 'station_id = ?' : 'station_id = ? AND expires_at > ?',
-      whereArgs:
-          ignoreExpiry ? [stationId.toString()] : [stationId.toString(), now],
+      where: whereClause,
+      whereArgs: whereArgs,
       orderBy: 'cached_at DESC',
       limit: 1,
     );
-
-    final results = await query;
 
     if (results.isEmpty) return null;
 
@@ -246,8 +249,13 @@ class OfflineStorageRepository {
         0;
 
     // Get total size (approximate)
-    final dbFile = File(await _db!.getPath());
-    final dbSize = await dbFile.length();
+    int dbSize = 0;
+    if (_dbPath != null) {
+      final dbFile = File(_dbPath!);
+      if (await dbFile.exists()) {
+        dbSize = await dbFile.length();
+      }
+    }
 
     // Calculate cache dir size
     int cacheSize = 0;

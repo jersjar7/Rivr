@@ -85,6 +85,15 @@ class AppRouter {
       case '/auth_success':
         return MaterialPageRoute(builder: (_) => const FavoritesPage());
 
+      // Offline routes
+      case '/offline_manager':
+        return MaterialPageRoute(builder: (_) => const OfflineManagerPage());
+
+      case '/offline/download-current-region':
+        return MaterialPageRoute(
+          builder: (_) => const DownloadCurrentRegionPage(),
+        );
+
       default:
         return MaterialPageRoute(
           builder:

@@ -6,8 +6,6 @@ import 'package:provider/provider.dart';
 import 'package:rivr/features/map/presentation/utils/map_tap_handler.dart';
 
 import '../../../../core/constants/map_constants.dart';
-import '../../../../core/network/connection_monitor.dart';
-import '../../../../core/widgets/empty_state.dart';
 import '../providers/map_provider.dart';
 import '../providers/station_provider.dart';
 import '../providers/enhanced_clustered_map_provider.dart';
@@ -23,13 +21,13 @@ import '../widgets/map_components/map_loading_indicator.dart';
 class OptimizedMapPage extends StatefulWidget {
   final double lat;
   final double lon;
-  final Function? onStationAddedToFavorites; // Add callback parameter
+  final Function? onStationAddedToFavorites;
 
   const OptimizedMapPage({
     super.key,
     this.lat = 0.0,
     this.lon = 0.0,
-    this.onStationAddedToFavorites, // Optional parameter
+    this.onStationAddedToFavorites,
   });
 
   @override
@@ -203,66 +201,63 @@ class _OptimizedMapPageState extends State<OptimizedMapPage>
             },
           ),
         ),
-        body: ConnectionAwareWidget(
-          offlineBuilder: (context, status) => _buildOfflineView(),
-          child: Stack(
-            children: [
-              // Mapbox Map (bottommost layer)
-              _buildMap(),
+        body: Stack(
+          children: [
+            // Mapbox Map (bottommost layer)
+            _buildMap(),
 
-              // Add the hint widget
-              ZoomHintWidget(
-                show: _showZoomHint,
-                onClose: () => setState(() => _showZoomHint = false),
+            // Add the hint widget
+            ZoomHintWidget(
+              show: _showZoomHint,
+              onClose: () => setState(() => _showZoomHint = false),
+            ),
+
+            // Drawer pull tag - Move to main Stack to always be visible
+            Positioned(
+              left: 0,
+              top: MediaQuery.of(context).padding.top + 100,
+              child: DrawerPullTag(
+                onTap: () => _scaffoldKey.currentState?.openDrawer(),
+                backgroundColor: Theme.of(context).primaryColor,
               ),
+            ),
 
-              // Drawer pull tag - Move to main Stack to always be visible
-              Positioned(
-                left: 0,
-                top: MediaQuery.of(context).padding.top + 100,
-                child: DrawerPullTag(
-                  onTap: () => _scaffoldKey.currentState?.openDrawer(),
-                  backgroundColor: Theme.of(context).primaryColor,
-                ),
-              ),
-
-              // UI Elements
-              SafeArea(
-                child: Column(
-                  children: [
-                    // Map Content - Takes remaining space
-                    Expanded(
-                      child: Stack(
-                        children: [
-                          // Loading indicator
-                          const MapLoadingIndicator(),
-                        ],
-                      ),
+            // UI Elements
+            SafeArea(
+              child: Column(
+                children: [
+                  // Map Content - Takes remaining space
+                  Expanded(
+                    child: Stack(
+                      children: [
+                        // Loading indicator
+                        const MapLoadingIndicator(),
+                      ],
                     ),
+                  ),
 
-                    // Search Bar - at the bottom
-                    const MapSearchBar(),
-                    const SizedBox(height: 30),
-                  ],
-                ),
+                  // Search Bar - at the bottom
+                  const MapSearchBar(),
+                  const SizedBox(height: 30),
+                ],
               ),
+            ),
 
-              // Map Controls overlay
-              Consumer<MapProvider>(
-                builder: (context, mapProvider, _) {
-                  return MapControls(
-                    is3DMode: _is3DMode,
-                    currentStyle: mapProvider.currentStyle,
-                    onStyleChanged: _changeMapStyle,
-                    onToggle3D: _toggle3DTerrain,
-                    onRefresh: _refreshStations,
-                    onZoomIn: _zoomIn,
-                    onZoomOut: _zoomOut,
-                  );
-                },
-              ),
-            ],
-          ),
+            // Map Controls overlay
+            Consumer<MapProvider>(
+              builder: (context, mapProvider, _) {
+                return MapControls(
+                  is3DMode: _is3DMode,
+                  currentStyle: mapProvider.currentStyle,
+                  onStyleChanged: _changeMapStyle,
+                  onToggle3D: _toggle3DTerrain,
+                  onRefresh: _refreshStations,
+                  onZoomIn: _zoomIn,
+                  onZoomOut: _zoomOut,
+                );
+              },
+            ),
+          ],
         ),
       ),
     );
@@ -302,22 +297,6 @@ class _OptimizedMapPageState extends State<OptimizedMapPage>
           return MapErrorView(error: e.toString(), onRetry: _resetMap);
         }
       },
-    );
-  }
-
-  Widget _buildOfflineView() {
-    return Scaffold(
-      body: Center(
-        child: NetworkErrorView(
-          onRetry: () {
-            final connectionMonitor = Provider.of<ConnectionMonitor>(
-              context,
-              listen: false,
-            );
-            connectionMonitor.resetOfflineStatus();
-          },
-        ),
-      ),
     );
   }
 

@@ -41,6 +41,7 @@ class EnhancedClusteredMapProvider with ChangeNotifier {
 
   bool _isInitialized = false;
   bool get isInitialized => _isInitialized;
+  bool _isInitializing = false;
 
   // Pending operations queue to handle race conditions
   final List<Function> _pendingOperations = [];
@@ -74,32 +75,49 @@ class EnhancedClusteredMapProvider with ChangeNotifier {
       return true;
     }
 
-    // Add to operation queue to prevent race conditions
-    return _queueOperation(() async {
-      try {
-        _setStatus(ClusteringStatus.initializing);
-
-        final result = await initializeClustering(mapboxMap);
-
-        return result.fold(
-          (failure) {
-            _setError(failure.message);
-            return false;
-          },
-          (_) async {
-            _isInitialized = true;
-            _setStatus(ClusteringStatus.ready);
-
-            // Setup handlers after initialization
-            await _setupHandlers(mapboxMap);
-            return true;
-          },
-        );
-      } catch (e) {
-        _setError('Initialization error: $e');
-        return false;
+    // Add a guard against multiple initialization attempts
+    if (_isInitializing) {
+      print('Clustering initialization already in progress');
+      // Wait for existing initialization to complete
+      int attempts = 0;
+      while (_isInitializing && attempts < 10) {
+        await Future.delayed(const Duration(milliseconds: 100));
+        attempts++;
       }
-    });
+      return _isInitialized;
+    }
+
+    _isInitializing = true;
+
+    try {
+      _setStatus(ClusteringStatus.initializing);
+
+      // Wait for map style to be fully loaded
+      await Future.delayed(const Duration(milliseconds: 500));
+
+      final result = await initializeClustering(mapboxMap);
+
+      return result.fold(
+        (failure) {
+          _setError(failure.message);
+          _isInitializing = false;
+          return false;
+        },
+        (_) async {
+          _isInitialized = true;
+          _isInitializing = false;
+          _setStatus(ClusteringStatus.ready);
+
+          // Setup handlers after initialization
+          await _setupHandlers(mapboxMap);
+          return true;
+        },
+      );
+    } catch (e) {
+      _setError('Initialization error: $e');
+      _isInitializing = false;
+      return false;
+    }
   }
 
   /// Update the stations in the clustering system

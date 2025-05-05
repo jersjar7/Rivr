@@ -182,28 +182,40 @@ class MapProvider with ChangeNotifier {
     }
   }
 
+  // —— UPDATED: only call notify when zoom or zoom-message change —— ///
   // Update visible region
   Future<void> updateVisibleRegion() async {
     if (_mapboxMap == null) return;
 
     try {
+      // Get current camera info
       CameraState cameraState = await _mapboxMap!.getCameraState();
-      _currentZoom = cameraState.zoom;
+      final newZoom = cameraState.zoom;
+      final newShowZoomMessage = newZoom < MapConstants.minZoomForMarkers;
 
-      _showZoomMessage = _currentZoom < MapConstants.minZoomForMarkers;
-
+      // Build camera options for bounds calculation
       CameraOptions cameraOptions = CameraOptions(
         center: cameraState.center,
-        zoom: cameraState.zoom,
+        zoom: newZoom,
         bearing: cameraState.bearing,
         pitch: cameraState.pitch,
       );
 
-      _visibleRegion = await _mapboxMap!.coordinateBoundsForCamera(
+      // Compute new visible bounds
+      final newBounds = await _mapboxMap!.coordinateBoundsForCamera(
         cameraOptions,
       );
 
-      notifyListeners();
+      // Only rebuild the UI if zoom level or zoom‐hint flag actually changed
+      if (newZoom != _currentZoom || newShowZoomMessage != _showZoomMessage) {
+        _currentZoom = newZoom;
+        _showZoomMessage = newShowZoomMessage;
+        _visibleRegion = newBounds;
+        notifyListeners();
+      } else {
+        // Still update bounds internally for clustering etc.
+        _visibleRegion = newBounds;
+      }
     } catch (e) {
       print("Error getting visible region: $e");
       _setError('Failed to update map view');

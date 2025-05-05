@@ -1,9 +1,9 @@
+// lib/features/map/presentation/utils/map_tap_handler.dart
+
 import 'dart:math' as Math;
 import 'package:flutter/material.dart';
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
 import 'package:provider/provider.dart';
-import 'package:rivr/core/services/offline_manager_service.dart'; // Updated import
-import 'package:rivr/core/network/connection_monitor.dart'; // Added import
 import 'package:rivr/features/map/domain/entities/map_station.dart';
 import 'package:rivr/features/auth/presentation/providers/auth_provider.dart';
 import 'package:rivr/features/favorites/presentation/providers/favorites_provider.dart';
@@ -12,18 +12,12 @@ import '../providers/enhanced_clustered_map_provider.dart';
 import '../providers/station_provider.dart';
 import '../providers/map_provider.dart';
 import '../widgets/stream_info_panel.dart';
-import '../../../../core/widgets/offline_aware_station_info_panel.dart'; // Added import for offline-aware panel
 import '../../../../core/constants/map_constants.dart';
-import '../../../../core/di/service_locator.dart'; // For service locator
 
 class MapTapHandler {
   final MapboxMap mapboxMap;
   final BuildContext context;
   final Function? onStationAddedToFavorites;
-
-  // Replace with OfflineManagerService
-  final OfflineManagerService _offlineManager;
-  final ConnectionMonitor _connectionMonitor;
 
   // Track the currently displayed info panel
   StreamInfoPanel? _currentInfoPanel;
@@ -37,10 +31,7 @@ class MapTapHandler {
     required this.mapboxMap,
     required this.context,
     this.onStationAddedToFavorites,
-    OfflineManagerService? offlineManager,
-    ConnectionMonitor? connectionMonitor,
-  }) : _offlineManager = offlineManager ?? sl<OfflineManagerService>(),
-       _connectionMonitor = connectionMonitor ?? sl<ConnectionMonitor>() {
+  }) {
     // Initialize provider references immediately
     _authProvider = Provider.of<AuthProvider>(context, listen: false);
     _favoritesProvider = Provider.of<FavoritesProvider>(context, listen: false);
@@ -226,7 +217,7 @@ class MapTapHandler {
       // Try to parse the station ID as an integer
       final int stationIdInt = int.parse(stationId);
 
-      // Initialize as empty - we'll only use "Untitled Stream" if we can't find a name
+      // Initialize station name
       String stationName = "";
 
       // Extract station name from properties if available
@@ -240,25 +231,9 @@ class MapTapHandler {
           (properties['properties'] as Map)['name'] != null &&
           (properties['properties'] as Map)['name'].toString().isNotEmpty) {
         stationName = (properties['properties'] as Map)['name'].toString();
-      } else {
-        // Check if we have a cached name using the new OfflineManagerService
-        try {
-          final cachedStation = await _offlineManager.getCachedStation(
-            stationIdInt,
-          );
-          if (cachedStation != null &&
-              cachedStation['station'] != null &&
-              cachedStation['station']['name'] != null) {
-            stationName = cachedStation['station']['name'] as String;
-            print("Retrieved cached name for station $stationId: $stationName");
-          }
-        } catch (e) {
-          print("Error retrieving cached name: $e");
-          // Keep the name empty for now
-        }
       }
 
-      // If no name found or empty, ONLY THEN use "Untitled Stream"
+      // If no name found or empty, use "Untitled Stream"
       if (stationName.isEmpty) {
         stationName = "Untitled Stream";
       }
@@ -297,9 +272,6 @@ class MapTapHandler {
         );
       }
 
-      // Save station info in offline cache using the new OfflineManagerService
-      await _offlineManager.cacheStation(tappedStation, {'name': stationName});
-
       // Set this station as selected in the provider
       clusteredMapProvider.selectStation(tappedStation);
 
@@ -323,103 +295,24 @@ class MapTapHandler {
 
       // Show the info panel for the selected station
       print("Showing info panel for station: ${tappedStation.stationId}");
-
-      // Now use the offline-aware station info panel instead
-      final isConnected = await _connectionMonitor.testConnection();
-      final isOfflineMode = _offlineManager.offlineModeEnabled;
-
-      if (!isConnected || isOfflineMode) {
-        // Show offline-aware panel in offline mode
-        _showOfflineAwareInfoPanel(
-          tappedStation,
-          clusteredMapProvider,
-          stationProvider,
-          mapProvider,
-        );
-      } else {
-        // Show regular panel in online mode
-        _showInfoPanel(
-          tappedStation,
-          clusteredMapProvider,
-          stationProvider,
-          mapProvider,
-        );
-      }
+      _showInfoPanel(
+        tappedStation,
+        clusteredMapProvider,
+        stationProvider,
+        mapProvider,
+      );
     } catch (e) {
       print("Error handling station tap: $e");
     }
   }
 
-  /// Show the offline-aware stream info panel
-  Future<void> _showOfflineAwareInfoPanel(
+  /// Show the stream info panel for the selected station
+  void _showInfoPanel(
     MapStation station,
     EnhancedClusteredMapProvider clusteredMapProvider,
     StationProvider stationProvider,
     MapProvider mapProvider,
-  ) async {
-    // Make method async
-    try {
-      // Remove existing panel first
-      _removeInfoPanel();
-
-      print(
-        "Creating offline-aware info panel for station: ${station.stationId}",
-      );
-
-      // Find the overlay to add our widget to
-      final overlay = Overlay.of(context);
-
-      // Create the offline-aware panel
-      final offlineAwarePanel = OfflineAwareStationInfoPanel(
-        station: station,
-        onClose: () {
-          // When closed, deselect the station and remove the panel
-          print("Closing info panel");
-          clusteredMapProvider.deselectStation();
-          _removeInfoPanel();
-        },
-        onAddToFavorites:
-            onStationAddedToFavorites != null
-                ? (station) async {
-                  // Handle adding to favorites with offline awareness
-                  final success = await _handleAddToFavorites(station);
-                  if (success) {
-                    _removeInfoPanel();
-                    await Future.delayed(const Duration(milliseconds: 300));
-                    onStationAddedToFavorites!();
-                    Navigator.of(context).pop();
-                  }
-                }
-                : null,
-        onViewForecast: (reachId, stationName) {
-          // Navigate to the forecast page
-          Navigator.pushNamed(
-            context,
-            '/forecast',
-            arguments: {'reachId': reachId, 'stationName': stationName},
-          );
-        },
-      );
-
-      // Create an overlay entry to show the panel
-      _overlayEntry = OverlayEntry(builder: (context) => offlineAwarePanel);
-
-      // Add the entry to the overlay
-      overlay.insert(_overlayEntry!);
-      print("Offline-aware info panel inserted into overlay");
-    } catch (e) {
-      print("Error showing offline-aware info panel: $e");
-    }
-  }
-
-  /// Show the regular stream info panel for the selected station (online mode)
-  Future<void> _showInfoPanel(
-    MapStation station,
-    EnhancedClusteredMapProvider clusteredMapProvider,
-    StationProvider stationProvider,
-    MapProvider mapProvider,
-  ) async {
-    // Make method async
+  ) {
     try {
       // Remove existing panel first
       _removeInfoPanel();
@@ -429,32 +322,10 @@ class MapTapHandler {
       // Find the overlay to add our widget to
       final overlay = Overlay.of(context);
 
-      // Determine the display name before creating the panel
-      String displayName = station.name ?? "";
+      // Determine the display name
+      String displayName = station.name ?? "Untitled Stream";
 
-      // If station name is empty, try to get a name from cache
-      if (displayName.isEmpty) {
-        try {
-          // Try to get cached station data - needs to be awaited
-          final cachedStation = await _offlineManager.getCachedStation(
-            station.stationId,
-            // Remove the ignoreExpiry parameter since it doesn't exist
-          );
-
-          if (cachedStation != null &&
-              cachedStation['station'] != null &&
-              cachedStation['station']['name'] != null) {
-            displayName = cachedStation['station']['name'] as String;
-          } else {
-            displayName = "Untitled Stream";
-          }
-        } catch (e) {
-          print("Error getting station name: $e");
-          displayName = "Untitled Stream";
-        }
-      }
-
-      // Create a new info panel with the determined display name
+      // Create a new info panel
       _currentInfoPanel = StreamInfoPanel(
         station: station,
         displayName: displayName,
@@ -524,6 +395,13 @@ class MapTapHandler {
             duration: const Duration(seconds: 2),
           ),
         );
+
+        // If there's a callback, execute it
+        if (onStationAddedToFavorites != null) {
+          _removeInfoPanel();
+          await Future.delayed(const Duration(milliseconds: 300));
+          onStationAddedToFavorites!();
+        }
 
         return true;
       } else {

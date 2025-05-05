@@ -7,6 +7,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:http/http.dart' as http;
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:rivr/core/di/map_di.dart';
+import 'package:rivr/core/network/connection_monitor.dart';
 
 // Core
 import '../network/network_info.dart';
@@ -121,6 +122,11 @@ Future<void> setupServiceLocator() async {
   // Biometric Authentication
   sl.registerLazySingleton<BiometricAuthService>(
     () => BiometricAuthService(secureStorage: sl()),
+  );
+
+  // Add this to the setupServiceLocator function
+  sl.registerLazySingleton<ConnectionMonitor>(
+    () => ConnectionMonitor(networkInfo: sl<NetworkInfo>()),
   );
 }
 

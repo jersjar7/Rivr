@@ -1,5 +1,6 @@
 // lib/features/map/presentation/pages/map_page.dart
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
 import 'package:provider/provider.dart';
 import 'package:rivr/features/map/presentation/utils/map_tap_handler.dart';
@@ -118,8 +119,10 @@ class _OptimizedMapPageState extends State<OptimizedMapPage>
   @override
   void dispose() {
     print("OPTIMIZED MAP PAGE: dispose called");
-    WidgetsBinding.instance.removeObserver(this);
-    _cleanupMapResources();
+    // Schedule cleanup for next frame instead of doing it immediately
+    SchedulerBinding.instance.addPostFrameCallback((_) {
+      _cleanupMapResources();
+    });
     super.dispose();
   }
 

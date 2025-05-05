@@ -3,6 +3,7 @@
 import 'dart:async';
 import 'dart:math' as Math;
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
 
 import '../../../../core/constants/map_constants.dart';
@@ -50,6 +51,9 @@ class MapProvider with ChangeNotifier {
 
   // Search use case
   final SearchLocation searchLocationUseCase;
+
+  // Add a boolean to track disposal state
+  bool _isDisposed = false;
 
   MapProvider({required this.searchLocationUseCase});
 
@@ -122,7 +126,7 @@ class MapProvider with ChangeNotifier {
 
   // Enable 3D terrain
   Future<void> _enableTerrain() async {
-    if (_mapboxMap == null) return;
+    if (_isDisposed || _mapboxMap == null) return;
 
     try {
       // Add a delay to ensure the style has loaded
@@ -371,12 +375,16 @@ class MapProvider with ChangeNotifier {
     notifyListeners();
   }
 
+  // In lib/features/map/presentation/providers/map_provider.dart
   void disposeMap() {
-    print("MAP PROVIDER: disposeMap called");
+    // Mark as disposed first
+    _isDisposed = true;
+
+    // Cleanup but don't notify
     _mapboxMap = null;
-    _pointAnnotationManager = null;
     _isMapInitialized = false;
-    notifyListeners();
+
+    // No calls to notifyListeners()
   }
 
   // Set the current map style

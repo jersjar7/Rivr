@@ -314,31 +314,7 @@ class OfflineManagerService extends ChangeNotifier {
   /// Refresh cache statistics
   Future<void> _refreshCacheStats() async {
     try {
-      final db = await (_cacheService as dynamic)._cacheDatabase.database;
-
-      // Count station entries
-      final stationCount = await db.rawQuery(
-        'SELECT COUNT(*) as count FROM cache_entries WHERE key LIKE ?',
-        ['station_%'],
-      );
-
-      // Count forecast entries
-      final forecastCount = await db.rawQuery(
-        'SELECT COUNT(*) as count FROM cache_entries WHERE key LIKE ?',
-        ['forecast_%'],
-      );
-
-      // Get total size
-      final cacheSize = await _cacheService.getCacheSize();
-
-      _cacheStats = {
-        'stationCount': stationCount.first['count'] ?? 0,
-        'forecastCount': forecastCount.first['count'] ?? 0,
-        'tileCount': 0, // Placeholder - implementation depends on map service
-        'cacheSizeBytes': cacheSize,
-        'cacheSizeMb': (cacheSize / (1024 * 1024)).ceil(),
-      };
-
+      _cacheStats = await _cacheService.getCacheStatistics();
       notifyListeners();
     } catch (e) {
       print('Error refreshing cache stats: $e');

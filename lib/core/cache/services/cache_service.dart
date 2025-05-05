@@ -217,4 +217,32 @@ class CacheService {
   Future<int> getCacheSize() async {
     return await _cacheDatabase.getCacheSize();
   }
+
+  // Add to CacheService
+  Future<Map<String, dynamic>> getCacheStatistics() async {
+    final db = await _cacheDatabase.database;
+
+    // Count station entries
+    final stationCount = await db.rawQuery(
+      'SELECT COUNT(*) as count FROM cache_entries WHERE key LIKE ?',
+      ['station_%'],
+    );
+
+    // Count forecast entries
+    final forecastCount = await db.rawQuery(
+      'SELECT COUNT(*) as count FROM cache_entries WHERE key LIKE ?',
+      ['forecast_%'],
+    );
+
+    // Get total size
+    final cacheSize = await getCacheSize();
+
+    return {
+      'stationCount': stationCount.first['count'] ?? 0,
+      'forecastCount': forecastCount.first['count'] ?? 0,
+      'tileCount': 0, // Placeholder
+      'cacheSizeBytes': cacheSize,
+      'cacheSizeMb': (cacheSize / (1024 * 1024)).ceil(),
+    };
+  }
 }

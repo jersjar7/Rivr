@@ -18,7 +18,6 @@ enum OfflineDownloadType { currentMapRegion, favoriteAreas, customArea }
 class OfflineManagerService extends ChangeNotifier {
   final CacheService _cacheService;
   final ApiClient _apiClient;
-  final NetworkInfo _networkInfo;
 
   // State
   OfflineStatus _status = OfflineStatus.initial;
@@ -64,8 +63,7 @@ class OfflineManagerService extends ChangeNotifier {
     required ApiClient apiClient,
     required NetworkInfo networkInfo,
   }) : _cacheService = cacheService,
-       _apiClient = apiClient,
-       _networkInfo = networkInfo {
+       _apiClient = apiClient {
     _initialize();
   }
 

@@ -1,10 +1,8 @@
 // lib/core/pages/download_current_region_page.dart
 
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
 import '../constants/map_constants.dart';
-import '../services/offline_manager_service.dart';
 import '../widgets/download_region_form.dart';
 
 class DownloadCurrentRegionPage extends StatefulWidget {
@@ -74,32 +72,29 @@ class _DownloadCurrentRegionPageState extends State<DownloadCurrentRegionPage> {
         GesturesSettings(
           scrollEnabled: true,
           rotateEnabled: true,
-          zoomEnabled: true,
+          pinchToZoomEnabled: true,
+          doubleTapToZoomInEnabled: true,
+          doubleTouchToZoomOutEnabled: true,
+          quickZoomEnabled: true,
           pitchEnabled: false,
         ),
       );
 
-      // Set attribution position
+      // Set attribution position to bottom-left with margins
       await mapboxMap.attribution.updateSettings(
         AttributionSettings(
-          position: OrnamentPosition(
-            top: null,
-            left: 10,
-            bottom: 10,
-            right: null,
-          ),
+          position: OrnamentPosition.BOTTOM_LEFT,
+          marginLeft: 10,
+          marginBottom: 10,
         ),
       );
 
-      // Set compass position
+      // Set compass position to top-right with margins
       await mapboxMap.compass.updateSettings(
         CompassSettings(
-          position: OrnamentPosition(
-            top: 10,
-            left: null,
-            bottom: null,
-            right: 10,
-          ),
+          position: OrnamentPosition.TOP_RIGHT,
+          marginTop: 10,
+          marginRight: 10,
         ),
       );
 

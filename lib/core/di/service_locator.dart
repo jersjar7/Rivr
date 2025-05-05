@@ -1,46 +1,61 @@
-// lib/core/di/service_locator.dart
+// lib/core/di/service_locator.dart - Updated with caching components
 
 import 'package:get_it/get_it.dart';
 import 'package:firebase_auth/firebase_auth.dart'
     hide AuthProvider; // Hide Firebase's AuthProvider
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:http/http.dart' as http;
-import 'package:rivr/common/data/local/database_helper.dart';
-import 'package:rivr/core/di/forecast_di.dart';
+import 'package:firebase_auth/firebase_auth.dart' hide AuthProvider;
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:rivr/core/di/map_di.dart';
-import 'package:rivr/core/network/network_info.dart';
-import 'package:rivr/core/storage/app_database.dart';
-import 'package:rivr/core/storage/secure_storage.dart';
-import 'package:rivr/features/auth/data/datasources/auth_remote_datasource.dart';
-import 'package:rivr/features/auth/data/datasources/auth_storage_service.dart';
-import 'package:rivr/features/auth/data/datasources/user_profile_service.dart';
-import 'package:rivr/features/auth/data/repositories/auth_repository_impl.dart';
-import 'package:rivr/features/auth/domain/repositories/auth_repository.dart';
-import 'package:rivr/features/auth/domain/usecases/login.dart';
-import 'package:rivr/features/auth/domain/usecases/register.dart';
-import 'package:rivr/features/auth/domain/usecases/get_current_user.dart';
-import 'package:rivr/features/auth/domain/usecases/send_password_reset_email.dart';
-import 'package:rivr/features/auth/domain/usecases/sign_out.dart';
-import 'package:rivr/features/auth/domain/usecases/update_user_profile.dart';
-import 'package:rivr/features/auth/presentation/providers/auth_provider.dart'
-    as app; // Use alias for our AuthProvider
-import 'package:rivr/features/favorites/data/datasources/favorites_local_datasource.dart';
-import 'package:rivr/features/favorites/data/repositories/favorites_repository_impl.dart';
-import 'package:rivr/features/favorites/domain/repositories/favorites_repository.dart';
-import 'package:rivr/features/favorites/domain/usecases/add_favorite.dart';
-import 'package:rivr/features/favorites/domain/usecases/get_favorites.dart';
-import 'package:rivr/features/favorites/domain/usecases/is_favorite.dart';
-import 'package:rivr/features/favorites/domain/usecases/remove_favorite.dart';
-import 'package:rivr/features/favorites/domain/usecases/update_favorite_position.dart';
-import 'package:rivr/features/forecast/domain/usecases/get_forecast.dart';
-import 'package:rivr/features/forecast/domain/usecases/get_return_periods.dart';
-import 'package:rivr/features/forecast/presentation/providers/forecast_provider.dart';
-import 'package:rivr/features/forecast/presentation/providers/return_period_provider.dart';
-import 'package:rivr/features/favorites/presentation/providers/favorites_provider.dart';
-import 'package:rivr/features/auth/data/datasources/biometric_auth_service.dart';
-// Import new global components
+
+// Core
+import '../network/network_info.dart';
+import '../storage/app_database.dart';
+import '../storage/secure_storage.dart';
 import '../network/api_client.dart';
+import '../cache/storage/cache_database.dart';
+import '../cache/services/cache_service.dart';
+import '../services/offline_manager_service.dart';
 import '../config/api_config.dart';
+
+// Features
+import '../../common/data/local/database_helper.dart';
+import '../../features/auth/data/datasources/auth_remote_datasource.dart';
+import '../../features/auth/data/datasources/auth_storage_service.dart';
+import '../../features/auth/data/datasources/user_profile_service.dart';
+import '../../features/auth/data/repositories/auth_repository_impl.dart';
+import '../../features/auth/domain/repositories/auth_repository.dart';
+import '../../features/auth/domain/usecases/login.dart';
+import '../../features/auth/domain/usecases/register.dart';
+import '../../features/auth/domain/usecases/get_current_user.dart';
+import '../../features/auth/domain/usecases/send_password_reset_email.dart';
+import '../../features/auth/domain/usecases/sign_out.dart';
+import '../../features/auth/domain/usecases/update_user_profile.dart';
+import '../../features/auth/presentation/providers/auth_provider.dart' as app;
+import '../../features/auth/data/datasources/biometric_auth_service.dart';
+
+import '../../features/favorites/data/datasources/favorites_local_datasource.dart';
+import '../../features/favorites/data/repositories/favorites_repository_impl.dart';
+import '../../features/favorites/domain/repositories/favorites_repository.dart';
+import '../../features/favorites/domain/usecases/add_favorite.dart';
+import '../../features/favorites/domain/usecases/get_favorites.dart';
+import '../../features/favorites/domain/usecases/is_favorite.dart';
+import '../../features/favorites/domain/usecases/remove_favorite.dart';
+import '../../features/favorites/domain/usecases/update_favorite_position.dart';
+import '../../features/favorites/presentation/providers/favorites_provider.dart';
+
+import '../../features/forecast/data/datasources/forecast_local_datasource.dart';
+import '../../features/forecast/data/datasources/forecast_remote_datasource.dart';
+import '../../features/forecast/data/repositories/forecast_repository_impl.dart';
+import '../../features/forecast/data/repositories/return_period_repository_impl.dart';
+import '../../features/forecast/domain/repositories/forecast_repository.dart';
+import '../../features/forecast/domain/repositories/return_period_repository.dart';
+import '../../features/forecast/domain/usecases/get_forecast.dart';
+import '../../features/forecast/domain/usecases/get_return_periods.dart';
+import '../../features/forecast/presentation/providers/forecast_provider.dart';
+import '../../features/forecast/presentation/providers/return_period_provider.dart';
 
 final sl = GetIt.instance;
 
@@ -51,17 +66,41 @@ Future<void> setupServiceLocator() async {
 
   // External
   sl.registerLazySingleton(() => http.Client());
+  sl.registerLazySingleton(() => Connectivity());
 
   // Core
-  sl.registerLazySingleton<NetworkInfo>(() => NetworkInfoImpl());
+  sl.registerLazySingleton<NetworkInfo>(
+    () => NetworkInfoImpl(connectivity: sl<Connectivity>()),
+  );
   sl.registerLazySingleton<AppDatabase>(() => AppDatabaseImpl());
   sl.registerLazySingleton<SecureStorage>(() => SecureStorageImpl());
-  sl.registerLazySingleton(() => DatabaseHelper());
 
-  // Register global API client
-  sl.registerLazySingleton<ApiClient>(
-    () => ApiClient(networkInfo: sl<NetworkInfo>()),
+  // New caching infrastructure
+  sl.registerLazySingleton(() => CacheDatabase());
+  sl.registerLazySingleton<CacheService>(
+    () => CacheService(cacheDatabase: sl<CacheDatabase>()),
   );
+
+  // API Client with caching
+  sl.registerLazySingleton<ApiClient>(
+    () => ApiClient(
+      httpClient: sl<http.Client>(),
+      networkInfo: sl<NetworkInfo>(),
+      cacheDatabase: sl<CacheDatabase>(),
+    ),
+  );
+
+  // Offline manager service
+  sl.registerLazySingleton<OfflineManagerService>(
+    () => OfflineManagerService(
+      cacheService: sl<CacheService>(),
+      apiClient: sl<ApiClient>(),
+      networkInfo: sl<NetworkInfo>(),
+    ),
+  );
+
+  // Legacy Database Helper - will be phased out as we transition to the new caching system
+  sl.registerLazySingleton(() => DatabaseHelper());
 
   // Validate API configuration during startup
   if (!ApiConfig.validateConfig()) {
@@ -133,6 +172,57 @@ void _registerFavoritesDependencies() {
   sl.registerLazySingleton(() => RemoveFavorite(sl()));
   sl.registerLazySingleton(() => UpdateFavoritePosition(sl()));
   sl.registerLazySingleton(() => IsFavorite(sl()));
+}
+
+// Updated forecast dependencies registration
+void registerForecastDependencies(GetIt sl) {
+  // Data sources
+  sl.registerLazySingleton<ForecastRemoteDataSource>(
+    () => ForecastRemoteDataSourceImpl(client: sl<ApiClient>()),
+  );
+  sl.registerLazySingleton<ForecastLocalDataSource>(
+    () => ForecastLocalDataSourceImpl(databaseHelper: sl<DatabaseHelper>()),
+  );
+
+  // Repositories - updated to use CacheService
+  sl.registerLazySingleton<ForecastRepository>(
+    () => ForecastRepositoryImpl(
+      remoteDataSource: sl<ForecastRemoteDataSource>(),
+      cacheService: sl<CacheService>(), // Using new cache service
+      networkInfo: sl<NetworkInfo>(),
+    ),
+  );
+
+  sl.registerLazySingleton<ReturnPeriodRepository>(
+    () => ReturnPeriodRepositoryImpl(
+      remoteDataSource: sl<ForecastRemoteDataSource>(),
+      localDataSource: sl<ForecastLocalDataSource>(),
+      networkInfo: sl<NetworkInfo>(),
+    ),
+  );
+
+  // Forecast use cases
+  sl.registerLazySingleton(() => GetForecast(sl<ForecastRepository>()));
+  sl.registerLazySingleton(
+    () => GetShortRangeForecast(sl<ForecastRepository>()),
+  );
+  sl.registerLazySingleton(
+    () => GetMediumRangeForecast(sl<ForecastRepository>()),
+  );
+  sl.registerLazySingleton(
+    () => GetLongRangeForecast(sl<ForecastRepository>()),
+  );
+  sl.registerLazySingleton(() => GetAllForecasts(sl<ForecastRepository>()));
+  sl.registerLazySingleton(() => GetLatestFlow(sl<ForecastRepository>()));
+
+  // Return period use cases
+  sl.registerLazySingleton(
+    () => GetReturnPeriods(sl<ReturnPeriodRepository>()),
+  );
+  sl.registerLazySingleton(() => GetFlowCategory(sl<ReturnPeriodRepository>()));
+  sl.registerLazySingleton(
+    () => CheckFlowExceedsThreshold(sl<ReturnPeriodRepository>()),
+  );
 }
 
 // Register all providers

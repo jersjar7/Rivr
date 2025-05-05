@@ -250,6 +250,8 @@ void _registerProviders() {
       removeFavorite: sl(),
       updateFavoritePosition: sl(),
       isFavorite: sl(),
+      offlineManager: sl<OfflineManagerService>(),
+      networkInfo: sl<NetworkInfo>(),
     ),
   );
 

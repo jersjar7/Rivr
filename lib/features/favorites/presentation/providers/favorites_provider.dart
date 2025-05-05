@@ -519,11 +519,32 @@ class FavoritesProvider with ChangeNotifier {
       final bool isOfflineMode = _offlineManager.offlineModeEnabled;
 
       // Update positions in local list
+      // We need to create new model instances with updated positions since position is final
+      final updatedFavorites = <Favorite>[];
       for (int i = 0; i < _favorites.length; i++) {
-        if (_favorites[i] is FavoriteModel) {
-          (_favorites[i] as FavoriteModel).position = i;
+        final fav = _favorites[i];
+        if (fav is FavoriteModel) {
+          // Create a new model with the updated position
+          updatedFavorites.add(
+            FavoriteModel(
+              stationId: fav.stationId,
+              name: fav.name,
+              userId: fav.userId,
+              position: i, // Update position
+              color: fav.color,
+              description: fav.description,
+              imgNumber: fav.imgNumber,
+              lastUpdated: fav.lastUpdated,
+            ),
+          );
+        } else {
+          // Add original with potentially wrong position, will be fixed when synced
+          updatedFavorites.add(fav);
         }
       }
+
+      // Replace the favorites list with the updated one
+      _favorites = updatedFavorites;
 
       if (!isConnected || isOfflineMode) {
         // Offline mode - add to pending operations

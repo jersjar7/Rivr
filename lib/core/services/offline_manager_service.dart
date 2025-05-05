@@ -147,6 +147,37 @@ class OfflineManagerService extends ChangeNotifier {
     return await _cacheService.get<Map<String, dynamic>>(forecastKey);
   }
 
+  /// Store offline data with given key
+  Future<void> setOfflineData(
+    String key,
+    Map<String, dynamic> data, {
+    int expirationHours = 24,
+  }) async {
+    await _cacheService.set(
+      key,
+      data,
+      duration: Duration(hours: expirationHours),
+    );
+
+    await _refreshCacheStats();
+  }
+
+  /// Retrieve offline data for the given key
+  Future<Map<String, dynamic>?> getOfflineData(String key) async {
+    return await _cacheService.get<Map<String, dynamic>>(key);
+  }
+
+  /// Check if offline data exists for a given key
+  Future<bool> hasOfflineData(String key) async {
+    return await _cacheService.exists(key);
+  }
+
+  /// Remove offline data for a given key
+  Future<void> removeOfflineData(String key) async {
+    await _cacheService.remove(key);
+    await _refreshCacheStats();
+  }
+
   /// Download map region for offline use
   Future<bool> downloadCurrentMapRegion({
     required MapboxMap mapboxMap,
@@ -265,6 +296,14 @@ class OfflineManagerService extends ChangeNotifier {
           'cache_entries',
           where: 'key LIKE ?',
           whereArgs: ['station_%'],
+        );
+        break;
+      case 'app_data':
+        // Delete application data (favorites, settings, etc.)
+        await db.delete(
+          'cache_entries',
+          where: 'key LIKE ? OR key LIKE ?',
+          whereArgs: ['favorites_%', '%_settings'],
         );
         break;
     }

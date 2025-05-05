@@ -1,25 +1,29 @@
-// lib/features/map/presentation/utils/map_tap_handler.dart
-
 import 'dart:math' as Math;
 import 'package:flutter/material.dart';
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
 import 'package:provider/provider.dart';
+import 'package:rivr/core/services/offline_manager_service.dart'; // Updated import
+import 'package:rivr/core/network/connection_monitor.dart'; // Added import
 import 'package:rivr/features/map/domain/entities/map_station.dart';
 import 'package:rivr/features/auth/presentation/providers/auth_provider.dart';
 import 'package:rivr/features/favorites/presentation/providers/favorites_provider.dart';
-import 'package:rivr/features/offline/data/repositories/offline_storage_repository.dart';
 
 import '../providers/enhanced_clustered_map_provider.dart';
 import '../providers/station_provider.dart';
 import '../providers/map_provider.dart';
 import '../widgets/stream_info_panel.dart';
+import '../../../../core/widgets/offline_aware_station_info_panel.dart'; // Added import for offline-aware panel
 import '../../../../core/constants/map_constants.dart';
+import '../../../../core/di/service_locator.dart'; // For service locator
 
 class MapTapHandler {
   final MapboxMap mapboxMap;
   final BuildContext context;
   final Function? onStationAddedToFavorites;
-  final OfflineStorageRepository _offlineStorage = OfflineStorageRepository();
+
+  // Replace with OfflineManagerService
+  final OfflineManagerService _offlineManager;
+  final ConnectionMonitor _connectionMonitor;
 
   // Track the currently displayed info panel
   StreamInfoPanel? _currentInfoPanel;
@@ -33,20 +37,19 @@ class MapTapHandler {
     required this.mapboxMap,
     required this.context,
     this.onStationAddedToFavorites,
-  }) {
+    OfflineManagerService? offlineManager,
+    ConnectionMonitor? connectionMonitor,
+  }) : _offlineManager = offlineManager ?? sl<OfflineManagerService>(),
+       _connectionMonitor = connectionMonitor ?? sl<ConnectionMonitor>() {
     // Initialize provider references immediately
     _authProvider = Provider.of<AuthProvider>(context, listen: false);
     _favoritesProvider = Provider.of<FavoritesProvider>(context, listen: false);
-
-    // Initialize offline storage
-    _offlineStorage.initialize();
   }
 
   /// Set up the tap handler
   Future<void> setupTapHandlers() async {
     print("MapTapHandler: Setting up tap handlers");
     // The actual handling will be done via the handleMapTap method
-    // which is connected to the MapWidget's onTapListener in map_page.dart
   }
 
   /// Handle tap events from the map
@@ -238,12 +241,16 @@ class MapTapHandler {
           (properties['properties'] as Map)['name'].toString().isNotEmpty) {
         stationName = (properties['properties'] as Map)['name'].toString();
       } else {
-        // Check if we have a cached name
+        // Check if we have a cached name using the new OfflineManagerService
         try {
-          final cachedName = await _offlineStorage.getStationName(stationIdInt);
-          if (cachedName.isNotEmpty) {
-            stationName = cachedName;
-            print("Retrieved cached name for station $stationId: $cachedName");
+          final cachedStation = await _offlineManager.getCachedStation(
+            stationIdInt,
+          );
+          if (cachedStation != null &&
+              cachedStation['station'] != null &&
+              cachedStation['station']['name'] != null) {
+            stationName = cachedStation['station']['name'] as String;
+            print("Retrieved cached name for station $stationId: $stationName");
           }
         } catch (e) {
           print("Error retrieving cached name: $e");
@@ -290,8 +297,8 @@ class MapTapHandler {
         );
       }
 
-      // Save station info in offline storage for future use
-      await _offlineStorage.cacheStation(tappedStation, {'name': stationName});
+      // Save station info in offline cache using the new OfflineManagerService
+      await _offlineManager.cacheStation(tappedStation, {'name': stationName});
 
       // Set this station as selected in the provider
       clusteredMapProvider.selectStation(tappedStation);
@@ -316,24 +323,103 @@ class MapTapHandler {
 
       // Show the info panel for the selected station
       print("Showing info panel for station: ${tappedStation.stationId}");
-      _showInfoPanel(
-        tappedStation,
-        clusteredMapProvider,
-        stationProvider,
-        mapProvider,
-      );
+
+      // Now use the offline-aware station info panel instead
+      final isConnected = await _connectionMonitor.testConnection();
+      final isOfflineMode = _offlineManager.offlineModeEnabled;
+
+      if (!isConnected || isOfflineMode) {
+        // Show offline-aware panel in offline mode
+        _showOfflineAwareInfoPanel(
+          tappedStation,
+          clusteredMapProvider,
+          stationProvider,
+          mapProvider,
+        );
+      } else {
+        // Show regular panel in online mode
+        _showInfoPanel(
+          tappedStation,
+          clusteredMapProvider,
+          stationProvider,
+          mapProvider,
+        );
+      }
     } catch (e) {
       print("Error handling station tap: $e");
     }
   }
 
-  /// Show the stream info panel for the selected station
-  void _showInfoPanel(
+  /// Show the offline-aware stream info panel
+  Future<void> _showOfflineAwareInfoPanel(
     MapStation station,
     EnhancedClusteredMapProvider clusteredMapProvider,
     StationProvider stationProvider,
     MapProvider mapProvider,
-  ) {
+  ) async {
+    // Make method async
+    try {
+      // Remove existing panel first
+      _removeInfoPanel();
+
+      print(
+        "Creating offline-aware info panel for station: ${station.stationId}",
+      );
+
+      // Find the overlay to add our widget to
+      final overlay = Overlay.of(context);
+
+      // Create the offline-aware panel
+      final offlineAwarePanel = OfflineAwareStationInfoPanel(
+        station: station,
+        onClose: () {
+          // When closed, deselect the station and remove the panel
+          print("Closing info panel");
+          clusteredMapProvider.deselectStation();
+          _removeInfoPanel();
+        },
+        onAddToFavorites:
+            onStationAddedToFavorites != null
+                ? (station) async {
+                  // Handle adding to favorites with offline awareness
+                  final success = await _handleAddToFavorites(station);
+                  if (success) {
+                    _removeInfoPanel();
+                    await Future.delayed(const Duration(milliseconds: 300));
+                    onStationAddedToFavorites!();
+                    Navigator.of(context).pop();
+                  }
+                }
+                : null,
+        onViewForecast: (reachId, stationName) {
+          // Navigate to the forecast page
+          Navigator.pushNamed(
+            context,
+            '/forecast',
+            arguments: {'reachId': reachId, 'stationName': stationName},
+          );
+        },
+      );
+
+      // Create an overlay entry to show the panel
+      _overlayEntry = OverlayEntry(builder: (context) => offlineAwarePanel);
+
+      // Add the entry to the overlay
+      overlay.insert(_overlayEntry!);
+      print("Offline-aware info panel inserted into overlay");
+    } catch (e) {
+      print("Error showing offline-aware info panel: $e");
+    }
+  }
+
+  /// Show the regular stream info panel for the selected station (online mode)
+  Future<void> _showInfoPanel(
+    MapStation station,
+    EnhancedClusteredMapProvider clusteredMapProvider,
+    StationProvider stationProvider,
+    MapProvider mapProvider,
+  ) async {
+    // Make method async
     try {
       // Remove existing panel first
       _removeInfoPanel();
@@ -346,17 +432,19 @@ class MapTapHandler {
       // Determine the display name before creating the panel
       String displayName = station.name ?? "";
 
-      // If station name is empty, try to get a name from offline storage
+      // If station name is empty, try to get a name from cache
       if (displayName.isEmpty) {
         try {
-          // This is a simplified example - in reality you might want to do this asynchronously
-          // and update the UI after getting the name
-          final cachedName = _offlineStorage.getStationName(
+          // Try to get cached station data - needs to be awaited
+          final cachedStation = await _offlineManager.getCachedStation(
             station.stationId,
-            fallback: "Untitled Stream",
+            // Remove the ignoreExpiry parameter since it doesn't exist
           );
-          if (cachedName.isNotEmpty) {
-            displayName = cachedName;
+
+          if (cachedStation != null &&
+              cachedStation['station'] != null &&
+              cachedStation['station']['name'] != null) {
+            displayName = cachedStation['station']['name'] as String;
           } else {
             displayName = "Untitled Stream";
           }
@@ -369,7 +457,7 @@ class MapTapHandler {
       // Create a new info panel with the determined display name
       _currentInfoPanel = StreamInfoPanel(
         station: station,
-        displayName: displayName, // Pass the display name here
+        displayName: displayName,
         onClose: () {
           // When closed, deselect the station and remove the panel
           print("Closing info panel");
@@ -377,82 +465,14 @@ class MapTapHandler {
           _removeInfoPanel();
         },
         onAddToFavorites: (station) async {
-          // Check if user is logged in using the stored provider reference
-          final user = _authProvider.currentUser;
-          if (user == null) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('You need to be logged in to add favorites'),
-                duration: Duration(seconds: 2),
-              ),
-            );
-            return;
-          }
-
-          try {
-            // Add station to favorites using the stored provider reference
-            print("Adding station ${station.stationId} to favorites");
-
-            // Use the display name that was passed to the panel
-            final success = await _favoritesProvider.addFavoriteFromStation(
-              user.uid,
-              station,
-              displayName: displayName, // Use the same display name
-              description: "Added from map view",
-            );
-
-            if (success) {
-              // Show success message
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('Added $displayName to favorites'),
-                  duration: const Duration(seconds: 2),
-                ),
-              );
-
-              // Close the info panel
-              _removeInfoPanel();
-
-              // Wait a moment before calling the callback
-              await Future.delayed(const Duration(milliseconds: 300));
-
-              // Execute callback if provided
-              if (onStationAddedToFavorites != null) {
-                print("Executing onStationAddedToFavorites callback");
-                onStationAddedToFavorites!();
-
-                // Navigate back to favorites page
-                Navigator.of(context).pop();
-              }
-            } else {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text(
-                    'Failed to add to favorites. Please try again.',
-                  ),
-                  duration: Duration(seconds: 2),
-                ),
-              );
-            }
-          } catch (e) {
-            print("Error adding station to favorites: $e");
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('Error: ${e.toString()}'),
-                duration: const Duration(seconds: 3),
-              ),
-            );
-          }
+          await _handleAddToFavorites(station);
         },
         onViewForecast: (reachId, stationName) {
           // Navigate to the forecast page
           Navigator.pushNamed(
             context,
             '/forecast',
-            arguments: {
-              'reachId': reachId,
-              'stationName': displayName,
-            }, // Use the same display name
+            arguments: {'reachId': reachId, 'stationName': displayName},
           );
         },
       );
@@ -465,6 +485,65 @@ class MapTapHandler {
       print("Info panel inserted into overlay");
     } catch (e) {
       print("Error showing info panel: $e");
+    }
+  }
+
+  /// Helper method to handle adding to favorites
+  Future<bool> _handleAddToFavorites(MapStation station) async {
+    // Check if user is logged in using the stored provider reference
+    final user = _authProvider.currentUser;
+    if (user == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('You need to be logged in to add favorites'),
+          duration: Duration(seconds: 2),
+        ),
+      );
+      return false;
+    }
+
+    try {
+      // Add station to favorites using the stored provider reference
+      print("Adding station ${station.stationId} to favorites");
+
+      // Use the station name
+      final displayName = station.name ?? "Untitled Stream";
+
+      final success = await _favoritesProvider.addFavoriteFromStation(
+        user.uid,
+        station,
+        displayName: displayName,
+        description: "Added from map view",
+      );
+
+      if (success) {
+        // Show success message
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Added $displayName to favorites'),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+
+        return true;
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Failed to add to favorites. Please try again.'),
+            duration: Duration(seconds: 2),
+          ),
+        );
+        return false;
+      }
+    } catch (e) {
+      print("Error adding station to favorites: $e");
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error: ${e.toString()}'),
+          duration: const Duration(seconds: 3),
+        ),
+      );
+      return false;
     }
   }
 

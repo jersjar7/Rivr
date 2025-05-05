@@ -2,6 +2,8 @@
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:rivr/core/repositories/offline_storage_repository.dart';
+import 'package:rivr/features/favorites/presentation/providers/favorites_provider.dart';
 import '../../domain/entities/map_station.dart';
 import '../../../../core/utils/location_utils.dart';
 import '../../../../core/widgets/loading_indicator.dart';
@@ -9,8 +11,6 @@ import '../../../../common/data/remote/reach_service.dart';
 import '../../../../core/error/app_exception.dart';
 import '../../../../core/error/error_handler.dart';
 import '../../../../features/auth/presentation/providers/auth_provider.dart';
-import '../../../../features/favorites/presentation/providers/favorites_provider.dart';
-import '../../../../features/offline/data/repositories/offline_storage_repository.dart';
 
 class StreamInfoPanel extends StatefulWidget {
   final MapStation station;

@@ -56,13 +56,11 @@ class _DownloadCurrentRegionPageState extends State<DownloadCurrentRegionPage> {
   Widget _buildMapboxMap() {
     return MapWidget(
       key: const ValueKey('mapPreview'),
-      // Updated to use the correct parameter names for Mapbox SDK
-      accessToken: MapConstants.accessToken,
+      styleUri: MapConstants.defaultMapStyle,
       cameraOptions: CameraOptions(
         center: MapConstants.defaultCenter,
         zoom: MapConstants.defaultZoom,
       ),
-      styleUri: MapConstants.defaultMapStyle,
       onMapCreated: _onMapCreated,
     );
   }
@@ -70,10 +68,8 @@ class _DownloadCurrentRegionPageState extends State<DownloadCurrentRegionPage> {
   void _onMapCreated(MapboxMap mapboxMap) async {
     _mapboxMap = mapboxMap;
 
-    // Configure map settings using the updated API
-    // Note: These methods might need to be adjusted based on the exact Mapbox SDK version
     try {
-      // Enable gestures
+      // Enable gestures with the updated API
       await mapboxMap.gestures.updateSettings(
         GesturesSettings(
           scrollEnabled: true,
@@ -85,12 +81,26 @@ class _DownloadCurrentRegionPageState extends State<DownloadCurrentRegionPage> {
 
       // Set attribution position
       await mapboxMap.attribution.updateSettings(
-        AttributionSettings(position: OrnamentPosition(left: 10, bottom: 10)),
+        AttributionSettings(
+          position: OrnamentPosition(
+            top: null,
+            left: 10,
+            bottom: 10,
+            right: null,
+          ),
+        ),
       );
 
       // Set compass position
       await mapboxMap.compass.updateSettings(
-        CompassSettings(position: OrnamentPosition(right: 10, top: 10)),
+        CompassSettings(
+          position: OrnamentPosition(
+            top: 10,
+            left: null,
+            bottom: null,
+            right: 10,
+          ),
+        ),
       );
 
       // Wait a bit for the map to fully initialize

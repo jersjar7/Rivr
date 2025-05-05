@@ -50,7 +50,6 @@ class OfflineAwareContent extends StatefulWidget {
 class _OfflineAwareContentState extends State<OfflineAwareContent> {
   bool _isLoading = true;
   bool _hasCachedData = false;
-  bool _hasCheckedCache = false;
   bool _isConnected = true;
 
   @override
@@ -88,7 +87,6 @@ class _OfflineAwareContentState extends State<OfflineAwareContent> {
       setState(() {
         _isConnected = isConnected && !forcedOffline;
         _hasCachedData = hasCachedData;
-        _hasCheckedCache = true;
         _isLoading = false;
       });
     }

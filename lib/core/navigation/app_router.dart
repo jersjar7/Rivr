@@ -16,9 +16,20 @@ import '../../features/forecast/presentation/pages/forecast_page.dart';
 import '../../features/settings/presentation/pages/biometric_settings_page.dart';
 import '../pages/offline_manager_page.dart';
 import '../pages/download_current_region_page.dart';
+import 'offline_routes.dart';
 
 class AppRouter {
   static Route<dynamic> generateRoute(RouteSettings settings) {
+    // First check if it's an offline route
+    final offlineRoutes = OfflineRoutes.getRoutes();
+    if (offlineRoutes.containsKey(settings.name)) {
+      return MaterialPageRoute(
+        builder: offlineRoutes[settings.name]!,
+        settings: settings,
+      );
+    }
+
+    // Handle other routes
     switch (settings.name) {
       case '/':
         return MaterialPageRoute(builder: (_) => const SplashPage());
@@ -85,10 +96,11 @@ class AppRouter {
       case '/auth_success':
         return MaterialPageRoute(builder: (_) => const FavoritesPage());
 
-      // Offline routes
+      // Offline manager route
       case '/offline_manager':
         return MaterialPageRoute(builder: (_) => const OfflineManagerPage());
 
+      // Download current region route
       case '/offline/download-current-region':
         return MaterialPageRoute(
           builder: (_) => const DownloadCurrentRegionPage(),

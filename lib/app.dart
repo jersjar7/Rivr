@@ -28,28 +28,37 @@ class RivrApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => ReachProvider()),
         // Any other providers that are not registered in main.dart
       ],
-      child: MaterialApp(
-        title: 'Rivr',
-        theme: ThemeData(
-          primaryColor: const Color(0xFF2B5876),
-          colorScheme: ColorScheme.fromSwatch().copyWith(
-            primary: const Color(0xFF2B5876),
-            secondary: const Color(0xFF4E4376),
-          ),
-        ),
-        initialRoute: '/',
-        onGenerateRoute: AppRouter.generateRoute,
-        builder: (context, child) {
-          // Add global banners at the top of the app (connection status and offline mode)
-          return Column(
-            children: [
-              // Network connection banner
-              const ConnectionStatusBanner(),
-              // Offline mode banner
-              const OfflineModeBanner(),
-              // Main content
-              Expanded(child: child!),
-            ],
+      child: Consumer<OfflineManagerService>(
+        builder: (context, offlineManager, child) {
+          // Initialize offline manager on first build
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            offlineManager.refreshCacheStats();
+          });
+
+          return MaterialApp(
+            title: 'Rivr',
+            theme: ThemeData(
+              primaryColor: const Color(0xFF2B5876),
+              colorScheme: ColorScheme.fromSwatch().copyWith(
+                primary: const Color(0xFF2B5876),
+                secondary: const Color(0xFF4E4376),
+              ),
+            ),
+            initialRoute: '/',
+            onGenerateRoute: AppRouter.generateRoute,
+            builder: (context, child) {
+              // Add global banners at the top of the app (connection status and offline mode)
+              return Column(
+                children: [
+                  // Network connection banner
+                  const ConnectionStatusBanner(),
+                  // Offline mode banner
+                  const OfflineModeBanner(),
+                  // Main content
+                  Expanded(child: child!),
+                ],
+              );
+            },
           );
         },
       ),

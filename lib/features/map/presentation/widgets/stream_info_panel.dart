@@ -186,7 +186,35 @@ class _StreamInfoPanelState extends State<StreamInfoPanel> {
   }
 
   Future<void> _addToFavorites(MapStation station) async {
-    // Show dialog to add a note first
+    // Check if we need to prompt for a name first
+    String displayName = _getDisplayName();
+    bool isDefaultName =
+        displayName.startsWith('Stream ') &&
+        displayName.substring(7).trim() == station.stationId.toString();
+
+    // If using the default name pattern, show name input dialog first
+    if (isDefaultName) {
+      final customName = await _showNameInputDialog();
+
+      // If user canceled the name dialog, abort the process
+      if (customName == null) return;
+
+      // Use the provided name and cache it
+      displayName = customName;
+
+      // Cache the custom name for this station
+      if (_reachData != null) {
+        final Map<String, dynamic> updatedData = Map.from(_reachData!);
+        updatedData['name'] = customName;
+        await _offlineStorage.cacheStation(station, updatedData);
+      } else {
+        // If no _reachData exists yet, create a basic one with the name
+        final Map<String, dynamic> newData = {'name': customName};
+        await _offlineStorage.cacheStation(station, newData);
+      }
+    }
+
+    // Show dialog to add a note
     await _showAddNoteDialog();
 
     // After dialog is closed, proceed with adding to favorites
@@ -199,14 +227,11 @@ class _StreamInfoPanelState extends State<StreamInfoPanel> {
     final user = authProvider.currentUser;
     if (user != null) {
       try {
-        // IMPORTANT: Get the exact display name as shown in the panel
-        final displayName = _getDisplayName();
-
-        // Add station to favorites, passing the display name AND description
+        // Add station to favorites with our displayName
         final success = await favoritesProvider.addFavoriteFromStation(
           user.uid,
           station,
-          displayName: displayName, // Use the name from API or fallback
+          displayName: displayName, // Use custom name if provided
           description: _note,
         );
 
@@ -254,6 +279,60 @@ class _StreamInfoPanelState extends State<StreamInfoPanel> {
         );
       }
     }
+  }
+
+  Future<String?> _showNameInputDialog() {
+    final TextEditingController nameController = TextEditingController();
+
+    return showDialog<String>(
+      context: context,
+      barrierDismissible: false, // User must take an action
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Name This Stream'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'This stream does not have a name. Please assign it a name for your device\'s use:',
+                style: TextStyle(color: Colors.grey[700], fontSize: 14),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: nameController,
+                decoration: const InputDecoration(
+                  hintText: 'Enter a name for this stream',
+                  border: OutlineInputBorder(),
+                ),
+                autofocus: true,
+                maxLength: 100,
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop(); // Cancel
+              },
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                // Validate input - don't allow empty names
+                if (nameController.text.trim().isNotEmpty) {
+                  Navigator.of(context).pop(nameController.text.trim());
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Please enter a name')),
+                  );
+                }
+              },
+              child: const Text('Save Name'),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   // Show dialog to add a note before adding to favorites

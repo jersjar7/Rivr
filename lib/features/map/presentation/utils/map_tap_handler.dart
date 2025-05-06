@@ -4,6 +4,7 @@ import 'dart:math' as Math;
 import 'package:flutter/material.dart';
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
 import 'package:provider/provider.dart';
+import 'package:rivr/core/repositories/offline_storage_repository.dart';
 import 'package:rivr/features/map/domain/entities/map_station.dart';
 import 'package:rivr/features/auth/presentation/providers/auth_provider.dart';
 import 'package:rivr/features/favorites/presentation/providers/favorites_provider.dart';
@@ -358,6 +359,60 @@ class MapTapHandler {
     }
   }
 
+  Future<String?> _showNameInputDialog(MapStation station) {
+    final TextEditingController nameController = TextEditingController();
+
+    return showDialog<String>(
+      context: context,
+      barrierDismissible: false, // User must take an action
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Name This Stream'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'This stream does not have a name. Please assign it a name for your device\'s use:',
+                style: TextStyle(color: Colors.grey[700], fontSize: 14),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: nameController,
+                decoration: const InputDecoration(
+                  hintText: 'Enter a name for this stream',
+                  border: OutlineInputBorder(),
+                ),
+                autofocus: true,
+                maxLength: 100,
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop(); // Cancel
+              },
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                // Validate input - don't allow empty names
+                if (nameController.text.trim().isNotEmpty) {
+                  Navigator.of(context).pop(nameController.text.trim());
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Please enter a name')),
+                  );
+                }
+              },
+              child: const Text('Save Name'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   /// Helper method to handle adding to favorites
   Future<bool> _handleAddToFavorites(MapStation station) async {
     // Check if user is logged in using the stored provider reference
@@ -373,11 +428,31 @@ class MapTapHandler {
     }
 
     try {
+      // First, determine if we need to show the name input dialog
+      String displayName = station.name ?? "";
+      bool needsName =
+          displayName.isEmpty ||
+          displayName == "Stream ${station.stationId}" ||
+          displayName == "Station ${station.stationId}";
+
+      // If we need a name, prompt the user
+      if (needsName) {
+        final customName = await _showNameInputDialog(station);
+
+        // If user canceled the name dialog, abort the process
+        if (customName == null) return false;
+
+        // Use the custom name
+        displayName = customName;
+
+        // Cache the custom name
+        final offlineStorage = OfflineStorageRepository();
+        final basicData = {'name': customName};
+        await offlineStorage.cacheStation(station, basicData);
+      }
+
       // Add station to favorites using the stored provider reference
       print("Adding station ${station.stationId} to favorites");
-
-      // Use the station name
-      final displayName = station.name ?? "";
 
       final success = await _favoritesProvider.addFavoriteFromStation(
         user.uid,

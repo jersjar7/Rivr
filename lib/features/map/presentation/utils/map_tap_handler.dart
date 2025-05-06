@@ -366,51 +366,122 @@ class MapTapHandler {
       context: context,
       barrierDismissible: false, // User must take an action
       builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text('Name This Stream'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                'This stream does not have a name. Please assign it a name for your device\'s use:',
-                style: TextStyle(color: Colors.grey[700], fontSize: 14),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: nameController,
-                decoration: const InputDecoration(
-                  hintText: 'Enter a name for this stream',
-                  border: OutlineInputBorder(),
-                ),
-                autofocus: true,
-                maxLength: 100,
-              ),
-            ],
+        // Use this to get the screen size
+        final screenSize = MediaQuery.of(context).size;
+
+        return Dialog(
+          // This alignment positions the dialog higher on the screen
+          // The default is Alignment.center (0.0, 0.0)
+          // Using Alignment(0.0, -0.3) will move it up by 30% of the screen height
+          alignment: const Alignment(0.0, -0.3),
+
+          // Use Dialog's insetPadding to control positioning
+          insetPadding: const EdgeInsets.symmetric(
+            horizontal: 40.0,
+            vertical: 24.0,
           ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).pop(); // Cancel
-              },
-              child: const Text('Cancel'),
+
+          child: Container(
+            width: screenSize.width * 0.85, // Control width
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              mainAxisSize: MainAxisSize.min, // Keep dialog size to minimum
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // Title section
+                const Text(
+                  'Name This Stream',
+                  style: TextStyle(fontSize: 18.0, fontWeight: FontWeight.bold),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 16),
+
+                // Message
+                Text(
+                  'This stream does not have a name. Please assign it a name for your device\'s use:',
+                  style: TextStyle(color: Colors.grey[700], fontSize: 14),
+                ),
+                const SizedBox(height: 16),
+
+                // Text field
+                TextField(
+                  controller: nameController,
+                  decoration: const InputDecoration(
+                    hintText: 'Enter a name for this stream',
+                    border: OutlineInputBorder(),
+                  ),
+                  autofocus: true,
+                  maxLength: 100,
+                ),
+                const SizedBox(height: 16),
+
+                // Buttons
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    TextButton(
+                      onPressed: () {
+                        Navigator.of(context).pop(); // Cancel
+                      },
+                      child: const Text('Cancel'),
+                    ),
+                    const SizedBox(width: 8),
+                    ElevatedButton(
+                      onPressed: () {
+                        // Validate input - don't allow empty names
+                        if (nameController.text.trim().isNotEmpty) {
+                          Navigator.of(context).pop(nameController.text.trim());
+                        } else {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Please enter a name'),
+                            ),
+                          );
+                        }
+                      },
+                      child: const Text('Save Name'),
+                    ),
+                  ],
+                ),
+              ],
             ),
-            ElevatedButton(
-              onPressed: () {
-                // Validate input - don't allow empty names
-                if (nameController.text.trim().isNotEmpty) {
-                  Navigator.of(context).pop(nameController.text.trim());
-                } else {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Please enter a name')),
-                  );
-                }
-              },
-              child: const Text('Save Name'),
-            ),
-          ],
+          ),
         );
       },
     );
+  }
+
+  Future<String> _getDisplayNameFromCache(MapStation station) async {
+    try {
+      // Get the cached data, just like StreamInfoPanel._fetchReachData does
+      final offlineStorage = OfflineStorageRepository();
+      final cachedData = await offlineStorage.getCachedStation(
+        station.stationId,
+      );
+
+      // Check if we have a valid name in the cached data
+      if (cachedData != null &&
+          cachedData['apiData'] != null &&
+          cachedData['apiData'] is Map &&
+          cachedData['apiData']['name'] != null &&
+          cachedData['apiData']['name'].toString().trim().isNotEmpty) {
+        // Found a name in cache - return it
+        final cachedName = cachedData['apiData']['name'].toString();
+        print(
+          "DEBUG: Found cached name: '$cachedName' for station ${station.stationId}",
+        );
+        return cachedName;
+      }
+    } catch (e) {
+      print("DEBUG: Error getting cached display name: $e");
+    }
+
+    // If no name in cache or error occurred, return the station name or default
+    final stationName = station.name ?? "";
+    if (stationName.isEmpty) {
+      return "Stream ${station.stationId}";
+    }
+    return stationName;
   }
 
   /// Helper method to handle adding to favorites
@@ -428,12 +499,19 @@ class MapTapHandler {
     }
 
     try {
-      // First, determine if we need to show the name input dialog
-      String displayName = station.name ?? "";
+      // CRITICAL FIX: Get the display name from cache just like the StreamInfoPanel does
+      String displayName = await _getDisplayNameFromCache(station);
+      print("DEBUG: Display name from cache: '$displayName'");
+
+      // Check if this is a default/generated name
       bool needsName =
           displayName.isEmpty ||
           displayName == "Stream ${station.stationId}" ||
           displayName == "Station ${station.stationId}";
+
+      print(
+        "DEBUG: Station display name: '$displayName', needsName: $needsName",
+      );
 
       // If we need a name, prompt the user
       if (needsName) {
@@ -447,12 +525,40 @@ class MapTapHandler {
 
         // Cache the custom name
         final offlineStorage = OfflineStorageRepository();
-        final basicData = {'name': customName};
-        await offlineStorage.cacheStation(station, basicData);
+
+        // Try to get existing data first to preserve other fields
+        try {
+          final cachedData = await offlineStorage.getCachedStation(
+            station.stationId,
+          );
+          if (cachedData != null && cachedData['apiData'] != null) {
+            // Update existing cache data
+            final Map<String, dynamic> updatedData = Map.from(
+              cachedData['apiData'],
+            );
+            updatedData['name'] = customName;
+            await offlineStorage.cacheStation(station, updatedData);
+            print(
+              "DEBUG: Updated existing cache with custom name: $customName",
+            );
+          } else {
+            // Create new cache data
+            final basicData = {'name': customName};
+            await offlineStorage.cacheStation(station, basicData);
+            print("DEBUG: Created new cache with custom name: $customName");
+          }
+        } catch (e) {
+          // If error accessing cache, just create new basic data
+          print("DEBUG: Error accessing cache: $e");
+          final basicData = {'name': customName};
+          await offlineStorage.cacheStation(station, basicData);
+        }
       }
 
       // Add station to favorites using the stored provider reference
-      print("Adding station ${station.stationId} to favorites");
+      print(
+        "DEBUG: Adding station ${station.stationId} to favorites with name: $displayName",
+      );
 
       final success = await _favoritesProvider.addFavoriteFromStation(
         user.uid,
@@ -461,6 +567,7 @@ class MapTapHandler {
         description: "Added from map view",
       );
 
+      // Continue with existing implementation...
       if (success) {
         // Show success message
         ScaffoldMessenger.of(context).showSnackBar(

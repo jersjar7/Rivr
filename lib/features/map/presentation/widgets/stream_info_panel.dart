@@ -188,9 +188,9 @@ class _StreamInfoPanelState extends State<StreamInfoPanel> {
   Future<void> _addToFavorites(MapStation station) async {
     // Check if we need to prompt for a name first
     String displayName = _getDisplayName();
-    bool isDefaultName =
-        displayName.startsWith('Stream ') &&
-        displayName.substring(7).trim() == station.stationId.toString();
+
+    // Use an exact match comparison instead of startsWith
+    bool isDefaultName = displayName == 'Stream ${station.stationId}';
 
     // If using the default name pattern, show name input dialog first
     if (isDefaultName) {
@@ -214,7 +214,7 @@ class _StreamInfoPanelState extends State<StreamInfoPanel> {
       }
     }
 
-    // Show dialog to add a note
+    // Rest of method continues normally...
     await _showAddNoteDialog();
 
     // After dialog is closed, proceed with adding to favorites

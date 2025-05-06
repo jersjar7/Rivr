@@ -245,6 +245,10 @@ class MapTapHandler {
           "Found matching station in provider: ${tappedStation.stationId}, name: ${tappedStation.name}",
         );
 
+        print(
+          "MARKER TAPPED: Station ID: ${tappedStation.stationId}, Raw station name: '${tappedStation.name}'",
+        );
+
         // Create a new station with our determined name
         tappedStation = MapStation(
           stationId: tappedStation.stationId,

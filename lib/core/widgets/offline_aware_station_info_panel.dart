@@ -232,15 +232,21 @@ class _OfflineAwareStationInfoPanelState
 
   // Get a reliable display name - prioritizing API data over other sources
   String _getDisplayName() {
+    print("GET DISPLAY NAME CALLED: Station ID: ${widget.station.stationId}");
+
     // Prioritize API data name, then fall back to default
     if (_reachData != null &&
         _reachData!.containsKey('name') &&
-        _reachData!['name'] != null) {
+        _reachData!['name'] != null &&
+        _reachData!['name'].toString().trim().isNotEmpty) {
+      // Added empty string check
       final result = _reachData!['name'].toString();
+      print("DISPLAY NAME DECISION: Using API name: '$result'");
       print("DEBUG: _getDisplayName using name from API data: '$result'");
       return result;
     } else {
       final result = 'Stream ${widget.station.stationId}';
+      print("DISPLAY NAME DECISION: Using fallback name: '$result'");
       print("DEBUG: _getDisplayName using default ID-based name: '$result'");
       return result;
     }
@@ -499,7 +505,8 @@ class _OfflineAwareStationInfoPanelState
 
     if (_reachData != null &&
         _reachData!.containsKey('name') &&
-        _reachData!['name'] != null) {
+        _reachData!['name'] != null &&
+        _reachData!['name'].toString().trim().isNotEmpty) {
       // Use API data name
       streamName = _reachData!['name'].toString();
       print("DEBUG UI: Using name from API data: '$streamName'");
@@ -508,6 +515,26 @@ class _OfflineAwareStationInfoPanelState
       streamName = 'Stream ${widget.station.stationId}';
       print("DEBUG UI: No API name available, using default: '$streamName'");
     }
+
+    // Inside _buildInfoPanel method, right after determining streamName:
+    print(
+      "DISPLAY NAME DEBUG: Showing name '$streamName' for station ID ${widget.station.stationId}",
+    );
+    print("DISPLAY NAME DEBUG: API data name value: ${_reachData?['name']}");
+    print(
+      "DISPLAY NAME DEBUG: API data name type: ${_reachData?['name']?.runtimeType}",
+    );
+    print(
+      "DISPLAY NAME DEBUG: API data name empty check: ${_reachData?['name']?.toString().isEmpty}",
+    );
+    print(
+      "DISPLAY NAME DEBUG: API data name whitespace check: ${_reachData?['name']?.toString().trim().isEmpty}",
+    );
+
+    // Inside onTap handler for markers in MapTapHandler:
+    print(
+      "MARKER TAPPED: Station ID: ${widget.station.stationId}, Raw station name: '${widget.station.name}'",
+    );
 
     print("STATION INFO ROW: Using streamName='$streamName'");
     print("DEBUG UI: Building info panel with streamName: '$streamName'");

@@ -313,7 +313,7 @@ class FavoritesProvider with ChangeNotifier {
         print("Using provided displayName: $riverName");
       } else {
         // Try to get name from offline cache
-        riverName = "Untitled Stream"; // Default fallback
+        riverName = ""; // Default fallback
         try {
           // Check cached station data
           final cachedStation = await _offlineManager.getCachedStation(
@@ -336,7 +336,6 @@ class FavoritesProvider with ChangeNotifier {
           }
         } catch (e) {
           print("Error getting proper station name: $e");
-          // Keep the default "Untitled Stream"
         }
       }
 

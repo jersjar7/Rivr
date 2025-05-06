@@ -39,7 +39,7 @@ class FavoriteCard extends StatelessWidget {
       cardColor = AppColors.primaryColor;
     }
 
-    // Display name - use "Untitled Stream" as fallback if empty or just station ID
+    // Display name
     final displayName = _getDisplayName(favorite);
 
     // Check if this is a user-edited name or a default station ID name
@@ -316,8 +316,8 @@ class FavoriteCard extends StatelessWidget {
 
   // Get a display name for the river, using fallbacks if needed
   String _getDisplayName(Favorite favorite) {
-    // Simply return the name as-is if it exists, otherwise use a fallback
-    return favorite.name.isNotEmpty ? favorite.name : 'Untitled Stream';
+    // Simply return the name as-is, even if empty
+    return favorite.name;
   }
 
   // This would ideally come from real-time data
@@ -347,7 +347,9 @@ class FavoriteCard extends StatelessWidget {
             ),
             title: const Text('Remove Favorite'),
             content: Text(
-              'Are you sure you want to remove ${_getDisplayName(favorite)} from your favorites?',
+              favorite.name.isEmpty
+                  ? 'Are you sure you want to remove this river from your favorites?'
+                  : 'Are you sure you want to remove ${favorite.name} from your favorites?',
             ),
             actions: [
               TextButton(

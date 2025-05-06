@@ -22,10 +22,8 @@ class _EditFavoriteNameDialogState extends State<EditFavoriteNameDialog> {
   @override
   void initState() {
     super.initState();
-    // Initialize with current name or "Untitled Stream" if empty
-    final initialName =
-        widget.currentName.isEmpty ? 'Untitled Stream' : widget.currentName;
-    _nameController = TextEditingController(text: initialName);
+    // Initialize with current name, even if it's empty
+    _nameController = TextEditingController(text: widget.currentName);
   }
 
   @override
@@ -92,12 +90,8 @@ class _EditFavoriteNameDialogState extends State<EditFavoriteNameDialog> {
         ElevatedButton(
           onPressed: () {
             final newName = _nameController.text.trim();
-            if (newName.isEmpty) {
-              // Default to "Untitled Stream" if empty
-              Navigator.of(context).pop('Untitled Stream');
-            } else {
-              Navigator.of(context).pop(newName);
-            }
+            // Return the name as-is, even if empty
+            Navigator.of(context).pop(newName);
           },
           style: ElevatedButton.styleFrom(
             backgroundColor: theme.primaryColor,

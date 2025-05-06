@@ -305,7 +305,7 @@ class _OfflineAwareStationInfoPanelState
             children: [
               Expanded(
                 child: Text(
-                  widget.station.name ?? 'Station ${widget.station.stationId}',
+                  widget.station.name ?? '',
                   style: const TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
@@ -443,8 +443,8 @@ class _OfflineAwareStationInfoPanelState
   Widget _buildInfoPanel(ThemeData theme) {
     final streamName =
         _reachData != null && _reachData!.containsKey('name')
-            ? _reachData!['name'] as String
-            : (widget.station.name ?? 'Station ${widget.station.stationId}');
+            ? _reachData!['name'] as String? ?? ''
+            : (widget.station.name ?? '');
 
     String? riverClass;
     String? difficulty;

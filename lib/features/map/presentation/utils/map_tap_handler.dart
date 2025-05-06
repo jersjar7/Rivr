@@ -233,11 +233,6 @@ class MapTapHandler {
         stationName = (properties['properties'] as Map)['name'].toString();
       }
 
-      // If no name found or empty, use "Untitled Stream"
-      if (stationName.isEmpty) {
-        stationName = "Untitled Stream";
-      }
-
       print("Station name determined: $stationName");
 
       // Try to find the station in the provider's list
@@ -323,7 +318,7 @@ class MapTapHandler {
       final overlay = Overlay.of(context);
 
       // Determine the display name
-      String displayName = station.name ?? "Untitled Stream";
+      String displayName = station.name ?? "";
 
       // Create a new info panel
       _currentInfoPanel = StreamInfoPanel(
@@ -378,7 +373,7 @@ class MapTapHandler {
       print("Adding station ${station.stationId} to favorites");
 
       // Use the station name
-      final displayName = station.name ?? "Untitled Stream";
+      final displayName = station.name ?? "";
 
       final success = await _favoritesProvider.addFavoriteFromStation(
         user.uid,

@@ -142,19 +142,16 @@ class _StreamInfoPanelState extends State<StreamInfoPanel> {
   String _getDisplayName() {
     // First try to get name from API data
     if (_reachData != null && _reachData!.containsKey('name')) {
-      final name = _reachData!['name'] as String?;
-      if (name != null && name.isNotEmpty) {
-        return name;
-      }
+      return _reachData!['name'] as String? ?? '';
     }
 
-    // If no API name, try station name and check if it's empty
-    if (widget.station.name != null && widget.station.name!.isNotEmpty) {
+    // If no API name, use station name
+    if (widget.station.name != null) {
       return widget.station.name!;
     }
 
-    // If no station name or empty name, use "Untitled Stream" as fallback
-    return 'Untitled Stream';
+    // If neither exists, return empty string
+    return '';
   }
 
   Future<void> _addToFavorites(MapStation station) async {

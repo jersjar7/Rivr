@@ -72,9 +72,8 @@ class MapStationLocalDataSourceImpl implements MapStationLocalDataSource {
         final enhancedMap = Map<String, dynamic>.from(map);
 
         // ONLY replace if name is null or empty
-        if (enhancedMap['name'] == null ||
-            enhancedMap['name'].toString().isEmpty) {
-          enhancedMap['name'] = 'Untitled Stream';
+        if (enhancedMap['name'] == null) {
+          enhancedMap['name'] = ''; // Set to empty string
         }
 
         enhancedMap['type'] ??= 'river';
@@ -125,10 +124,9 @@ class MapStationLocalDataSourceImpl implements MapStationLocalDataSource {
         // Add default values for missing fields
         final enhancedMap = Map<String, dynamic>.from(map);
 
-        // Only use "Untitled Stream" for null or empty names
-        if (enhancedMap['name'] == null ||
-            enhancedMap['name'].toString().isEmpty) {
-          enhancedMap['name'] = 'Untitled Stream';
+        // Only name as it is
+        if (enhancedMap['name'] == null) {
+          enhancedMap['name'] = ''; // Empty string
         }
         enhancedMap['type'] ??= 'river';
         enhancedMap['color'] ??= '#2389DA';
@@ -207,10 +205,9 @@ class MapStationLocalDataSourceImpl implements MapStationLocalDataSource {
         // Add default values for missing fields
         final enhancedMap = Map<String, dynamic>.from(map);
 
-        // Only use "Untitled Stream" for null or empty names
-        if (enhancedMap['name'] == null ||
-            enhancedMap['name'].toString().isEmpty) {
-          enhancedMap['name'] = 'Untitled Stream';
+        // Only use name as it is
+        if (enhancedMap['name'] == null) {
+          enhancedMap['name'] = ''; // Empty string
         }
         enhancedMap['type'] ??= 'river';
         enhancedMap['color'] ??= '#2389DA';

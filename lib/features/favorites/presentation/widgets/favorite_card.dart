@@ -43,11 +43,13 @@ class FavoriteCard extends StatelessWidget {
     final displayName = _getDisplayName(favorite);
 
     // Check if this is a custom name by comparing with original API name
+    // Improved logic that handles null originalApiName better
     final isCustomName =
         favorite.originalApiName != null &&
-        favorite.originalApiName != 'null' &&
-        favorite.name != favorite.originalApiName;
+        favorite.name != favorite.originalApiName &&
+        favorite.originalApiName!.isNotEmpty;
 
+    // Debug print to track values
     print(
       "FavoriteCard DEBUG: name='${favorite.name}', originalApiName='${favorite.originalApiName}', isCustomName=$isCustomName",
     );

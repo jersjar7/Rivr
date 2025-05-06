@@ -342,57 +342,38 @@ class FavoritesProvider with ChangeNotifier {
                 apiData['name'].toString().isNotEmpty) {
               riverName = apiData['name'].toString();
               originalApiName = riverName; // Store the API name
+              print(
+                "DEBUG NAME: Got name '$riverName' from cached station data",
+              );
             }
           }
 
           // Check if station has name from another source
           if (station.name != null && station.name!.isNotEmpty) {
             riverName = station.name!;
-            originalApiName ??= station.name!;
+            if (originalApiName == null) {
+              originalApiName = station.name!;
+              print(
+                "DEBUG NAME: Using station.name as originalApiName: $originalApiName",
+              );
+            }
           }
         } catch (e) {
           print("Error getting proper station name: $e");
         }
       }
 
-      // Add debugging after the above code:
-      print(
-        "DEBUG NAME TRACKING: riverName='$riverName', originalApiName=${originalApiName == null ? 'null' : "'$originalApiName'"}",
-      );
-
-      // For the case where displayName is provided, we need to still track the originalApiName
-      if (displayName != null &&
-          displayName.isNotEmpty &&
-          originalApiName == null) {
-        // If we have a custom name but no original API name, try to determine the original name
-        try {
-          final cachedStation = await _offlineManager.getCachedStation(
-            station.stationId,
-          );
-          if (cachedStation != null && cachedStation['apiData'] != null) {
-            final apiData = cachedStation['apiData'];
-            if (apiData is Map<String, dynamic> &&
-                apiData.containsKey('name') &&
-                apiData['name'] != null &&
-                apiData['name'].toString().isNotEmpty) {
-              originalApiName = apiData['name'].toString();
-            }
-          }
-
-          // Fallback to station name if available
-          if (originalApiName == null &&
-              station.name != null &&
-              station.name!.isNotEmpty) {
-            originalApiName = station.name!;
-          }
-
-          print(
-            "DEBUG NAME TRACKING: After checking for original API name: originalApiName=${originalApiName == null ? 'null' : "'$originalApiName'"}",
-          );
-        } catch (e) {
-          print("Error determining original API name: $e");
-        }
+      // If we have a name but no original API name, set the original to the current name
+      if (riverName.isNotEmpty && originalApiName == null) {
+        originalApiName = riverName;
+        print(
+          "DEBUG NAME: Setting originalApiName to current riverName: $originalApiName",
+        );
       }
+
+      print(
+        "DEBUG NAME: Final values - riverName: '$riverName', originalApiName: '$originalApiName'",
+      );
 
       // Create favorite model
       final favorite = FavoriteModel(
@@ -412,8 +393,10 @@ class FavoritesProvider with ChangeNotifier {
       );
 
       print(
-        "Created favorite object: ${favorite.stationId}, position: ${favorite.position}, name: ${favorite.name}",
+        "Created favorite object: ${favorite.stationId}, position: ${favorite.position}, name: ${favorite.name}, originalApiName: ${favorite.originalApiName}",
       );
+
+      // Rest of the method remains unchanged...
 
       // Check if we're online or offline
       final bool isConnected = await _networkInfo.isConnected;
@@ -806,7 +789,8 @@ class FavoritesProvider with ChangeNotifier {
         imgNumber: favorite.imgNumber,
         lastUpdated: DateTime.now().millisecondsSinceEpoch,
         originalApiName:
-            favorite.originalApiName, // Preserve the original API name
+            favorite
+                .originalApiName, // IMPORTANT: Preserve the original API name
       );
 
       print(

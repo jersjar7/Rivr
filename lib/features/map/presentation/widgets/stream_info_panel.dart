@@ -2,14 +2,14 @@
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:rivr/core/error/error_handler.dart';
+import 'package:rivr/core/error/exceptions.dart';
 import 'package:rivr/core/repositories/offline_storage_repository.dart';
 import 'package:rivr/features/favorites/presentation/providers/favorites_provider.dart';
 import '../../domain/entities/map_station.dart';
 import '../../../../core/utils/location_utils.dart';
 import '../../../../core/widgets/loading_indicator.dart';
 import '../../../../common/data/remote/reach_service.dart';
-import '../../../../core/error/app_exception.dart';
-import '../../../../core/error/error_handler.dart';
 import '../../../../features/auth/presentation/providers/auth_provider.dart';
 
 class StreamInfoPanel extends StatefulWidget {
@@ -18,7 +18,7 @@ class StreamInfoPanel extends StatefulWidget {
   final Future<void> Function(MapStation)? onAddToFavorites;
   final Function(String, String)? onViewForecast;
   final Function? onNavigateToFavorites;
-  final String displayName; // Add this property
+  final String? displayName; // Optional parameter
 
   const StreamInfoPanel({
     super.key,
@@ -27,7 +27,7 @@ class StreamInfoPanel extends StatefulWidget {
     this.onAddToFavorites,
     this.onViewForecast,
     this.onNavigateToFavorites,
-    required this.displayName, // Make it required
+    this.displayName, // Made optional
   });
 
   @override
@@ -67,6 +67,12 @@ class _StreamInfoPanelState extends State<StreamInfoPanel> {
   Future<void> _fetchReachData() async {
     if (!mounted) return;
 
+    print(
+      "DEBUG START: _fetchReachData for station ID: ${widget.station.stationId}",
+    );
+    print("DEBUG: Initial station name from widget: ${widget.station.name}");
+    print("DEBUG: Display name from widget: ${widget.displayName}");
+
     setState(() {
       _isLoading = true;
       _hasError = false;
@@ -77,51 +83,68 @@ class _StreamInfoPanelState extends State<StreamInfoPanel> {
 
     // First check if we have cached data for this station
     try {
+      print("DEBUG: Checking for cached data");
       final cachedData = await _offlineStorage.getCachedStation(
         widget.station.stationId,
       );
 
       if (cachedData != null && cachedData['apiData'] != null) {
-        if (mounted) {
-          setState(() {
-            _reachData = cachedData['apiData'];
-            _isLoading = false;
-          });
-
-          print(
-            "StreamInfoPanel: Using cached data for station ${widget.station.stationId}",
-          );
-          return;
+        print("DEBUG: Found cached data: ${cachedData['apiData']}");
+        if (cachedData['apiData'] is Map &&
+            cachedData['apiData']['name'] != null) {
+          print("DEBUG: Cached name: ${cachedData['apiData']['name']}");
+        } else {
+          print("DEBUG: No name found in cached data");
         }
+
+        if (!mounted) return;
+
+        setState(() {
+          _reachData = cachedData['apiData'];
+          _isLoading = false;
+        });
+
+        print(
+          "DEBUG: Using cached data, final display name: ${_getDisplayName()}",
+        );
+        return;
+      } else {
+        print("DEBUG: No cached data found or data is invalid");
       }
     } catch (e) {
-      print("Error checking cached data: $e");
+      print("DEBUG ERROR: Error checking cached data: $e");
       // Continue to fetch from API if cache check fails
     }
 
     try {
-      print("Fetching reach data for station ID: ${widget.station.stationId}");
+      print(
+        "DEBUG: Fetching fresh data from API for station ID: ${widget.station.stationId}",
+      );
       final reachService = ReachService();
       final reachId = widget.station.stationId.toString();
 
-      print("Making API request for reach ID: $reachId");
       final data = await reachService.fetchReach(reachId);
-      print("API response received for reach ID $reachId");
+      print("DEBUG: API response received: $data");
+      if (data != null && data is Map) {
+        print("DEBUG: API returned name: ${data['name']}");
+      }
 
       if (!mounted) return;
 
       // Cache the data for offline use
       await _offlineStorage.cacheStation(widget.station, data);
-      print("Cached data for station ${widget.station.stationId}");
+      print("DEBUG: Cached data for station ${widget.station.stationId}");
 
       setState(() {
         _reachData = data;
         _isLoading = false;
       });
 
-      print("StreamInfoPanel: Data loaded successfully");
+      print(
+        "DEBUG: Data loaded successfully, final display name: ${_getDisplayName()}",
+      );
     } catch (e) {
-      print("Error fetching reach data for ${widget.station.stationId}: $e");
+      print("DEBUG ERROR: Error fetching reach data: $e");
 
       if (!mounted) return;
 
@@ -136,22 +159,24 @@ class _StreamInfoPanelState extends State<StreamInfoPanel> {
         _errorRecovery = ErrorHandler.getRecoverySuggestion(exception);
       });
     }
+
+    print("DEBUG END: _fetchReachData");
   }
 
-  // Get the display name for the station, with fallbacks
+  // Get a reliable display name - prioritizing API data over other sources
   String _getDisplayName() {
-    // First try to get name from API data
-    if (_reachData != null && _reachData!.containsKey('name')) {
-      return _reachData!['name'] as String? ?? '';
+    // Prioritize API data name, then fall back to default
+    if (_reachData != null &&
+        _reachData!.containsKey('name') &&
+        _reachData!['name'] != null) {
+      final result = _reachData!['name'].toString();
+      print("DEBUG: _getDisplayName using name from API data: '$result'");
+      return result;
+    } else {
+      final result = 'Stream ${widget.station.stationId}';
+      print("DEBUG: _getDisplayName using default ID-based name: '$result'");
+      return result;
     }
-
-    // If no API name, use station name
-    if (widget.station.name != null) {
-      return widget.station.name!;
-    }
-
-    // If neither exists, return empty string
-    return '';
   }
 
   Future<void> _addToFavorites(MapStation station) async {
@@ -168,14 +193,14 @@ class _StreamInfoPanelState extends State<StreamInfoPanel> {
     final user = authProvider.currentUser;
     if (user != null) {
       try {
-        // IMPORTANT CHANGE: Get the exact display name as shown in the panel
+        // IMPORTANT: Get the exact display name as shown in the panel
         final displayName = _getDisplayName();
 
         // Add station to favorites, passing the display name AND description
         final success = await favoritesProvider.addFavoriteFromStation(
           user.uid,
           station,
-          displayName: displayName, // Pass the exact displayed name!
+          displayName: displayName, // Use the name from API or fallback
           description: _note,
         );
 
@@ -227,6 +252,7 @@ class _StreamInfoPanelState extends State<StreamInfoPanel> {
 
   // Show dialog to add a note before adding to favorites
   Future<void> _showAddNoteDialog() {
+    // Existing dialog implementation...
     return showDialog(
       context: context,
       builder:
@@ -318,6 +344,7 @@ class _StreamInfoPanelState extends State<StreamInfoPanel> {
   }
 
   Widget _buildErrorState() {
+    // Existing error state implementation...
     return Padding(
       padding: const EdgeInsets.all(16),
       child: Column(
@@ -329,7 +356,7 @@ class _StreamInfoPanelState extends State<StreamInfoPanel> {
             children: [
               Expanded(
                 child: Text(
-                  widget.displayName,
+                  _getDisplayName(), // Use our robust display name method
                   style: const TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
@@ -345,6 +372,7 @@ class _StreamInfoPanelState extends State<StreamInfoPanel> {
               ),
             ],
           ),
+          // Rest of error state implementation...
           const SizedBox(height: 16),
           Icon(
             _isNetworkError ? Icons.cloud_off : Icons.error_outline,
@@ -454,8 +482,22 @@ class _StreamInfoPanelState extends State<StreamInfoPanel> {
   }
 
   Widget _buildInfoPanel(ThemeData theme) {
-    // Use the display name from the widget directly
-    final streamName = widget.displayName;
+    // Prioritize API data name, then fall back to default
+    String streamName;
+
+    if (_reachData != null &&
+        _reachData!.containsKey('name') &&
+        _reachData!['name'] != null) {
+      // Use API data name
+      streamName = _reachData!['name'].toString();
+      print("DEBUG UI: Using name from API data: '$streamName'");
+    } else {
+      // Fall back to a station ID-based name
+      streamName = 'Stream ${widget.station.stationId}';
+      print("DEBUG UI: No API name available, using default: '$streamName'");
+    }
+
+    print("DEBUG UI: Building info panel with streamName: '$streamName'");
 
     String? riverClass;
     String? difficulty;
@@ -481,7 +523,7 @@ class _StreamInfoPanelState extends State<StreamInfoPanel> {
             children: [
               Expanded(
                 child: Text(
-                  streamName, // Use our display name
+                  streamName, // Use our determined name
                   style: const TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
@@ -497,6 +539,7 @@ class _StreamInfoPanelState extends State<StreamInfoPanel> {
               ),
             ],
           ),
+          // Rest of the panel implementation...
           const SizedBox(height: 8),
 
           // River classification if available
@@ -504,7 +547,7 @@ class _StreamInfoPanelState extends State<StreamInfoPanel> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               decoration: BoxDecoration(
-                color: theme.primaryColor.withOpacity(0.1),
+                color: theme.primaryColor.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(4),
               ),
               child: Row(

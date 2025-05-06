@@ -99,6 +99,13 @@ class OfflineManagerService extends ChangeNotifier {
     MapStation station,
     Map<String, dynamic>? apiData,
   ) async {
+    print("DEBUG CACHE: Caching station ${station.stationId}");
+    print("DEBUG CACHE: Station name: ${station.name}");
+    print("DEBUG CACHE: API data: $apiData");
+    if (apiData != null) {
+      print("DEBUG CACHE: API data name: ${apiData['name']}");
+    }
+
     if (apiData == null) return;
 
     final stationKey = 'station_${station.stationId}';
@@ -117,6 +124,8 @@ class OfflineManagerService extends ChangeNotifier {
       'cachedAt': DateTime.now().millisecondsSinceEpoch,
     }, duration: const Duration(days: 30));
 
+    print("DEBUG CACHE: Station cached successfully");
+
     // Use a debounce for non-critical operations like updating stats
     _debounceTimer?.cancel();
     _debounceTimer = Timer(const Duration(milliseconds: 500), () {
@@ -126,8 +135,28 @@ class OfflineManagerService extends ChangeNotifier {
 
   /// Get cached station data
   Future<Map<String, dynamic>?> getCachedStation(int stationId) async {
+    print("DEBUG CACHE GET: Getting cached station $stationId");
     final stationKey = 'station_$stationId';
-    return await _cacheService.get<Map<String, dynamic>>(stationKey);
+    final data = await _cacheService.get<Map<String, dynamic>>(stationKey);
+
+    if (data != null) {
+      print("DEBUG CACHE GET: Found cached data");
+      if (data['apiData'] != null) {
+        print("DEBUG CACHE GET: API data: ${data['apiData']}");
+        if (data['apiData'] is Map && data['apiData']['name'] != null) {
+          print("DEBUG CACHE GET: Cached API name: ${data['apiData']['name']}");
+        }
+      }
+      if (data['station'] != null && data['station']['name'] != null) {
+        print(
+          "DEBUG CACHE GET: Cached station name: ${data['station']['name']}",
+        );
+      }
+    } else {
+      print("DEBUG CACHE GET: No cached data found");
+    }
+
+    return data;
   }
 
   /// Cache forecast data

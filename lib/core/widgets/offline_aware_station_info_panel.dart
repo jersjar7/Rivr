@@ -2,12 +2,12 @@
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:rivr/core/error/error_handler.dart';
+import 'package:rivr/core/error/exceptions.dart';
 import '../../features/map/domain/entities/map_station.dart';
 import '../utils/location_utils.dart';
 import '../widgets/loading_indicator.dart';
 import '../../common/data/remote/reach_service.dart';
-import '../error/app_exception.dart';
-import '../error/error_handler.dart';
 import '../../features/auth/presentation/providers/auth_provider.dart';
 import '../../features/favorites/presentation/providers/favorites_provider.dart';
 import '../../features/favorites/domain/entities/favorite.dart';
@@ -66,6 +66,11 @@ class _OfflineAwareStationInfoPanelState
   Future<void> _fetchReachData() async {
     if (!mounted) return;
 
+    print(
+      "DEBUG START: OfflineAwareStationInfoPanel._fetchReachData for station ID: ${widget.station.stationId}",
+    );
+    print("DEBUG: Initial station name from widget: ${widget.station.name}");
+
     setState(() {
       _isLoading = true;
       _hasError = false;
@@ -82,11 +87,20 @@ class _OfflineAwareStationInfoPanelState
     );
 
     // Check for cached data first
+    print("DEBUG: Checking for cached data with offlineManager");
     final cachedData = await offlineManager.getCachedStation(
       widget.station.stationId,
     );
 
     if (cachedData != null && cachedData['apiData'] != null) {
+      print("DEBUG: Found cached data: ${cachedData['apiData']}");
+      if (cachedData['apiData'] is Map &&
+          cachedData['apiData']['name'] != null) {
+        print("DEBUG: Cached name: ${cachedData['apiData']['name']}");
+      } else {
+        print("DEBUG: No name found in cached data");
+      }
+
       // We have cached data, use it
       if (!mounted) return;
 
@@ -96,33 +110,43 @@ class _OfflineAwareStationInfoPanelState
         _usedOfflineData = true;
       });
 
-      print("StationInfoPanel: Using cached data");
+      print("DEBUG: Using cached data");
       return;
+    } else {
+      print("DEBUG: No cached data found or data is invalid");
     }
 
     // No cached data, try to fetch from API
     try {
-      print("Fetching reach data for station ID: ${widget.station.stationId}");
+      print(
+        "DEBUG: Fetching fresh data from API for station ID: ${widget.station.stationId}",
+      );
       final reachService = ReachService();
       final reachId = widget.station.stationId.toString();
 
-      print("Making API request for reach ID: $reachId");
+      print("DEBUG: Making API request for reach ID: $reachId");
       final data = await reachService.fetchReach(reachId);
-      print("API response received for reach ID $reachId");
+      print("DEBUG: API response received for reach ID $reachId: $data");
+      if (data != null && data is Map) {
+        print("DEBUG: API returned name: ${data['name']}");
+      }
 
       if (!mounted) return;
 
       // Cache the data for offline use
       offlineManager.cacheStation(widget.station, data);
+      print("DEBUG: Cached data for station ${widget.station.stationId}");
 
       setState(() {
         _reachData = data;
         _isLoading = false;
       });
 
-      print("StationInfoPanel: Data loaded successfully");
+      print("DEBUG: Data loaded successfully");
     } catch (e) {
-      print("Error fetching reach data for ${widget.station.stationId}: $e");
+      print(
+        "DEBUG ERROR: Error fetching reach data for ${widget.station.stationId}: $e",
+      );
 
       if (!mounted) return;
 
@@ -137,6 +161,8 @@ class _OfflineAwareStationInfoPanelState
         _errorRecovery = ErrorHandler.getRecoverySuggestion(exception);
       });
     }
+
+    print("DEBUG END: OfflineAwareStationInfoPanel._fetchReachData");
   }
 
   Future<void> _addToFavorites(MapStation station) async {
@@ -152,9 +178,12 @@ class _OfflineAwareStationInfoPanelState
 
     final user = authProvider.currentUser;
     if (user != null) {
+      // Get the station name from API data or use a fallback
+      final displayName = _getDisplayName();
+
       final favorite = Favorite(
         stationId: station.stationId.toString(),
-        name: station.name ?? 'Station ${station.stationId}',
+        name: displayName,
         userId: user.uid,
         position: 0, // This will be updated by the provider
         color: station.color,
@@ -174,7 +203,7 @@ class _OfflineAwareStationInfoPanelState
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Added ${station.name ?? "Station"} to favorites'),
+            content: Text('Added $displayName to favorites'),
             duration: const Duration(
               seconds: 1,
             ), // Short duration since we're navigating away
@@ -198,6 +227,22 @@ class _OfflineAwareStationInfoPanelState
           const SnackBar(content: Text('Please log in to add favorites')),
         );
       }
+    }
+  }
+
+  // Get a reliable display name - prioritizing API data over other sources
+  String _getDisplayName() {
+    // Prioritize API data name, then fall back to default
+    if (_reachData != null &&
+        _reachData!.containsKey('name') &&
+        _reachData!['name'] != null) {
+      final result = _reachData!['name'].toString();
+      print("DEBUG: _getDisplayName using name from API data: '$result'");
+      return result;
+    } else {
+      final result = 'Stream ${widget.station.stationId}';
+      print("DEBUG: _getDisplayName using default ID-based name: '$result'");
+      return result;
     }
   }
 
@@ -258,6 +303,16 @@ class _OfflineAwareStationInfoPanelState
     print(
       "StationInfoPanel: Building UI with isLoading=$_isLoading, hasError=$_hasError, usedOfflineData=$_usedOfflineData",
     );
+    print(
+      "STATION INFO: Building panel for station ID: ${widget.station.stationId}",
+    );
+    print("STATION INFO: Station name property: '${widget.station.name}'");
+    if (_reachData != null && _reachData!.containsKey('name')) {
+      print("STATION INFO: API data name: '${_reachData!['name']}'");
+    } else {
+      print("STATION INFO: No name in API data");
+    }
+
     final theme = Theme.of(context);
 
     return Positioned(
@@ -305,7 +360,7 @@ class _OfflineAwareStationInfoPanelState
             children: [
               Expanded(
                 child: Text(
-                  widget.station.name ?? '',
+                  _getDisplayName(), // Use our robust display name method
                   style: const TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
@@ -411,8 +466,7 @@ class _OfflineAwareStationInfoPanelState
                     widget.onViewForecast != null
                         ? () => widget.onViewForecast!(
                           widget.station.stationId.toString(),
-                          widget.station.name ??
-                              'Station ${widget.station.stationId}',
+                          _getDisplayName(), // Use our robust display name method
                         )
                         : () {
                           Navigator.pushNamed(
@@ -421,8 +475,7 @@ class _OfflineAwareStationInfoPanelState
                             arguments: {
                               'reachId': widget.station.stationId.toString(),
                               'stationName':
-                                  widget.station.name ??
-                                  'Station ${widget.station.stationId}',
+                                  _getDisplayName(), // Use our display name method
                             },
                           );
                         },
@@ -441,10 +494,23 @@ class _OfflineAwareStationInfoPanelState
   }
 
   Widget _buildInfoPanel(ThemeData theme) {
-    final streamName =
-        _reachData != null && _reachData!.containsKey('name')
-            ? _reachData!['name'] as String? ?? ''
-            : (widget.station.name ?? '');
+    // Prioritize API data name, then fall back to default
+    String streamName;
+
+    if (_reachData != null &&
+        _reachData!.containsKey('name') &&
+        _reachData!['name'] != null) {
+      // Use API data name
+      streamName = _reachData!['name'].toString();
+      print("DEBUG UI: Using name from API data: '$streamName'");
+    } else {
+      // Fall back to a station ID-based name
+      streamName = 'Stream ${widget.station.stationId}';
+      print("DEBUG UI: No API name available, using default: '$streamName'");
+    }
+
+    print("STATION INFO ROW: Using streamName='$streamName'");
+    print("DEBUG UI: Building info panel with streamName: '$streamName'");
 
     String? riverClass;
     String? difficulty;
@@ -470,7 +536,7 @@ class _OfflineAwareStationInfoPanelState
             children: [
               Expanded(
                 child: Text(
-                  streamName,
+                  streamName, // Use our determined name
                   style: const TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
@@ -601,7 +667,7 @@ class _OfflineAwareStationInfoPanelState
                     widget.onViewForecast != null
                         ? () => widget.onViewForecast!(
                           widget.station.stationId.toString(),
-                          streamName,
+                          streamName, // Use the streamName we determined
                         )
                         : () {
                           Navigator.pushNamed(
@@ -609,7 +675,8 @@ class _OfflineAwareStationInfoPanelState
                             '/forecast',
                             arguments: {
                               'reachId': widget.station.stationId.toString(),
-                              'stationName': streamName,
+                              'stationName':
+                                  streamName, // Use the streamName we determined
                             },
                           );
                         },

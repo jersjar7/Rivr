@@ -256,7 +256,7 @@ class FavoritesProvider with ChangeNotifier {
     };
 
     print(
-      "_favoriteToJson: serializing - name='${favorite.name}', originalApiName='${favorite.originalApiName}'",
+      "_favoriteToJson DEBUG: name='${favorite.name}', saving originalApiName=${favorite.originalApiName}",
     );
     return json;
   }
@@ -276,7 +276,7 @@ class FavoritesProvider with ChangeNotifier {
     );
 
     print(
-      "_favoriteFromJson: deserializing - name='${favorite.name}', originalApiName='${favorite.originalApiName}'",
+      "_favoriteFromJson DEBUG: deserializing - name='${favorite.name}', originalApiName='${favorite.originalApiName}'",
     );
     return favorite;
   }
@@ -352,6 +352,45 @@ class FavoritesProvider with ChangeNotifier {
           }
         } catch (e) {
           print("Error getting proper station name: $e");
+        }
+      }
+
+      // Add debugging after the above code:
+      print(
+        "DEBUG NAME TRACKING: riverName='$riverName', originalApiName=${originalApiName == null ? 'null' : "'$originalApiName'"}",
+      );
+
+      // For the case where displayName is provided, we need to still track the originalApiName
+      if (displayName != null &&
+          displayName.isNotEmpty &&
+          originalApiName == null) {
+        // If we have a custom name but no original API name, try to determine the original name
+        try {
+          final cachedStation = await _offlineManager.getCachedStation(
+            station.stationId,
+          );
+          if (cachedStation != null && cachedStation['apiData'] != null) {
+            final apiData = cachedStation['apiData'];
+            if (apiData is Map<String, dynamic> &&
+                apiData.containsKey('name') &&
+                apiData['name'] != null &&
+                apiData['name'].toString().isNotEmpty) {
+              originalApiName = apiData['name'].toString();
+            }
+          }
+
+          // Fallback to station name if available
+          if (originalApiName == null &&
+              station.name != null &&
+              station.name!.isNotEmpty) {
+            originalApiName = station.name!;
+          }
+
+          print(
+            "DEBUG NAME TRACKING: After checking for original API name: originalApiName=${originalApiName == null ? 'null' : "'$originalApiName'"}",
+          );
+        } catch (e) {
+          print("Error determining original API name: $e");
         }
       }
 

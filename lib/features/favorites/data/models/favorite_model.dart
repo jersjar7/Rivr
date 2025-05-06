@@ -12,6 +12,7 @@ class FavoriteModel extends Favorite {
     super.description,
     super.imgNumber,
     super.lastUpdated,
+    super.originalApiName,
   });
 
   factory FavoriteModel.fromMap(Map<String, dynamic> map) {
@@ -24,6 +25,7 @@ class FavoriteModel extends Favorite {
       description: map['description'],
       imgNumber: map['imgNumber'],
       lastUpdated: map['lastUpdated'],
+      originalApiName: map['originalApiName'],
     );
   }
 
@@ -37,6 +39,7 @@ class FavoriteModel extends Favorite {
       'description': description,
       'imgNumber': imgNumber,
       'lastUpdated': lastUpdated ?? DateTime.now().millisecondsSinceEpoch,
+      'originalApiName': originalApiName, // Added field
     };
   }
 }

@@ -5,11 +5,13 @@ import 'package:flutter/material.dart';
 class EditFavoriteNameDialog extends StatefulWidget {
   final String currentName;
   final String stationId;
+  final String? originalApiName; // Added parameter
 
   const EditFavoriteNameDialog({
     super.key,
     required this.currentName,
     required this.stationId,
+    this.originalApiName, // New parameter
   });
 
   @override
@@ -56,8 +58,8 @@ class _EditFavoriteNameDialogState extends State<EditFavoriteNameDialog> {
             autofocus: true,
             maxLength: 50, // Reasonable character limit
           ),
-          if (widget.currentName.startsWith('Station ') ||
-              widget.currentName.isEmpty)
+          if (widget.originalApiName != null &&
+              widget.currentName != widget.originalApiName)
             Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
@@ -70,7 +72,7 @@ class _EditFavoriteNameDialogState extends State<EditFavoriteNameDialog> {
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      'This river has no official name. Your custom name will be saved locally.',
+                      'This river has a custom name. Original name: "${widget.originalApiName}"',
                       style: TextStyle(
                         fontSize: 12,
                         color: theme.primaryColor.withValues(alpha: 0.8),
@@ -87,6 +89,12 @@ class _EditFavoriteNameDialogState extends State<EditFavoriteNameDialog> {
           onPressed: () => Navigator.of(context).pop(),
           child: const Text('Cancel'),
         ),
+        if (widget.originalApiName != null &&
+            widget.currentName != widget.originalApiName)
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(widget.originalApiName),
+            child: const Text('Reset to Default'),
+          ),
         ElevatedButton(
           onPressed: () {
             final newName = _nameController.text.trim();

@@ -136,7 +136,6 @@ class DatabaseHelper {
     return tableInfo.isNotEmpty;
   }
 
-  // Create favorites table if it doesn't exist - can be called on demand
   Future<void> createFavoritesTable([Database? providedDb]) async {
     final db = providedDb ?? await database;
 
@@ -144,19 +143,20 @@ class DatabaseHelper {
       print("DEBUG: Creating favorites table");
       try {
         await db.execute('''
-          CREATE TABLE $tableFavorites (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            stationId TEXT NOT NULL,
-            name TEXT NOT NULL,
-            userId TEXT NOT NULL,
-            position INTEGER NOT NULL,
-            color TEXT,
-            description TEXT,
-            imgNumber INTEGER,
-            lastUpdated INTEGER NOT NULL,
-            UNIQUE(stationId, userId)
-          )
-        ''');
+        CREATE TABLE $tableFavorites (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          stationId TEXT NOT NULL,
+          name TEXT NOT NULL,
+          userId TEXT NOT NULL,
+          position INTEGER NOT NULL,
+          color TEXT,
+          description TEXT,
+          imgNumber INTEGER,
+          lastUpdated INTEGER NOT NULL,
+          originalApiName TEXT,
+          UNIQUE(stationId, userId)
+        )
+      ''');
         print("DEBUG: Favorites table created successfully");
       } catch (e) {
         print("ERROR: Failed to create favorites table: $e");
@@ -164,6 +164,28 @@ class DatabaseHelper {
       }
     } else {
       print("DEBUG: Favorites table already exists");
+
+      // Check if originalApiName column exists, and add it if it doesn't
+      try {
+        final tableInfo = await db.rawQuery(
+          'PRAGMA table_info($tableFavorites)',
+        );
+        final hasOriginalApiName = tableInfo.any(
+          (column) => column['name'] == 'originalApiName',
+        );
+
+        if (!hasOriginalApiName) {
+          print(
+            "DEBUG: Adding originalApiName column to existing favorites table",
+          );
+          await db.execute(
+            'ALTER TABLE $tableFavorites ADD COLUMN originalApiName TEXT',
+          );
+          print("DEBUG: originalApiName column added successfully");
+        }
+      } catch (e) {
+        print("ERROR: Failed to check/add originalApiName column: $e");
+      }
     }
   }
 

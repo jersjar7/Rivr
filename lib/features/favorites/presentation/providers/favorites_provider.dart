@@ -308,9 +308,10 @@ class FavoritesProvider with ChangeNotifier {
 
       // Determine station name with priority to displayName
       String riverName;
+      String? originalApiName;
+
       if (displayName != null && displayName.isNotEmpty) {
         riverName = displayName;
-        print("Using provided displayName: $riverName");
       } else {
         // Try to get name from offline cache
         riverName = ""; // Default fallback
@@ -327,12 +328,14 @@ class FavoritesProvider with ChangeNotifier {
                 apiData['name'] != null &&
                 apiData['name'].toString().isNotEmpty) {
               riverName = apiData['name'].toString();
+              originalApiName = riverName; // Store the API name
             }
           }
 
           // Check if station has name from another source
           if (station.name != null && station.name!.isNotEmpty) {
             riverName = station.name!;
+            originalApiName ??= station.name!;
           }
         } catch (e) {
           print("Error getting proper station name: $e");
@@ -349,6 +352,7 @@ class FavoritesProvider with ChangeNotifier {
         description: description,
         imgNumber: randomImgNumber,
         lastUpdated: DateTime.now().millisecondsSinceEpoch,
+        originalApiName: originalApiName, // Store the original API name
       );
 
       print(
@@ -731,7 +735,7 @@ class FavoritesProvider with ChangeNotifier {
       // Get the favorite
       final favorite = _favorites[favoriteIndex];
 
-      // Create updated favorite
+      // Create updated favorite - preserve original API name
       final updatedFavorite = FavoriteModel(
         stationId: favorite.stationId,
         name: newName,
@@ -741,6 +745,8 @@ class FavoritesProvider with ChangeNotifier {
         description: favorite.description,
         imgNumber: favorite.imgNumber,
         lastUpdated: DateTime.now().millisecondsSinceEpoch,
+        originalApiName:
+            favorite.originalApiName, // Preserve the original API name
       );
 
       // Update local list first for responsive UI

@@ -9,6 +9,7 @@ class Favorite {
   final String? description;
   final int? imgNumber;
   final int? lastUpdated;
+  final String? originalApiName;
 
   const Favorite({
     required this.stationId,
@@ -19,5 +20,6 @@ class Favorite {
     this.description,
     this.imgNumber,
     this.lastUpdated,
+    this.originalApiName,
   });
 }

@@ -42,9 +42,10 @@ class FavoriteCard extends StatelessWidget {
     // Display name
     final displayName = _getDisplayName(favorite);
 
-    // Check if this is a user-edited name or a default station ID name
-    final isDefaultName =
-        favorite.name.startsWith('Station ') || favorite.name.isEmpty;
+    // Check if this is a custom name by comparing with original API name
+    final isCustomName =
+        favorite.originalApiName != null &&
+        favorite.name != favorite.originalApiName;
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 16.0),
@@ -181,7 +182,7 @@ class FavoriteCard extends StatelessWidget {
                   ),
 
                   // Optional: Show indicator for custom-named rivers
-                  if (!isDefaultName)
+                  if (isCustomName)
                     Positioned(
                       top: 8,
                       left: 8,
@@ -389,6 +390,8 @@ class FavoriteCard extends StatelessWidget {
           (context) => EditFavoriteNameDialog(
             currentName: favorite.name,
             stationId: favorite.stationId,
+            originalApiName:
+                favorite.originalApiName, // Pass the original API name
           ),
     );
 

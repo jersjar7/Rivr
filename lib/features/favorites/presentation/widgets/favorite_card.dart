@@ -47,6 +47,11 @@ class FavoriteCard extends StatelessWidget {
         favorite.originalApiName != null &&
         favorite.name != favorite.originalApiName;
 
+    // Debug print to track values
+    print(
+      "FavoriteCard: stationId=${favorite.stationId}, name='${favorite.name}', originalApiName='${favorite.originalApiName}', isCustomName=$isCustomName",
+    );
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 16.0),
       child: Material(

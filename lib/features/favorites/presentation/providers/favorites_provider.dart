@@ -242,7 +242,7 @@ class FavoritesProvider with ChangeNotifier {
 
   // Convert Favorite to JSON
   Map<String, dynamic> _favoriteToJson(Favorite favorite) {
-    return {
+    final json = {
       'stationId': favorite.stationId,
       'name': favorite.name,
       'userId': favorite.userId,
@@ -251,12 +251,19 @@ class FavoritesProvider with ChangeNotifier {
       'description': favorite.description,
       'imgNumber': favorite.imgNumber,
       'lastUpdated': favorite.lastUpdated,
+      'originalApiName':
+          favorite.originalApiName, // Make sure this field is included
     };
+
+    print(
+      "_favoriteToJson: serializing - name='${favorite.name}', originalApiName='${favorite.originalApiName}'",
+    );
+    return json;
   }
 
   // Create Favorite from JSON
   Favorite _favoriteFromJson(Map<String, dynamic> json) {
-    return FavoriteModel(
+    final favorite = FavoriteModel(
       stationId: json['stationId'],
       name: json['name'],
       userId: json['userId'],
@@ -265,7 +272,13 @@ class FavoritesProvider with ChangeNotifier {
       description: json['description'],
       imgNumber: json['imgNumber'] ?? 1,
       lastUpdated: json['lastUpdated'],
+      originalApiName: json['originalApiName'], // Make sure to read this field
     );
+
+    print(
+      "_favoriteFromJson: deserializing - name='${favorite.name}', originalApiName='${favorite.originalApiName}'",
+    );
+    return favorite;
   }
 
   // Add a new favorite from a MapStation with offline awareness
@@ -353,6 +366,10 @@ class FavoritesProvider with ChangeNotifier {
         imgNumber: randomImgNumber,
         lastUpdated: DateTime.now().millisecondsSinceEpoch,
         originalApiName: originalApiName, // Store the original API name
+      );
+
+      print(
+        "addFavoriteFromStation: New favorite - stationId=${station.stationId}, name='$riverName', originalApiName='$originalApiName'",
       );
 
       print(
@@ -735,6 +752,10 @@ class FavoritesProvider with ChangeNotifier {
       // Get the favorite
       final favorite = _favorites[favoriteIndex];
 
+      print(
+        "updateFavoriteName: BEFORE update - stationId=$stationId, name='${favorite.name}', originalApiName='${favorite.originalApiName}'",
+      );
+
       // Create updated favorite - preserve original API name
       final updatedFavorite = FavoriteModel(
         stationId: favorite.stationId,
@@ -747,6 +768,10 @@ class FavoritesProvider with ChangeNotifier {
         lastUpdated: DateTime.now().millisecondsSinceEpoch,
         originalApiName:
             favorite.originalApiName, // Preserve the original API name
+      );
+
+      print(
+        "updateFavoriteName: AFTER update - stationId=$stationId, name='$newName', originalApiName='${updatedFavorite.originalApiName}'",
       );
 
       // Update local list first for responsive UI

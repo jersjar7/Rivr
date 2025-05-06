@@ -291,30 +291,6 @@ class FavoriteCard extends StatelessWidget {
                   ],
                 ),
               ),
-
-              // Description (if any)
-              if (favorite.description != null &&
-                  favorite.description!.isNotEmpty)
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Divider(color: Colors.grey[300]),
-                      const SizedBox(height: 8),
-                      Text(
-                        favorite.description!,
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: Colors.grey[700],
-                          fontStyle: FontStyle.italic,
-                        ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
-                  ),
-                ),
             ],
           ),
         ),

@@ -7,10 +7,12 @@ import 'package:provider/provider.dart';
 import 'package:rivr/features/favorites/services/favorite_image_service.dart';
 import '../../domain/entities/favorite.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/services/stream_name_service.dart';
+import '../../../../core/di/service_locator.dart';
 import '../providers/favorites_provider.dart';
 import '../widgets/edit_favorite_name_dialog.dart';
 
-class FavoriteCard extends StatelessWidget {
+class FavoriteCard extends StatefulWidget {
   final Favorite favorite;
   final VoidCallback onTap;
   final VoidCallback onDelete;
@@ -23,22 +25,96 @@ class FavoriteCard extends StatelessWidget {
   });
 
   @override
+  State<FavoriteCard> createState() => _FavoriteCardState();
+}
+
+class _FavoriteCardState extends State<FavoriteCard> {
+  late StreamNameService _streamNameService;
+  String? _displayName;
+  bool _isLoadingName = true;
+  bool _isCustomName = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _streamNameService = sl<StreamNameService>();
+    _loadNameInfo();
+  }
+
+  // Load name information from the service
+  Future<void> _loadNameInfo() async {
+    setState(() => _isLoadingName = true);
+
+    try {
+      // Get the current name from StreamNameService
+      final nameInfo = await _streamNameService.getNameInfo(
+        widget.favorite.stationId,
+      );
+
+      // Check if it's a custom name
+      bool isCustom = false;
+      if (nameInfo.originalApiName != null &&
+          nameInfo.originalApiName!.isNotEmpty &&
+          nameInfo.displayName != nameInfo.originalApiName) {
+        isCustom = true;
+      }
+
+      // Update state if the widget is still mounted
+      if (mounted) {
+        setState(() {
+          _displayName = nameInfo.displayName;
+          _isCustomName = isCustom;
+          _isLoadingName = false;
+        });
+      }
+    } catch (e) {
+      print("Error loading name info: $e");
+      // Fallback to the favorite's name
+      if (mounted) {
+        setState(() {
+          _displayName = widget.favorite.name;
+          // Check if it's a custom name using the favorite entity
+          final String? apiName =
+              widget.favorite.originalApiName == "null"
+                  ? null
+                  : widget.favorite.originalApiName;
+          _isCustomName =
+              apiName != null &&
+              widget.favorite.name != apiName &&
+              apiName.isNotEmpty;
+          _isLoadingName = false;
+        });
+      }
+    }
+  }
+
+  @override
+  void didUpdateWidget(FavoriteCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+
+    // Reload name info if the favorite has changed
+    if (oldWidget.favorite.stationId != widget.favorite.stationId ||
+        oldWidget.favorite.name != widget.favorite.name ||
+        oldWidget.favorite.lastUpdated != widget.favorite.lastUpdated) {
+      _loadNameInfo();
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     // Default image if none specified - use river_images subfolder
     final imgNumber =
-        favorite.imgNumber ?? (favorite.stationId.hashCode % 30 + 1);
-
-    // Debug log to verify image number
-    print(
-      'REBUILDING FavoriteCard: stationId=${favorite.stationId}, imgNumber=${favorite.imgNumber}, lastUpdated=${favorite.lastUpdated}',
-    );
+        widget.favorite.imgNumber ??
+        (widget.favorite.stationId.hashCode % 30 + 1);
 
     // Parse color or use default
     Color cardColor;
-    if (favorite.color != null) {
+    if (widget.favorite.color != null) {
       // Convert hex color to Color object
       try {
-        final colorValue = int.parse(favorite.color!.replaceAll('#', '0xff'));
+        final colorValue = int.parse(
+          widget.favorite.color!.replaceAll('#', '0xff'),
+        );
         cardColor = Color(colorValue);
       } catch (_) {
         cardColor = AppColors.primaryColor;
@@ -47,26 +123,14 @@ class FavoriteCard extends StatelessWidget {
       cardColor = AppColors.primaryColor;
     }
 
-    // Display name
-    final displayName = _getDisplayName(favorite);
-
-    // Check if this is a custom name by comparing with original API name
-    // Improved logic that handles null originalApiName better
-    // Modify the isCustomName check to handle "null" string
-    final String? apiName =
-        favorite.originalApiName == "null" ? null : favorite.originalApiName;
-    final isCustomName =
-        apiName != null && favorite.name != apiName && apiName.isNotEmpty;
-
-    // Debug print to track values
-    print(
-      "FavoriteCard DEBUG: name='${favorite.name}', originalApiName='$apiName', isCustomName=$isCustomName",
-    );
-
-    // Debug print
-    print(
-      "FavoriteCard DEBUG: name='${favorite.name}', originalApiName='${favorite.originalApiName}', isCustomName=$isCustomName",
-    );
+    // Get the display name to use
+    final displayName =
+        _isLoadingName
+            ? widget
+                .favorite
+                .name // Use favorite's name as fallback while loading
+            : (_displayName ??
+                widget.favorite.name); // Use name from service or fallback
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 16.0),
@@ -76,7 +140,7 @@ class FavoriteCard extends StatelessWidget {
         clipBehavior: Clip.antiAlias,
         color: Colors.white,
         child: InkWell(
-          onTap: onTap,
+          onTap: widget.onTap,
           splashColor: cardColor.withValues(alpha: 0.1),
           highlightColor: cardColor.withValues(alpha: 0.05),
           child: Column(
@@ -87,13 +151,13 @@ class FavoriteCard extends StatelessWidget {
                 children: [
                   // River Image
                   Hero(
-                    tag: 'river_image_${favorite.stationId}',
+                    tag: 'river_image_${widget.favorite.stationId}',
                     child:
-                        favorite.customImagePath != null &&
-                                favorite.customImagePath!.isNotEmpty
+                        widget.favorite.customImagePath != null &&
+                                widget.favorite.customImagePath!.isNotEmpty
                             ? FutureBuilder<String?>(
                               future: FavoriteImageService.getImagePath(
-                                favorite.customImagePath!,
+                                widget.favorite.customImagePath!,
                               ),
                               builder: (context, snapshot) {
                                 if (snapshot.connectionState ==
@@ -161,10 +225,22 @@ class FavoriteCard extends StatelessWidget {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
-                        // Title
+                        // Title with loading indicator if needed
                         Expanded(
                           child: Row(
                             children: [
+                              if (_isLoadingName)
+                                const SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    valueColor: AlwaysStoppedAnimation<Color>(
+                                      Colors.white,
+                                    ),
+                                  ),
+                                ),
+                              if (_isLoadingName) const SizedBox(width: 8),
                               Expanded(
                                 child: Text(
                                   displayName,
@@ -205,7 +281,9 @@ class FavoriteCard extends StatelessWidget {
                           width: 12,
                           height: 12,
                           decoration: BoxDecoration(
-                            color: _getFlowStatusColor(favorite.stationId),
+                            color: _getFlowStatusColor(
+                              widget.favorite.stationId,
+                            ),
                             shape: BoxShape.circle,
                             border: Border.all(color: Colors.white, width: 2),
                           ),
@@ -233,7 +311,7 @@ class FavoriteCard extends StatelessWidget {
                   ),
 
                   // Optional: Show indicator for custom-named rivers
-                  if (isCustomName)
+                  if (_isCustomName)
                     Positioned(
                       top: 8,
                       left: 8,
@@ -286,7 +364,7 @@ class FavoriteCard extends StatelessWidget {
                         ),
                         const SizedBox(width: 6),
                         Text(
-                          'Station ID: ${favorite.stationId}',
+                          'Station ID: ${widget.favorite.stationId}',
                           style: TextStyle(
                             fontSize: 14,
                             color: Colors.grey[700],
@@ -300,7 +378,7 @@ class FavoriteCard extends StatelessWidget {
                       children: [
                         // View button
                         ElevatedButton.icon(
-                          onPressed: onTap,
+                          onPressed: widget.onTap,
                           icon: const Icon(Icons.analytics, size: 16),
                           label: const Text('View'),
                           style: ElevatedButton.styleFrom(
@@ -340,12 +418,6 @@ class FavoriteCard extends StatelessWidget {
         ),
       ),
     );
-  }
-
-  // Get a display name for the river, using fallbacks if needed
-  String _getDisplayName(Favorite favorite) {
-    // Simply return the name as-is, even if empty
-    return favorite.name;
   }
 
   // This would ideally come from real-time data
@@ -393,9 +465,9 @@ class FavoriteCard extends StatelessWidget {
             ),
             title: const Text('Remove Favorite'),
             content: Text(
-              favorite.name.isEmpty
+              _displayName == null || _displayName!.isEmpty
                   ? 'Are you sure you want to remove this river from your favorites?'
-                  : 'Are you sure you want to remove ${favorite.name} from your favorites?',
+                  : 'Are you sure you want to remove $_displayName from your favorites?',
             ),
             actions: [
               TextButton(
@@ -408,7 +480,7 @@ class FavoriteCard extends StatelessWidget {
               ElevatedButton(
                 onPressed: () {
                   Navigator.pop(context);
-                  onDelete();
+                  widget.onDelete();
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.red[400],
@@ -424,37 +496,74 @@ class FavoriteCard extends StatelessWidget {
 
   // Show dialog to edit the river name
   void _showEditNameDialog(BuildContext context) async {
-    // Store a local reference to the context to avoid using a potentially stale context
     final currentContext = context;
-
     final favoritesProvider = Provider.of<FavoritesProvider>(
       currentContext,
       listen: false,
     );
 
+    // Get the original API name from StreamNameService if possible
+    String? originalApiName;
+    try {
+      final nameInfo = await _streamNameService.getNameInfo(
+        widget.favorite.stationId,
+      );
+      originalApiName = nameInfo.originalApiName;
+    } catch (e) {
+      print("Error getting original API name from service: $e");
+      // Fall back to the favorite's originalApiName
+      originalApiName =
+          widget.favorite.originalApiName == "null"
+              ? null
+              : widget.favorite.originalApiName;
+    }
+
+    final currentName = _displayName ?? widget.favorite.name;
+
     final result = await showDialog<String>(
       context: currentContext,
       builder:
           (dialogContext) => EditFavoriteNameDialog(
-            currentName: favorite.name,
-            stationId: favorite.stationId,
-            originalApiName: favorite.originalApiName,
+            currentName: currentName,
+            stationId: widget.favorite.stationId,
+            originalApiName: originalApiName,
           ),
     );
 
-    // Check if the context is still valid before using it
-    if (result != null && result != favorite.name) {
+    // Proceed with update if we got a result and it's different
+    if (result != null && result != currentName) {
       try {
-        // Update the name
+        // Update name in both the FavoritesProvider and StreamNameService
         final success = await favoritesProvider.updateFavoriteName(
-          favorite.userId,
-          favorite.stationId,
+          widget.favorite.userId,
+          widget.favorite.stationId,
           result,
         );
 
-        // Before showing snackbar, check if the context is still active
+        // Also try to update directly in StreamNameService for immediate effect
+        try {
+          await _streamNameService.updateDisplayName(
+            widget.favorite.stationId,
+            result,
+          );
+
+          // Update local state immediately
+          if (mounted) {
+            setState(() {
+              _displayName = result;
+              _isCustomName =
+                  originalApiName != null &&
+                  result != originalApiName &&
+                  originalApiName.isNotEmpty;
+            });
+          }
+        } catch (e) {
+          print("Error updating StreamNameService directly: $e");
+          // We'll eventually get the update when the FavoritesProvider refreshes
+        }
+
+        // Show feedback to user
         if (currentContext.mounted) {
-          // Use the context's mounted property
           ScaffoldMessenger.of(currentContext).showSnackBar(
             SnackBar(
               content: Text(

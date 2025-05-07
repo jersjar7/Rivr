@@ -7,6 +7,8 @@ import 'package:rivr/features/forecast/domain/entities/forecast_types.dart';
 import 'package:rivr/features/forecast/domain/entities/return_period.dart';
 import 'package:rivr/features/forecast/domain/usecases/get_forecast.dart';
 import 'package:rivr/features/forecast/domain/usecases/get_return_periods.dart';
+import 'package:rivr/core/services/stream_name_service.dart';
+import 'package:rivr/core/di/service_locator.dart';
 
 enum ForecastLoadingState { initial, loading, loaded, error }
 
@@ -18,6 +20,7 @@ class ForecastProvider extends ChangeNotifier {
   final GetAllForecasts _getAllForecasts;
   final GetLatestFlow _getLatestFlow;
   final GetReturnPeriods _getReturnPeriods;
+  final StreamNameService _streamNameService;
 
   ForecastProvider({
     required GetForecast getForecast,
@@ -27,13 +30,15 @@ class ForecastProvider extends ChangeNotifier {
     required GetAllForecasts getAllForecasts,
     required GetLatestFlow getLatestFlow,
     required GetReturnPeriods getReturnPeriods,
+    StreamNameService? streamNameService,
   }) : _getForecast = getForecast,
        _getShortRangeForecast = getShortRangeForecast,
        _getMediumRangeForecast = getMediumRangeForecast,
        _getLongRangeForecast = getLongRangeForecast,
        _getAllForecasts = getAllForecasts,
        _getLatestFlow = getLatestFlow,
-       _getReturnPeriods = getReturnPeriods;
+       _getReturnPeriods = getReturnPeriods,
+       _streamNameService = streamNameService ?? sl<StreamNameService>();
 
   // State variables
   final Map<String, ForecastLoadingState> _loadingStates = {};
@@ -45,6 +50,9 @@ class ForecastProvider extends ChangeNotifier {
   final Map<String, DateTime> _lastFetchTimes = {};
   final Map<String, Map<DateTime, Map<String, double>>> _aggregatedDailyData =
       {};
+
+  // Cache for station names to reduce service calls
+  final Map<String, String> _stationNameCache = {};
 
   // Getters
   bool isLoading(String reachId) =>
@@ -104,6 +112,59 @@ class ForecastProvider extends ChangeNotifier {
     return _aggregatedDailyData[reachId];
   }
 
+  // Get the station name from StreamNameService
+  Future<String> getStationName(String reachId) async {
+    // Check cache first
+    if (_stationNameCache.containsKey(reachId)) {
+      return _stationNameCache[reachId]!;
+    }
+
+    try {
+      // Get name from StreamNameService
+      final name = await _streamNameService.getDisplayName(reachId);
+      // Cache the result
+      _stationNameCache[reachId] = name;
+      return name;
+    } catch (e) {
+      print("Error getting station name for $reachId: $e");
+      // Return a fallback name if service fails
+      return "Stream $reachId";
+    }
+  }
+
+  // Get the station name synchronously (from cache or fallback)
+  String getStationNameSync(String reachId) {
+    if (_stationNameCache.containsKey(reachId)) {
+      return _stationNameCache[reachId]!;
+    }
+
+    // Start an async fetch for next time but return a fallback for now
+    getStationName(reachId).then((name) {
+      // This will update the cache for future calls
+      if (name != "Stream $reachId") {
+        notifyListeners(); // Only notify if we got a real name
+      }
+    });
+
+    return "Stream $reachId";
+  }
+
+  // Update a station name - useful if the user changes it elsewhere
+  Future<void> updateStationName(String reachId, String newName) async {
+    if (newName.isEmpty) return;
+
+    try {
+      // Update in StreamNameService
+      await _streamNameService.updateDisplayName(reachId, newName);
+
+      // Update our cache
+      _stationNameCache[reachId] = newName;
+      notifyListeners();
+    } catch (e) {
+      print("Error updating station name for $reachId: $e");
+    }
+  }
+
   // Load all forecast types for a reach
   Future<bool> loadAllForecasts(
     String reachId, {
@@ -138,6 +199,11 @@ class ForecastProvider extends ChangeNotifier {
         _loadLatestFlow(reachId);
         _loadReturnPeriod(reachId);
         _processDailyData(reachId);
+
+        // Prefetch the station name if we don't have it
+        if (!_stationNameCache.containsKey(reachId)) {
+          getStationName(reachId);
+        }
 
         return true;
       },
@@ -184,6 +250,12 @@ class ForecastProvider extends ChangeNotifier {
         _lastFetchTimes[reachId] = DateTime.now();
         _loadingStates[reachId] = ForecastLoadingState.loaded;
         _processDailyData(reachId);
+
+        // Prefetch the station name if we don't have it
+        if (!_stationNameCache.containsKey(reachId)) {
+          getStationName(reachId);
+        }
+
         notifyListeners();
         return forecastCollection;
       },
@@ -398,6 +470,12 @@ class ForecastProvider extends ChangeNotifier {
 
   // Refresh all data for a reach
   Future<bool> refreshAllData(String reachId) async {
+    // Also refresh the station name
+    if (_stationNameCache.containsKey(reachId)) {
+      _stationNameCache.remove(reachId);
+      getStationName(reachId);
+    }
+
     return loadAllForecasts(reachId, forceRefresh: true);
   }
 
@@ -410,6 +488,7 @@ class ForecastProvider extends ChangeNotifier {
     _lastFetchTimes.remove(reachId);
     _returnPeriods.remove(reachId);
     _aggregatedDailyData.remove(reachId);
+    _stationNameCache.remove(reachId);
     notifyListeners();
   }
 
@@ -422,6 +501,7 @@ class ForecastProvider extends ChangeNotifier {
     _lastFetchTimes.clear();
     _returnPeriods.clear();
     _aggregatedDailyData.clear();
+    _stationNameCache.clear();
     notifyListeners();
   }
 

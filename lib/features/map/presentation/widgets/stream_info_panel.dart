@@ -6,6 +6,8 @@ import 'package:rivr/core/error/error_handler.dart';
 import 'package:rivr/core/error/exceptions.dart';
 import 'package:rivr/core/repositories/offline_storage_repository.dart';
 import 'package:rivr/features/favorites/presentation/providers/favorites_provider.dart';
+import 'package:rivr/core/services/stream_name_service.dart';
+import 'package:rivr/core/di/service_locator.dart';
 import '../../domain/entities/map_station.dart';
 import '../../../../core/utils/location_utils.dart';
 import '../../../../core/widgets/loading_indicator.dart';
@@ -42,6 +44,12 @@ class _StreamInfoPanelState extends State<StreamInfoPanel> {
   String? _errorRecovery;
   Map<String, dynamic>? _reachData;
 
+  // For name management
+  late StreamNameService _streamNameService;
+  bool _isLoadingName = true;
+  String? _displayName;
+  bool _isCustomName = false;
+
   // For note
   final TextEditingController _noteController = TextEditingController();
   String? _note;
@@ -52,16 +60,57 @@ class _StreamInfoPanelState extends State<StreamInfoPanel> {
   @override
   void initState() {
     super.initState();
+    _streamNameService = sl<StreamNameService>();
     print(
       "StreamInfoPanel: initializing for station ID: ${widget.station.stationId}",
     );
     _fetchReachData();
+    _loadStationName();
   }
 
   @override
   void dispose() {
     _noteController.dispose();
     super.dispose();
+  }
+
+  // Load the station name from StreamNameService
+  Future<void> _loadStationName() async {
+    if (!mounted) return;
+
+    setState(() => _isLoadingName = true);
+
+    try {
+      // Try to get name info from the service
+      final nameInfo = await _streamNameService.getNameInfo(
+        widget.station.stationId.toString(),
+      );
+
+      // Check if this is a custom name
+      bool isCustom = false;
+      if (nameInfo.originalApiName != null &&
+          nameInfo.originalApiName!.isNotEmpty &&
+          nameInfo.displayName != nameInfo.originalApiName) {
+        isCustom = true;
+      }
+
+      // Update state if still mounted
+      if (mounted) {
+        setState(() {
+          _displayName = nameInfo.displayName;
+          _isCustomName = isCustom;
+          _isLoadingName = false;
+        });
+      }
+    } catch (e) {
+      print("Error loading name from StreamNameService: $e");
+
+      // We'll fall back to using the name from API data
+      // in _getDisplayName method
+      if (mounted) {
+        setState(() => _isLoadingName = false);
+      }
+    }
   }
 
   Future<void> _fetchReachData() async {
@@ -93,6 +142,16 @@ class _StreamInfoPanelState extends State<StreamInfoPanel> {
         if (cachedData['apiData'] is Map &&
             cachedData['apiData']['name'] != null) {
           print("DEBUG: Cached name: ${cachedData['apiData']['name']}");
+
+          // Update the StreamNameService with this name as the original API name
+          try {
+            await _streamNameService.setOriginalApiName(
+              widget.station.stationId.toString(),
+              cachedData['apiData']['name'].toString(),
+            );
+          } catch (e) {
+            print("Warning: Failed to update original API name: $e");
+          }
         } else {
           print("DEBUG: No name found in cached data");
         }
@@ -104,9 +163,7 @@ class _StreamInfoPanelState extends State<StreamInfoPanel> {
           _isLoading = false;
         });
 
-        print(
-          "DEBUG: Using cached data, final display name: ${_getDisplayName()}",
-        );
+        print("DEBUG: Using cached data");
         return;
       } else {
         print("DEBUG: No cached data found or data is invalid");
@@ -127,6 +184,18 @@ class _StreamInfoPanelState extends State<StreamInfoPanel> {
       print("DEBUG: API response received: $data");
       if (data != null && data is Map) {
         print("DEBUG: API returned name: ${data['name']}");
+
+        // Update the StreamNameService with this name as the original API name
+        if (data['name'] != null && data['name'].toString().isNotEmpty) {
+          try {
+            await _streamNameService.setOriginalApiName(
+              reachId,
+              data['name'].toString(),
+            );
+          } catch (e) {
+            print("Warning: Failed to update original API name: $e");
+          }
+        }
       }
 
       if (!mounted) return;
@@ -140,9 +209,7 @@ class _StreamInfoPanelState extends State<StreamInfoPanel> {
         _isLoading = false;
       });
 
-      print(
-        "DEBUG: Data loaded successfully, final display name: ${_getDisplayName()}",
-      );
+      print("DEBUG: Data loaded successfully");
     } catch (e) {
       print("DEBUG ERROR: Error fetching reach data: $e");
 
@@ -163,34 +230,57 @@ class _StreamInfoPanelState extends State<StreamInfoPanel> {
     print("DEBUG END: _fetchReachData");
   }
 
-  // Get a reliable display name - prioritizing API data over other sources
+  // Get a reliable display name - now uses StreamNameService as primary source
   String _getDisplayName() {
-    print("GET DISPLAY NAME CALLED: Station ID: ${widget.station.stationId}");
+    // First priority: Use name from StreamNameService if available
+    if (!_isLoadingName && _displayName != null && _displayName!.isNotEmpty) {
+      return _displayName!;
+    }
 
-    // Prioritize API data name, then fall back to default
+    // Second priority: Use the provided display name from widget
+    if (widget.displayName != null && widget.displayName!.isNotEmpty) {
+      return widget.displayName!;
+    }
+
+    // Third priority: Use API data name if available
     if (_reachData != null &&
         _reachData!.containsKey('name') &&
         _reachData!['name'] != null &&
         _reachData!['name'].toString().trim().isNotEmpty) {
-      // Added empty string check
-      final result = _reachData!['name'].toString();
-      print("DISPLAY NAME DECISION: Using API name: '$result'");
-      print("DEBUG: _getDisplayName using name from API data: '$result'");
-      return result;
-    } else {
-      final result = 'Stream ${widget.station.stationId}';
-      print("DISPLAY NAME DECISION: Using fallback name: '$result'");
-      print("DEBUG: _getDisplayName using default ID-based name: '$result'");
-      return result;
+      return _reachData!['name'].toString();
     }
+
+    // Last resort: Use station name from widget or default to ID-based name
+    if (widget.station.name != null && widget.station.name!.isNotEmpty) {
+      return widget.station.name!;
+    }
+
+    // Ultimate fallback: Use ID-based name
+    return 'Stream ${widget.station.stationId}';
   }
 
   Future<void> _addToFavorites(MapStation station) async {
-    // Check if we need to prompt for a name first
+    // Get the current display name
     String displayName = _getDisplayName();
+    String stationId = station.stationId.toString();
 
-    // Use an exact match comparison instead of startsWith
-    bool isDefaultName = displayName == 'Stream ${station.stationId}';
+    // Check if we need to prompt for a name
+    bool isDefaultName = displayName == 'Stream $stationId';
+    String? originalApiName;
+
+    // Try to get original API name from StreamNameService first
+    try {
+      final nameInfo = await _streamNameService.getNameInfo(stationId);
+      originalApiName = nameInfo.originalApiName;
+    } catch (e) {
+      print("Error getting original API name: $e");
+      // Try to get it from API data as fallback
+      if (_reachData != null &&
+          _reachData!.containsKey('name') &&
+          _reachData!['name'] != null) {
+        originalApiName = _reachData!['name'].toString();
+      }
+    }
 
     // If using the default name pattern, show name input dialog first
     if (isDefaultName) {
@@ -199,10 +289,34 @@ class _StreamInfoPanelState extends State<StreamInfoPanel> {
       // If user canceled the name dialog, abort the process
       if (customName == null) return;
 
-      // Use the provided name and cache it
+      // Use the provided name
       displayName = customName;
 
-      // Cache the custom name for this station
+      // Update the StreamNameService with the new name
+      try {
+        await _streamNameService.updateDisplayName(stationId, customName);
+
+        // If we have an original API name, ensure it's set
+        if (originalApiName != null && originalApiName.isNotEmpty) {
+          await _streamNameService.setOriginalApiName(
+            stationId,
+            originalApiName,
+          );
+        }
+
+        // Update local state
+        setState(() {
+          _displayName = customName;
+          _isCustomName =
+              originalApiName != null &&
+              originalApiName != customName &&
+              originalApiName.isNotEmpty;
+        });
+      } catch (e) {
+        print("Warning: Failed to update StreamNameService with new name: $e");
+      }
+
+      // Also update the cached data for backward compatibility
       if (_reachData != null) {
         final Map<String, dynamic> updatedData = Map.from(_reachData!);
         updatedData['name'] = customName;
@@ -224,12 +338,13 @@ class _StreamInfoPanelState extends State<StreamInfoPanel> {
     final user = authProvider.currentUser;
     if (user != null) {
       try {
-        // Add station to favorites with our displayName
+        // Add station to favorites with the display name and original API name
         final success = await favoritesProvider.addFavoriteFromStation(
           user.uid,
-          station,
-          displayName: displayName, // Use custom name if provided
+          stationId,
+          displayName: displayName,
           description: _note,
+          originalApiName: originalApiName,
         );
 
         if (success) {
@@ -334,9 +449,6 @@ class _StreamInfoPanelState extends State<StreamInfoPanel> {
 
   @override
   Widget build(BuildContext context) {
-    print(
-      "StreamInfoPanel: Building UI with isLoading=$_isLoading, hasError=$_hasError",
-    );
     final theme = Theme.of(context);
 
     return Positioned(
@@ -373,7 +485,6 @@ class _StreamInfoPanelState extends State<StreamInfoPanel> {
   }
 
   Widget _buildErrorState() {
-    // Existing error state implementation...
     return Padding(
       padding: const EdgeInsets.all(16),
       child: Column(
@@ -384,13 +495,31 @@ class _StreamInfoPanelState extends State<StreamInfoPanel> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Expanded(
-                child: Text(
-                  _getDisplayName(), // Use our robust display name method
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                  overflow: TextOverflow.ellipsis,
+                child: Row(
+                  children: [
+                    if (_isLoadingName)
+                      const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            Colors.black54,
+                          ),
+                        ),
+                      ),
+                    if (_isLoadingName) const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        _getDisplayName(), // Use our enhanced display name method
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
                 ),
               ),
               IconButton(
@@ -483,7 +612,7 @@ class _StreamInfoPanelState extends State<StreamInfoPanel> {
                     widget.onViewForecast != null
                         ? () => widget.onViewForecast!(
                           widget.station.stationId.toString(),
-                          _getDisplayName(), // Use our display name helper
+                          _getDisplayName(), // Use our enhanced display name method
                         )
                         : () {
                           Navigator.pushNamed(
@@ -491,8 +620,7 @@ class _StreamInfoPanelState extends State<StreamInfoPanel> {
                             '/forecast',
                             arguments: {
                               'reachId': widget.station.stationId.toString(),
-                              'stationName':
-                                  _getDisplayName(), // Use our helper
+                              'stationName': _getDisplayName(),
                             },
                           );
                         },
@@ -511,43 +639,19 @@ class _StreamInfoPanelState extends State<StreamInfoPanel> {
   }
 
   Widget _buildInfoPanel(ThemeData theme) {
-    // Prioritize API data name, then fall back to default
-    String streamName;
+    // Get the station name - now uses our enhanced method
+    final streamName = _getDisplayName();
 
-    if (_reachData != null &&
-        _reachData!.containsKey('name') &&
-        _reachData!['name'] != null &&
-        _reachData!['name'].toString().trim().isNotEmpty) {
-      // Use API data name
-      streamName = _reachData!['name'].toString();
-      print("DEBUG UI: Using name from API data: '$streamName'");
-    } else {
-      // Fall back to a station ID-based name
-      streamName = 'Stream ${widget.station.stationId}';
-      print("DEBUG UI: No API name available, using default: '$streamName'");
-    }
-
-    // Inside _buildInfoPanel method, right after determining streamName:
-    print(
-      "DISPLAY NAME DEBUG: Showing name '$streamName' for station ID ${widget.station.stationId}",
-    );
-    print("DISPLAY NAME DEBUG: API data name value: ${_reachData?['name']}");
-    print(
-      "DISPLAY NAME DEBUG: API data name type: ${_reachData?['name']?.runtimeType}",
-    );
-    print(
-      "DISPLAY NAME DEBUG: API data name empty check: ${_reachData?['name']?.toString().isEmpty}",
-    );
-    print(
-      "DISPLAY NAME DEBUG: API data name whitespace check: ${_reachData?['name']?.toString().trim().isEmpty}",
-    );
-
-    // Inside onTap handler for markers in MapTapHandler:
-    print(
-      "MARKER TAPPED: Station ID: ${widget.station.stationId}, Raw station name: '${widget.station.name}'",
-    );
-
-    print("DEBUG UI: Building info panel with streamName: '$streamName'");
+    // Show custom name indicator if applicable
+    final isCustomName =
+        _isCustomName ||
+        (
+        // Legacy check for backward compatibility
+        _reachData != null &&
+            _reachData!.containsKey('name') &&
+            _reachData!['name'] != null &&
+            streamName != _reachData!['name'].toString() &&
+            _reachData!['name'].toString().isNotEmpty);
 
     String? riverClass;
     String? difficulty;
@@ -572,13 +676,60 @@ class _StreamInfoPanelState extends State<StreamInfoPanel> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Expanded(
-                child: Text(
-                  streamName, // Use our determined name
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                  overflow: TextOverflow.ellipsis,
+                child: Row(
+                  children: [
+                    if (_isLoadingName)
+                      const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            Colors.black54,
+                          ),
+                        ),
+                      ),
+                    if (_isLoadingName) const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        streamName,
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    // Optional edit button for renaming
+                    IconButton(
+                      icon: const Icon(Icons.edit, size: 16),
+                      onPressed: () async {
+                        final newName = await _showNameInputDialog();
+                        if (newName != null) {
+                          // Update the name in StreamNameService
+                          try {
+                            await _streamNameService.updateDisplayName(
+                              widget.station.stationId.toString(),
+                              newName,
+                            );
+
+                            // Update local state
+                            if (mounted) {
+                              setState(() {
+                                _displayName = newName;
+                                _isCustomName = true;
+                              });
+                            }
+                          } catch (e) {
+                            print("Error updating name: $e");
+                          }
+                        }
+                      },
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                      tooltip: 'Edit Name',
+                    ),
+                  ],
                 ),
               ),
               IconButton(
@@ -589,7 +740,28 @@ class _StreamInfoPanelState extends State<StreamInfoPanel> {
               ),
             ],
           ),
-          // Rest of the panel implementation...
+
+          // Show custom name indicator if applicable
+          if (isCustomName)
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: theme.primaryColor.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Text(
+                  'Custom Name',
+                  style: TextStyle(
+                    fontSize: 10,
+                    color: theme.primaryColor,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+            ),
+
           const SizedBox(height: 8),
 
           // River classification if available
@@ -597,7 +769,7 @@ class _StreamInfoPanelState extends State<StreamInfoPanel> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               decoration: BoxDecoration(
-                color: theme.primaryColor.withValues(alpha: 0.1),
+                color: theme.primaryColor.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(4),
               ),
               child: Row(

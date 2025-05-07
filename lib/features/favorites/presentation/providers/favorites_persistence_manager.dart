@@ -35,22 +35,46 @@ class FavoritesPersistenceManager {
   Future<void> cacheFavorites(String userId, List<Favorite> favorites) async {
     print("DEBUG: cacheFavorites called with userId=$userId");
     print(
-      "DEBUG: Favorites list types in cacheFavorites: ${favorites.map((f) => f.runtimeType).toList()}",
+      "DEBUG: Input favorites parameter runtimeType: ${favorites.runtimeType}",
     );
-    print("DEBUG: Favorites length: ${favorites.length}");
+    print("DEBUG: Input favorites length: ${favorites.length}");
+
+    if (favorites.isEmpty) {
+      print("DEBUG: Favorites list is empty, early return");
+      return;
+    }
 
     try {
+      print("DEBUG: Creating List<Map> for favoriteJsonList");
+      final List<Map<String, dynamic>> favoriteJsonList = [];
+
+      print("DEBUG: Iterating through favorites to convert to JSON");
+      for (int i = 0; i < favorites.length; i++) {
+        final favorite = favorites[i];
+        print(
+          "DEBUG: Processing favorite $i of ${favorites.length}, type: ${favorite.runtimeType}, id: ${favorite.stationId}",
+        );
+        try {
+          final json = _favoriteToJson(favorite);
+          print("DEBUG: JSON created successfully for favorite $i");
+          favoriteJsonList.add(json);
+        } catch (e) {
+          print("DEBUG: Error converting favorite $i to JSON: $e");
+          print(
+            "DEBUG: Error stack trace for favorite $i: ${StackTrace.current}",
+          );
+        }
+      }
+
+      print(
+        "DEBUG: favoriteJsonList created with ${favoriteJsonList.length} items",
+      );
+
       print("DEBUG: Creating favoritesData map");
       final Map<String, dynamic> favoritesData = {
         'userId': userId,
         'timestamp': DateTime.now().millisecondsSinceEpoch,
-        'favorites':
-            favorites.map((f) {
-              print(
-                "DEBUG: Converting favorite of type ${f.runtimeType} to JSON",
-              );
-              return _favoriteToJson(f);
-            }).toList(),
+        'favorites': favoriteJsonList,
       };
       print("DEBUG: Successfully created favoritesData");
 
@@ -118,22 +142,50 @@ class FavoritesPersistenceManager {
     return [];
   }
 
-  // Store pending operations for later sync
+  // Add debug code to addToPendingOperations method
   Future<void> addToPendingOperations(
     String operation,
     Favorite? favorite,
   ) async {
+    print("DEBUG: addToPendingOperations called with operation=$operation");
+    if (favorite != null) {
+      print(
+        "DEBUG: favorite type: ${favorite.runtimeType}, id: ${favorite.stationId}",
+      );
+    } else {
+      print("DEBUG: favorite is null");
+    }
+
     try {
+      print("DEBUG: Getting pending operations");
       final List<Map<String, dynamic>> pendingOps =
           await _getPendingOperations();
+      print("DEBUG: Got ${pendingOps.length} pending operations");
 
-      pendingOps.add({
+      // Create the operation entry
+      final Map<String, dynamic> operationEntry = {
         'operation': operation,
         'timestamp': DateTime.now().millisecondsSinceEpoch,
-        'favorite': favorite != null ? _favoriteToJson(favorite) : null,
-      });
+      };
+
+      // Add favorite if provided
+      if (favorite != null) {
+        print("DEBUG: Converting favorite to JSON for pending op");
+        try {
+          operationEntry['favorite'] = _favoriteToJson(favorite);
+          print("DEBUG: Successfully added favorite to operation entry");
+        } catch (e) {
+          print("DEBUG: Error converting favorite to JSON: $e");
+          print("DEBUG: Stack trace: ${StackTrace.current}");
+        }
+      }
+
+      print("DEBUG: Adding operation entry to pendingOps");
+      pendingOps.add(operationEntry);
+      print("DEBUG: Now have ${pendingOps.length} pending operations");
 
       // Create a fake station to store pending operations
+      print("DEBUG: Creating fake station for pending operations");
       final fakeStation = MapStation(
         stationId: int.parse(_fakePendingOpsStationId),
         name: 'pending_operations',
@@ -142,11 +194,14 @@ class FavoritesPersistenceManager {
       );
 
       // Cache the pending operations
+      print("DEBUG: Caching pending operations");
       await _offlineManager.cacheStation(fakeStation, {
         'operations': pendingOps,
       });
+      print("DEBUG: Successfully cached pending operations");
     } catch (e) {
-      print("Error adding to pending operations: $e");
+      print("DEBUG: Error adding to pending operations: $e");
+      print("DEBUG: Stack trace: ${StackTrace.current}");
     }
   }
 
@@ -344,6 +399,8 @@ class FavoritesPersistenceManager {
     print(
       "DEBUG: favorite.stationId=${favorite.stationId}, favorite.name=${favorite.name}",
     );
+    print("DEBUG: checking if I can access all properties...");
+    print("DEBUG: userId=${favorite.userId}, position=${favorite.position}");
 
     try {
       final json = {

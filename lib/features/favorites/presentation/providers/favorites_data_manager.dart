@@ -549,6 +549,7 @@ class FavoritesDataManager {
     print(
       "DEBUG: Favorites list types before reordering: ${parent.favorites.map((f) => f.runtimeType).toList()}",
     );
+    print("DEBUG: Favorites list length: ${parent.favorites.length}");
 
     if (parent.isProcessing ||
         oldIndex < 0 ||
@@ -567,7 +568,9 @@ class FavoritesDataManager {
 
       // Update the local list first for responsive UI
       final favorite = parent.favorites.removeAt(oldIndex);
-      print("DEBUG: Removed favorite type: ${favorite.runtimeType}");
+      print(
+        "DEBUG: Removed favorite type: ${favorite.runtimeType}, id: ${favorite.stationId}",
+      );
       parent.favorites.insert(newIndex, favorite);
       parent.notifyChanges();
       print(
@@ -579,6 +582,9 @@ class FavoritesDataManager {
       final updatedFavorites = <Favorite>[];
       for (int i = 0; i < parent.favorites.length; i++) {
         final fav = parent.favorites[i];
+        print(
+          "DEBUG: Processing favorite at index $i, type: ${fav.runtimeType}, id: ${fav.stationId}",
+        );
         if (fav is FavoriteModel) {
           print("DEBUG: Adding FavoriteModel at position $i");
           // Create a new model with the updated position
@@ -607,12 +613,18 @@ class FavoritesDataManager {
       print(
         "DEBUG: updatedFavorites types: ${updatedFavorites.map((f) => f.runtimeType).toList()}",
       );
+      print("DEBUG: updatedFavorites length: ${updatedFavorites.length}");
 
       // Replace the favorites list with the updated one
+      print("DEBUG: Clearing parent.favorites");
       parent.favorites.clear();
+      print("DEBUG: Adding updatedFavorites to parent.favorites");
       parent.favorites.addAll(updatedFavorites);
       print(
         "DEBUG: parent.favorites after updating: ${parent.favorites.map((f) => f.runtimeType).toList()}",
+      );
+      print(
+        "DEBUG: parent.favorites length after updating: ${parent.favorites.length}",
       );
 
       // Check connectivity
@@ -625,6 +637,7 @@ class FavoritesDataManager {
       if (!isConnected || isOfflineMode) {
         print("DEBUG: In offline mode branch");
         // Offline mode - add to pending operations
+        print("DEBUG: About to add to pending operations");
         await parent.persistenceManager.addToPendingOperations('REORDER', null);
         print("DEBUG: Added to pending operations");
 
@@ -636,14 +649,17 @@ class FavoritesDataManager {
           print(
             "DEBUG: parent.favorites types: ${parent.favorites.map((f) => f.runtimeType).toList()}",
           );
+          print("DEBUG: parent.favorites length: ${parent.favorites.length}");
 
           // Convert to FavoriteModel list to ensure type compatibility
-          final favoriteModels =
+          print("DEBUG: Starting map operation for favoriteModels");
+          final List<FavoriteModel> favoriteModels =
               parent.favorites.map((favorite) {
                 print(
-                  "DEBUG: Converting favorite of type ${favorite.runtimeType}",
+                  "DEBUG: Converting favorite of type ${favorite.runtimeType}, id: ${favorite.stationId}",
                 );
                 if (favorite is FavoriteModel) {
+                  print("DEBUG: Already a FavoriteModel, returning directly");
                   return favorite;
                 } else {
                   print("DEBUG: Creating new FavoriteModel from non-model");
@@ -660,16 +676,37 @@ class FavoritesDataManager {
                     customImagePath: favorite.customImagePath,
                   );
                 }
-              }).toList();
+              }).toList(); // Explicitly convert to List<FavoriteModel>
+
           print(
-            "DEBUG: favoriteModels types: ${favoriteModels.map((f) => f.runtimeType).toList()}",
+            "DEBUG: favoriteModels created with type: ${favoriteModels.runtimeType}",
+          );
+          print(
+            "DEBUG: favoriteModels element types: ${favoriteModels.map((f) => f.runtimeType).toList()}",
+          );
+          print("DEBUG: favoriteModels length: ${favoriteModels.length}");
+
+          print(
+            "DEBUG: About to call cacheFavorites with userId=${parent.favorites.first.userId}",
+          );
+          print(
+            "DEBUG: First userId is ${parent.favorites.first.userId}, runtimeType: ${parent.favorites.first.userId.runtimeType}",
           );
 
+          // Use explicit List<FavoriteModel> type to avoid confusion
           print("DEBUG: Calling cacheFavorites with converted models");
-          parent.persistenceManager.cacheFavorites(
-            parent.favorites.first.userId,
-            favoriteModels, // Use the converted list
-          );
+          try {
+            await parent.persistenceManager.cacheFavorites(
+              parent.favorites.first.userId,
+              favoriteModels, // Use the converted list
+            );
+            print(
+              "DEBUG: cacheFavorites completed successfully in offline mode",
+            );
+          } catch (e) {
+            print("DEBUG: Error in cacheFavorites offline call: $e");
+            print("DEBUG: Error stack trace: ${StackTrace.current}");
+          }
         }
         return;
       }
@@ -716,14 +753,17 @@ class FavoritesDataManager {
         print(
           "DEBUG: parent.favorites types: ${parent.favorites.map((f) => f.runtimeType).toList()}",
         );
+        print("DEBUG: parent.favorites length: ${parent.favorites.length}");
 
         // Convert to FavoriteModel list to ensure type compatibility
-        final favoriteModels =
+        print("DEBUG: Starting map operation for favoriteModels");
+        final List<FavoriteModel> favoriteModels =
             parent.favorites.map((favorite) {
               print(
-                "DEBUG: Converting favorite of type ${favorite.runtimeType}",
+                "DEBUG: Converting favorite of type ${favorite.runtimeType}, id: ${favorite.stationId}",
               );
               if (favorite is FavoriteModel) {
+                print("DEBUG: Already a FavoriteModel, returning directly");
                 return favorite;
               } else {
                 print("DEBUG: Creating new FavoriteModel from non-model");
@@ -740,16 +780,31 @@ class FavoritesDataManager {
                   customImagePath: favorite.customImagePath,
                 );
               }
-            }).toList();
+            }).toList(); // Explicitly convert to List<FavoriteModel>
+
         print(
-          "DEBUG: favoriteModels types: ${favoriteModels.map((f) => f.runtimeType).toList()}",
+          "DEBUG: favoriteModels created with type: ${favoriteModels.runtimeType}",
+        );
+        print(
+          "DEBUG: favoriteModels element types: ${favoriteModels.map((f) => f.runtimeType).toList()}",
+        );
+        print("DEBUG: favoriteModels length: ${favoriteModels.length}");
+
+        print(
+          "DEBUG: About to call cacheFavorites with userId=${parent.favorites.first.userId}",
         );
 
         print("DEBUG: Calling cacheFavorites with converted models");
-        parent.persistenceManager.cacheFavorites(
-          parent.favorites.first.userId,
-          favoriteModels, // Use the converted list
-        );
+        try {
+          await parent.persistenceManager.cacheFavorites(
+            parent.favorites.first.userId,
+            favoriteModels, // Use the converted list
+          );
+          print("DEBUG: cacheFavorites completed successfully in online mode");
+        } catch (e) {
+          print("DEBUG: Error in cacheFavorites online call: $e");
+          print("DEBUG: Error stack trace: ${StackTrace.current}");
+        }
       }
     } catch (e) {
       print('DEBUG: Error reordering favorites: $e');

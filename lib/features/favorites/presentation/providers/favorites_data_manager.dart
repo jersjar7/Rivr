@@ -253,30 +253,47 @@ class FavoritesDataManager {
     String stationId,
     String newName,
   ) async {
-    if (parent.isProcessing) return false;
+    print(
+      "DEBUG: DataManager updateFavoriteName called for station $stationId with new name '$newName'",
+    );
 
     try {
       // Find the favorite to update
+      print("DEBUG: Looking for favorite in list");
       final favoriteIndex = parent.favorites.indexWhere(
         (f) => f.stationId == stationId && f.userId == userId,
       );
+      print("DEBUG: Favorite index: $favoriteIndex");
 
       if (favoriteIndex < 0) {
+        print("DEBUG: Favorite not found, returning false");
         return false; // Not found
       }
 
       // Get the favorite
       final favorite = parent.favorites[favoriteIndex];
+      print(
+        "DEBUG: Found favorite: ${favorite.stationId}, current name: '${favorite.name}'",
+      );
 
       // IMPORTANT: Ensure we have an originalApiName before changing the name
+      print(
+        "DEBUG: Original API name from favorite: ${favorite.originalApiName}",
+      );
       String? originalApiNameToUse = favorite.originalApiName;
       if (originalApiNameToUse == null ||
           originalApiNameToUse.isEmpty ||
           originalApiNameToUse == "null") {
         // Try to get from StreamNameService first
         try {
+          print(
+            "DEBUG: Trying to get original API name from StreamNameService",
+          );
           final nameInfo = await _streamNameService.getNameInfo(stationId);
           originalApiNameToUse = nameInfo.originalApiName;
+          print(
+            "DEBUG: Got original API name from service: $originalApiNameToUse",
+          );
         } catch (e) {
           print("Error getting original API name from service: $e");
         }
@@ -286,10 +303,12 @@ class FavoritesDataManager {
             originalApiNameToUse.isEmpty ||
             originalApiNameToUse == "null") {
           originalApiNameToUse = favorite.name;
+          print("DEBUG: Using current name as original: $originalApiNameToUse");
         }
       }
 
       // Create updated favorite - preserve original API name
+      print("DEBUG: Creating updated favorite model");
       final updatedFavorite = FavoriteModel(
         stationId: favorite.stationId,
         name: newName,
@@ -302,49 +321,68 @@ class FavoritesDataManager {
         originalApiName: originalApiNameToUse,
         customImagePath: favorite.customImagePath,
       );
+      print(
+        "DEBUG: Created updated favorite: ${updatedFavorite.stationId}, name: '${updatedFavorite.name}', originalApiName: '${updatedFavorite.originalApiName}', customImagePath: '${updatedFavorite.customImagePath}'",
+      );
 
       // Update local list first for responsive UI
+      print("DEBUG: Updating favorite in local list");
       parent.favorites[favoriteIndex] = updatedFavorite;
       parent.notifyChanges();
+      print("DEBUG: Local list updated and UI notified");
 
       // Always update StreamNameService
       try {
+        print("DEBUG: Updating StreamNameService");
         await _streamNameService.updateDisplayName(stationId, newName);
+        print("DEBUG: StreamNameService updated successfully");
       } catch (e) {
         print("Warning: Failed to update StreamNameService: $e");
       }
 
       // Check connectivity
+      print("DEBUG: Checking connectivity");
       final bool isConnected = await parent.persistenceManager.isConnected();
       final bool isOfflineMode =
           await parent.persistenceManager.isOfflineMode();
+      print("DEBUG: isConnected=$isConnected, isOfflineMode=$isOfflineMode");
 
       if (!isConnected || isOfflineMode) {
+        print("DEBUG: Offline mode detected, using pending operations");
         // Offline mode - add to pending operations
         await parent.persistenceManager.addToPendingOperations(
           'UPDATE',
           updatedFavorite,
         );
+        print("DEBUG: Added to pending operations");
 
         // Update cache
         parent.persistenceManager.cacheFavorites(userId, parent.favorites);
+        print("DEBUG: Updated cache in offline mode");
         return true;
       }
 
       // Update in database
+      print("DEBUG: Online mode - calling addFavoriteUseCase");
       final result = await parent.addFavoriteUseCase(updatedFavorite);
+      print("DEBUG: Repository result: $result");
 
-      return result.fold(
+      final bool returnValue = result.fold(
         (failure) {
-          print("Failed to update favorite name: ${failure.message}");
+          print("DEBUG: Failure from repository: ${failure.message}");
           return false;
         },
         (_) {
+          print("DEBUG: Success from repository");
           // Update cache
           parent.persistenceManager.cacheFavorites(userId, parent.favorites);
+          print("DEBUG: Cache updated after successful repository update");
           return true;
         },
       );
+
+      print("DEBUG: Final result of updateFavoriteName: $returnValue");
+      return returnValue;
     } catch (e) {
       print('Error updating favorite name: $e');
       return false;

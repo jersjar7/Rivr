@@ -28,6 +28,9 @@ class FavoritesRepositoryImpl implements FavoritesRepository {
   @override
   Future<Either<Failure, void>> addFavorite(Favorite favorite) async {
     try {
+      print(
+        "DEBUG: Repository adding favorite: ${favorite.stationId}, ${favorite.name}",
+      );
       await localDataSource.addFavorite(
         FavoriteModel(
           stationId: favorite.stationId,
@@ -38,12 +41,17 @@ class FavoritesRepositoryImpl implements FavoritesRepository {
           description: favorite.description,
           imgNumber: favorite.imgNumber,
           lastUpdated: favorite.lastUpdated,
+          originalApiName: favorite.originalApiName,
+          customImagePath: favorite.customImagePath,
         ),
       );
+      print("DEBUG: Repository addFavorite succeeded");
       return const Right(null);
     } on DatabaseException catch (e) {
+      print("DEBUG: DatabaseException in repository: ${e.message}");
       return Left(CacheFailure(message: e.message));
     } catch (e) {
+      print("DEBUG: General exception in repository: $e");
       return Left(CacheFailure(message: e.toString()));
     }
   }

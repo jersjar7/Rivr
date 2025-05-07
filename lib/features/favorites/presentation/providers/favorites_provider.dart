@@ -390,14 +390,24 @@ class FavoritesProvider with ChangeNotifier {
     String stationId,
     String newName,
   ) async {
-    if (_isProcessing) return false;
+    print(
+      "DEBUG: Provider updateFavoriteName called for station $stationId with new name '$newName'",
+    );
+
+    if (_isProcessing) {
+      print("DEBUG: Provider is already processing, returning false");
+      return false;
+    }
 
     try {
       _isProcessing = true;
+      print("DEBUG: Set _isProcessing = true");
 
       // First update the central StreamNameService
+      print("DEBUG: About to update StreamNameService");
       final streamNameUpdateSuccess = await _streamNameService
           .updateDisplayName(stationId, newName);
+      print("DEBUG: StreamNameService update result: $streamNameUpdateSuccess");
 
       if (!streamNameUpdateSuccess) {
         print("Warning: Failed to update StreamNameService for $stationId");
@@ -405,13 +415,21 @@ class FavoritesProvider with ChangeNotifier {
       }
 
       // Now update the favorite in our local list
-      return _dataManager.updateFavoriteName(userId, stationId, newName);
+      print("DEBUG: Calling _dataManager.updateFavoriteName");
+      final result = await _dataManager.updateFavoriteName(
+        userId,
+        stationId,
+        newName,
+      );
+      print("DEBUG: _dataManager.updateFavoriteName returned: $result");
+      return result;
     } catch (e) {
       print("Error in updateFavoriteName: $e");
       _setError('Failed to update favorite name: ${e.toString()}');
       return false;
     } finally {
       _isProcessing = false;
+      print("DEBUG: Set _isProcessing = false");
     }
   }
 

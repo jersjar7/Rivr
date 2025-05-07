@@ -136,6 +136,53 @@ class DatabaseHelper {
     return tableInfo.isNotEmpty;
   }
 
+  // Check if a column exists in a table
+  Future<bool> columnExists(
+    String tableName,
+    String columnName, [
+    Database? providedDb,
+  ]) async {
+    final db = providedDb ?? await database;
+
+    try {
+      final tableInfo = await db.rawQuery('PRAGMA table_info($tableName)');
+      return tableInfo.any((column) => column['name'] == columnName);
+    } catch (e) {
+      print("ERROR: Failed to check if column exists: $e");
+      return false;
+    }
+  }
+
+  // Add a column to a table if it doesn't exist
+  Future<bool> addColumnIfNeeded(
+    String tableName,
+    String columnName,
+    String columnType, [
+    Database? providedDb,
+  ]) async {
+    final db = providedDb ?? await database;
+
+    try {
+      // First check if the column already exists
+      final hasColumn = await columnExists(tableName, columnName, db);
+
+      if (!hasColumn) {
+        print("DEBUG: Adding $columnName column to $tableName");
+        await db.execute(
+          'ALTER TABLE $tableName ADD COLUMN $columnName $columnType',
+        );
+        print("DEBUG: $columnName column added successfully");
+        return true;
+      } else {
+        print("DEBUG: $columnName column already exists in $tableName");
+        return false;
+      }
+    } catch (e) {
+      print("ERROR: Failed to add column $columnName to $tableName: $e");
+      return false;
+    }
+  }
+
   Future<void> createFavoritesTable([Database? providedDb]) async {
     final db = providedDb ?? await database;
 
@@ -154,6 +201,7 @@ class DatabaseHelper {
           imgNumber INTEGER,
           lastUpdated INTEGER NOT NULL,
           originalApiName TEXT,
+          customImagePath TEXT,
           UNIQUE(stationId, userId)
         )
       ''');
@@ -165,28 +213,28 @@ class DatabaseHelper {
     } else {
       print("DEBUG: Favorites table already exists");
 
-      // Check if originalApiName column exists, and add it if it doesn't
-      try {
-        final tableInfo = await db.rawQuery(
-          'PRAGMA table_info($tableFavorites)',
-        );
-        final hasOriginalApiName = tableInfo.any(
-          (column) => column['name'] == 'originalApiName',
-        );
-
-        if (!hasOriginalApiName) {
-          print(
-            "DEBUG: Adding originalApiName column to existing favorites table",
-          );
-          await db.execute(
-            'ALTER TABLE $tableFavorites ADD COLUMN originalApiName TEXT',
-          );
-          print("DEBUG: originalApiName column added successfully");
-        }
-      } catch (e) {
-        print("ERROR: Failed to check/add originalApiName column: $e");
-      }
+      // Check for and add missing columns if needed
+      await ensureFavoritesTableColumns(db);
     }
+  }
+
+  // Ensure all required columns exist in the favorites table
+  Future<void> ensureFavoritesTableColumns([Database? providedDb]) async {
+    final db = providedDb ?? await database;
+
+    // Check and add originalApiName column if needed
+    await addColumnIfNeeded(tableFavorites, 'originalApiName', 'TEXT', db);
+
+    // Check and add customImagePath column if needed
+    await addColumnIfNeeded(tableFavorites, 'customImagePath', 'TEXT', db);
+
+    // Add any future columns here in the same pattern
+  }
+
+  // Specific method for ensuring customImagePath column exists
+  Future<void> ensureCustomImagePathColumn([Database? providedDb]) async {
+    final db = providedDb ?? await database;
+    await addColumnIfNeeded(tableFavorites, 'customImagePath', 'TEXT', db);
   }
 
   // Create forecast cache table if it doesn't exist - can be called on demand

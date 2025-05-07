@@ -28,6 +28,11 @@ class FavoriteCard extends StatelessWidget {
     final imgNumber =
         favorite.imgNumber ?? (favorite.stationId.hashCode % 30 + 1);
 
+    // Debug log to verify image number
+    print(
+      'REBUILDING FavoriteCard: stationId=${favorite.stationId}, imgNumber=${favorite.imgNumber}, lastUpdated=${favorite.lastUpdated}',
+    );
+
     // Parse color or use default
     Color cardColor;
     if (favorite.color != null) {

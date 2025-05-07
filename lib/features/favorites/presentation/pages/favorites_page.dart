@@ -1,9 +1,12 @@
 // lib/features/favorites/presentation/pages/favorites_page.dart
 
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_slidable/flutter_slidable.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
+import 'package:rivr/common/data/local/database_helper.dart';
 import 'package:rivr/features/favorites/services/favorite_image_service.dart';
 
 import '../providers/favorites_provider.dart';
@@ -40,9 +43,22 @@ class _FavoritesPageState extends State<FavoritesPage>
       vsync: this,
       duration: const Duration(milliseconds: 300),
     );
+
+    // Initialize database - ensure columns exist
+    _initializeDatabase();
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _loadFavorites();
     });
+  }
+
+  Future<void> _initializeDatabase() async {
+    try {
+      final databaseHelper = DatabaseHelper();
+      await databaseHelper.ensureCustomImagePathColumn();
+    } catch (e) {
+      print('Error initializing database: $e');
+    }
   }
 
   @override
@@ -64,8 +80,19 @@ class _FavoritesPageState extends State<FavoritesPage>
       );
       final user = authProvider.currentUser;
       if (user != null) {
+        print('Loading favorites for user: ${user.uid}');
         await favoritesProvider.loadFavorites(user.uid);
+
+        // Log loaded favorites for debugging
+        print('Loaded ${favoritesProvider.favorites.length} favorites');
+        for (var fav in favoritesProvider.favorites) {
+          print(
+            '  - Favorite: ${fav.stationId}, imgNumber: ${fav.imgNumber}, lastUpdated: ${fav.lastUpdated}',
+          );
+        }
       }
+    } catch (e) {
+      print('Error loading favorites: $e');
     } finally {
       if (mounted) {
         setState(() {
@@ -114,7 +141,7 @@ class _FavoritesPageState extends State<FavoritesPage>
                 ),
                 ListTile(
                   leading: const Icon(Icons.photo_library),
-                  title: const Text('Choose From Library'),
+                  title: const Text('Choose River Image'),
                   onTap: () {
                     Navigator.pop(context);
                     _showChangeImageDialog(favorite);
@@ -123,10 +150,9 @@ class _FavoritesPageState extends State<FavoritesPage>
                 ListTile(
                   leading: const Icon(Icons.add_photo_alternate),
                   title: const Text('Upload Custom Image'),
-                  onTap: () {
-                    Navigator.pop(context);
-                    _pickAndUploadImage(favorite);
-                  },
+                  subtitle: const Text('Coming soon'),
+                  enabled: false, // Disable until fully implemented
+                  onTap: null,
                 ),
               ],
             ),
@@ -217,40 +243,86 @@ class _FavoritesPageState extends State<FavoritesPage>
       return;
     }
 
-    final favoritesProvider = Provider.of<FavoritesProvider>(
-      context,
-      listen: false,
-    );
+    // Show loading indicator
+    setState(() {
+      _isRefreshing = true;
+    });
 
-    final success = await favoritesProvider.updateFavoriteImage(
-      favorite.userId,
-      favorite.stationId,
-      imgNumber,
-    );
+    try {
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      final user = authProvider.currentUser;
+      if (user == null) {
+        throw Exception("User not logged in");
+      }
 
-    if (success) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('River image updated')));
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Failed to update river image')),
+      // Access database directly to update image number
+      final databaseHelper = DatabaseHelper();
+      final db = await databaseHelper.database;
+
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
+
+      // Update with new timestamp to force UI refresh
+      await db.update(
+        DatabaseHelper.tableFavorites,
+        {'imgNumber': imgNumber, 'lastUpdated': timestamp},
+        where: 'userId = ? AND stationId = ?',
+        whereArgs: [favorite.userId, favorite.stationId],
       );
+
+      print(
+        'DEBUG: Image updated in database - stationId: ${favorite.stationId}, imgNumber: $imgNumber, timestamp: $timestamp',
+      );
+
+      // Refresh favorites to show updated image
+      await _loadFavorites();
+
+      // Show success message
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('River image updated'),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (e) {
+      print('Error updating favorite image: $e');
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to update image: $e'),
+            backgroundColor: Colors.red,
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isRefreshing = false;
+        });
+      }
     }
   }
 
   void _showChangeImageDialog(Favorite favorite) {
     showDialog(
       context: context,
+      barrierDismissible: true,
       builder: (context) {
         return Dialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          clipBehavior: Clip.antiAlias,
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               Padding(
                 padding: const EdgeInsets.all(16.0),
                 child: Text(
-                  'Select an Image',
+                  'Select River Image',
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
@@ -258,26 +330,28 @@ class _FavoritesPageState extends State<FavoritesPage>
                   ),
                 ),
               ),
+              const Divider(height: 1),
               Expanded(
                 child: GridView.builder(
                   shrinkWrap: true,
-                  padding: const EdgeInsets.all(16),
+                  padding: const EdgeInsets.all(12.0),
+                  physics: const BouncingScrollPhysics(),
                   gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                     crossAxisCount: 3,
                     crossAxisSpacing: 8,
                     mainAxisSpacing: 8,
                   ),
-                  itemCount: 30,
+                  itemCount: 30, // We have 30 river images
                   itemBuilder: (context, idx) {
                     final imgNumber = idx + 1;
                     // Highlight the currently selected image
                     final isSelected = favorite.imgNumber == imgNumber;
 
-                    return GestureDetector(
+                    return InkWell(
                       onTap: () {
-                        Navigator.pop(context);
-                        _updateFavoriteImage(favorite, imgNumber);
+                        Navigator.pop(context, imgNumber);
                       },
+                      borderRadius: BorderRadius.circular(8),
                       child: Container(
                         decoration: BoxDecoration(
                           border:
@@ -286,16 +360,26 @@ class _FavoritesPageState extends State<FavoritesPage>
                                     color: AppColors.primaryColor,
                                     width: 3,
                                   )
-                                  : null,
+                                  : Border.all(
+                                    color: Colors.grey[300]!,
+                                    width: 1,
+                                  ),
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: ClipRRect(
-                          borderRadius: BorderRadius.circular(6),
+                          borderRadius: BorderRadius.circular(7),
                           child: Image.asset(
                             'assets/img/river_images/$imgNumber.jpeg',
                             fit: BoxFit.cover,
-                            errorBuilder:
-                                (_, __, ___) => const Icon(Icons.broken_image),
+                            errorBuilder: (context, error, stackTrace) {
+                              return Container(
+                                color: Colors.grey[200],
+                                child: Icon(
+                                  Icons.broken_image,
+                                  color: Colors.grey[500],
+                                ),
+                              );
+                            },
                           ),
                         ),
                       ),
@@ -304,13 +388,25 @@ class _FavoritesPageState extends State<FavoritesPage>
                 ),
               ),
               Padding(
-                padding: const EdgeInsets.all(16.0),
+                padding: const EdgeInsets.all(12.0),
                 child: Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     TextButton(
                       onPressed: () => Navigator.pop(context),
                       child: const Text('Cancel'),
+                    ),
+                    ElevatedButton(
+                      onPressed: () {
+                        // Generate a random image number
+                        final random = math.Random();
+                        final randomImgNumber = random.nextInt(30) + 1;
+                        Navigator.pop(context, randomImgNumber);
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.secondaryColor,
+                      ),
+                      child: const Text('Random'),
                     ),
                   ],
                 ),
@@ -319,7 +415,11 @@ class _FavoritesPageState extends State<FavoritesPage>
           ),
         );
       },
-    );
+    ).then((selectedImgNumber) {
+      if (selectedImgNumber != null && selectedImgNumber is int) {
+        _updateFavoriteImage(favorite, selectedImgNumber);
+      }
+    });
   }
 
   void _confirmDelete(Favorite favorite) {
@@ -519,6 +619,10 @@ class _FavoritesPageState extends State<FavoritesPage>
                     ],
                   ),
                   child: FavoriteCard(
+                    // Add a key with the lastUpdated timestamp to force rebuild when it changes
+                    key: Key(
+                      'favorite_card_${favorite.stationId}_${favorite.lastUpdated}',
+                    ),
                     favorite: favorite,
                     onTap:
                         () => _navigateToForecast(

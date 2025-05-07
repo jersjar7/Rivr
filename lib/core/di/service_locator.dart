@@ -8,6 +8,7 @@ import 'package:http/http.dart' as http;
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:rivr/core/di/map_di.dart';
 import 'package:rivr/core/network/connection_monitor.dart';
+import 'package:rivr/core/services/stream_name_service.dart';
 
 // Core
 import '../network/network_info.dart';
@@ -79,6 +80,14 @@ Future<void> setupServiceLocator() async {
   sl.registerLazySingleton(() => CacheDatabase());
   sl.registerLazySingleton<CacheService>(
     () => CacheService(cacheDatabase: sl<CacheDatabase>()),
+  );
+
+  // Add StreamNameService registration here
+  sl.registerLazySingleton<StreamNameService>(
+    () => StreamNameService(
+      appDatabase: sl<AppDatabase>(),
+      cacheService: sl<CacheService>(),
+    ),
   );
 
   // API Client with caching

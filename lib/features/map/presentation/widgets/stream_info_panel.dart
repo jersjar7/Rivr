@@ -214,9 +214,6 @@ class _StreamInfoPanelState extends State<StreamInfoPanel> {
       }
     }
 
-    // Rest of method continues normally...
-    await _showAddNoteDialog();
-
     // After dialog is closed, proceed with adding to favorites
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
     final favoritesProvider = Provider.of<FavoritesProvider>(
@@ -332,59 +329,6 @@ class _StreamInfoPanelState extends State<StreamInfoPanel> {
           ],
         );
       },
-    );
-  }
-
-  // Show dialog to add a note before adding to favorites
-  Future<void> _showAddNoteDialog() {
-    // Existing dialog implementation...
-    return showDialog(
-      context: context,
-      builder:
-          (context) => AlertDialog(
-            title: const Text('Add a Note (Optional)'),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  'Add a personal note about this river:',
-                  style: TextStyle(color: Colors.grey[700], fontSize: 14),
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: _noteController,
-                  decoration: const InputDecoration(
-                    hintText: 'e.g., Great fishing spot, Class III rapids...',
-                    border: OutlineInputBorder(),
-                  ),
-                  maxLines: 3,
-                  maxLength: 200,
-                ),
-              ],
-            ),
-            actions: [
-              TextButton(
-                onPressed: () {
-                  // Cancel without setting note
-                  Navigator.of(context).pop();
-                },
-                child: const Text('Skip'),
-              ),
-              ElevatedButton(
-                onPressed: () {
-                  // Set note and close dialog
-                  setState(() {
-                    _note =
-                        _noteController.text.isNotEmpty
-                            ? _noteController.text
-                            : null;
-                  });
-                  Navigator.of(context).pop();
-                },
-                child: const Text('Save Note'),
-              ),
-            ],
-          ),
     );
   }
 

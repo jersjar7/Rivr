@@ -7,6 +7,7 @@ import 'package:flutter_slidable/flutter_slidable.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import 'package:rivr/common/data/local/database_helper.dart';
+import 'package:rivr/features/favorites/data/models/favorite_model.dart';
 import 'package:rivr/features/favorites/services/favorite_image_service.dart';
 
 import '../providers/favorites_provider.dart';
@@ -239,29 +240,21 @@ class _FavoritesPageState extends State<FavoritesPage>
 
   Future<void> _updateFavoriteImage(Favorite favorite, int imgNumber) async {
     if (favorite.imgNumber == imgNumber) {
-      // No change needed
-      return;
+      return; // No change needed
     }
 
-    // Show loading indicator
     setState(() {
       _isRefreshing = true;
     });
 
     try {
-      final authProvider = Provider.of<AuthProvider>(context, listen: false);
-      final user = authProvider.currentUser;
-      if (user == null) {
-        throw Exception("User not logged in");
-      }
-
       // Access database directly to update image number
       final databaseHelper = DatabaseHelper();
       final db = await databaseHelper.database;
 
       final timestamp = DateTime.now().millisecondsSinceEpoch;
 
-      // Update with new timestamp to force UI refresh
+      // Update the database
       await db.update(
         DatabaseHelper.tableFavorites,
         {'imgNumber': imgNumber, 'lastUpdated': timestamp},
@@ -273,17 +266,44 @@ class _FavoritesPageState extends State<FavoritesPage>
         'DEBUG: Image updated in database - stationId: ${favorite.stationId}, imgNumber: $imgNumber, timestamp: $timestamp',
       );
 
-      // Refresh favorites to show updated image
-      await _loadFavorites();
+      // Instead of reloading from database, directly update the favorites provider
+      final favoritesProvider = Provider.of<FavoritesProvider>(
+        context,
+        listen: false,
+      );
 
-      // Show success message
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('River image updated'),
-            duration: Duration(seconds: 2),
-          ),
+      // Find and update the favorite in the provider's list
+      final index = favoritesProvider.favorites.indexWhere(
+        (f) => f.stationId == favorite.stationId && f.userId == favorite.userId,
+      );
+
+      if (index >= 0) {
+        // Create updated model
+        final updatedFavorite = FavoriteModel(
+          stationId: favorite.stationId,
+          name: favorite.name,
+          userId: favorite.userId,
+          position: favorite.position,
+          color: favorite.color,
+          description: favorite.description,
+          imgNumber: imgNumber, // Update image number
+          lastUpdated: timestamp, // Update timestamp
+          originalApiName: favorite.originalApiName,
+          customImagePath: favorite.customImagePath,
         );
+
+        // Update the provider's list directly
+        favoritesProvider.updateFavoriteDirectly(index, updatedFavorite);
+
+        // Show success message
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('River image updated'),
+              duration: Duration(seconds: 2),
+            ),
+          );
+        }
       }
     } catch (e) {
       print('Error updating favorite image: $e');

@@ -240,6 +240,13 @@ class FavoritesProvider with ChangeNotifier {
     return [];
   }
 
+  void updateFavoriteDirectly(int index, Favorite updatedFavorite) {
+    if (index >= 0 && index < _favorites.length) {
+      _favorites[index] = updatedFavorite;
+      notifyListeners(); // This will refresh the UI immediately
+    }
+  }
+
   // Convert Favorite to JSON
   Map<String, dynamic> _favoriteToJson(Favorite favorite) {
     final json = {

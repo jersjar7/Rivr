@@ -4,11 +4,9 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_slidable/flutter_slidable.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import 'package:rivr/common/data/local/database_helper.dart';
 import 'package:rivr/features/favorites/data/models/favorite_model.dart';
-import 'package:rivr/features/favorites/services/favorite_image_service.dart';
 
 import '../providers/favorites_provider.dart';
 import '../../../../features/auth/presentation/providers/auth_provider.dart';
@@ -35,7 +33,6 @@ class _FavoritesPageState extends State<FavoritesPage>
   late AnimationController _animationController;
   final GlobalKey<RefreshIndicatorState> _refreshIndicatorKey =
       GlobalKey<RefreshIndicatorState>();
-  final ImagePicker _picker = ImagePicker();
 
   @override
   void initState() {
@@ -159,83 +156,6 @@ class _FavoritesPageState extends State<FavoritesPage>
             ),
           ),
     );
-  }
-
-  // Let's implement the image upload functionality
-  Future<void> _pickAndUploadImage(Favorite favorite) async {
-    try {
-      final pickedFile = await _picker.pickImage(
-        source: ImageSource.gallery,
-        maxWidth: 1200,
-        maxHeight: 1200,
-        imageQuality: 85,
-      );
-
-      if (pickedFile == null) {
-        return; // User canceled selection
-      }
-
-      // Show loading indicator
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Processing image...'),
-          duration: Duration(seconds: 1),
-        ),
-      );
-
-      // Read the file
-      final bytes = await pickedFile.readAsBytes();
-
-      // Save the image using our service
-      final fileName = await FavoriteImageService.saveImage(
-        userId: favorite.userId,
-        stationId: favorite.stationId,
-        bytes: bytes,
-      );
-
-      // Update the favorite with the custom image path
-      final favoritesProvider = Provider.of<FavoritesProvider>(
-        context,
-        listen: false,
-      );
-
-      // We need to add a method to update the custom image path in FavoritesProvider
-      final success = await favoritesProvider.updateFavoriteCustomImage(
-        favorite.userId,
-        favorite.stationId,
-        fileName,
-      );
-
-      if (!mounted) return;
-
-      if (success) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Custom image saved successfully'),
-            duration: Duration(seconds: 2),
-          ),
-        );
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Failed to save custom image'),
-            backgroundColor: Colors.red,
-            duration: Duration(seconds: 2),
-          ),
-        );
-      }
-    } catch (e) {
-      // Handle errors
-      if (!mounted) return;
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error uploading image: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
-    }
   }
 
   Future<void> _updateFavoriteImage(Favorite favorite, int imgNumber) async {
@@ -649,13 +569,7 @@ class _FavoritesPageState extends State<FavoritesPage>
                           favorite.stationId,
                           favorite.name,
                         ),
-                    onDelete: () {
-                      final uid = authProvider.currentUser!.uid;
-                      Provider.of<FavoritesProvider>(
-                        context,
-                        listen: false,
-                      ).deleteFavorite(uid, favorite.stationId);
-                    },
+                    onDelete: () => _confirmDelete(favorite),
                   ),
                 );
               },

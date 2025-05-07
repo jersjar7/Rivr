@@ -92,6 +92,22 @@ class FavoritesProvider with ChangeNotifier {
     _dataManager.initTables();
   }
 
+  /// Public method to notify listeners of changes
+  /// This allows manager classes to trigger UI updates without directly accessing protected methods
+  void notifyChanges() {
+    // Use microtask to avoid setState during build
+    Future.microtask(() {
+      notifyListeners();
+    });
+  }
+
+  /// Set the last synchronization time
+  /// This allows persistence manager to update sync time when retrieving cached data
+  void setLastSyncTime(DateTime time) {
+    _lastSyncTime = time;
+    // No need to notify listeners as this is mostly for internal bookkeeping
+  }
+
   // Load favorites for user with offline handling
   Future<void> loadFavorites(String userId) async {
     // Prevent multiple simultaneous loads

@@ -80,13 +80,13 @@ class FavoritesPersistenceManager {
           final List<Favorite> favorites =
               favoritesJson.map((json) => _favoriteFromJson(json)).toList();
 
-          // Update last sync time
+          // Update last sync time in parent
           if (apiData['timestamp'] != null) {
             final lastSyncTime = DateTime.fromMillisecondsSinceEpoch(
               apiData['timestamp'],
             );
-            // We can't update parent's private _lastSyncTime directly,
-            // but this is available when needed
+            // Use the setLastSyncTime method from parent instead of accessing private field
+            parent.setLastSyncTime(lastSyncTime);
           }
 
           return favorites;
@@ -274,7 +274,11 @@ class FavoritesPersistenceManager {
 
       // Only notify if there were actual changes
       if (processedIndices.isNotEmpty) {
-        parent.notifyListeners();
+        // Use notifyChanges instead of notifyListeners
+        parent.notifyChanges();
+
+        // Update last sync time
+        parent.setLastSyncTime(DateTime.now());
       }
     } catch (e) {
       print("Error syncing pending operations: $e");

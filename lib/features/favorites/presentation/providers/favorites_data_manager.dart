@@ -128,7 +128,8 @@ class FavoritesDataManager {
         // Add to pending operations queue for later sync
         await parent.persistenceManager.addToPendingOperations('ADD', favorite);
 
-        parent.notifyListeners();
+        // Use notifyChanges method instead of direct access to notifyListeners
+        parent.notifyChanges();
         return true;
       }
 
@@ -148,7 +149,8 @@ class FavoritesDataManager {
           // Cache the updated favorites list
           parent.persistenceManager.cacheFavorites(userId, parent.favorites);
 
-          parent.notifyListeners();
+          // Use notifyChanges method instead of direct access to notifyListeners
+          parent.notifyChanges();
           return true;
         },
       );
@@ -214,7 +216,8 @@ class FavoritesDataManager {
           favoriteModel,
         );
 
-        parent.notifyListeners();
+        // Use notifyChanges method instead of direct access to notifyListeners
+        parent.notifyChanges();
         return;
       }
 
@@ -235,7 +238,8 @@ class FavoritesDataManager {
             parent.favorites,
           );
 
-          parent.notifyListeners();
+          // Use notifyChanges method instead of direct access to notifyListeners
+          parent.notifyChanges();
         },
       );
     } catch (e) {
@@ -301,7 +305,7 @@ class FavoritesDataManager {
 
       // Update local list first for responsive UI
       parent.favorites[favoriteIndex] = updatedFavorite;
-      parent.notifyListeners();
+      parent.notifyChanges();
 
       // Always update StreamNameService
       try {
@@ -384,7 +388,7 @@ class FavoritesDataManager {
 
       // Update local list first for responsive UI
       parent.favorites[favoriteIndex] = updatedFavorite;
-      parent.notifyListeners();
+      parent.notifyChanges();
 
       // Check connectivity
       final bool isConnected = await parent.persistenceManager.isConnected();
@@ -460,7 +464,7 @@ class FavoritesDataManager {
 
       // Update local list first for responsive UI
       parent.favorites[favoriteIndex] = updatedFavorite;
-      parent.notifyListeners();
+      parent.notifyChanges();
 
       // Check connectivity
       final bool isConnected = await parent.persistenceManager.isConnected();
@@ -517,7 +521,7 @@ class FavoritesDataManager {
       // Update the local list first for responsive UI
       final favorite = parent.favorites.removeAt(oldIndex);
       parent.favorites.insert(newIndex, favorite);
-      parent.notifyListeners();
+      parent.notifyChanges();
 
       // Update positions in local list
       final updatedFavorites = <Favorite>[];

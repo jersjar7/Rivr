@@ -467,6 +467,11 @@ class FavoriteCard extends StatelessWidget {
         }
       } catch (e) {
         print('Error updating favorite name: $e');
+        if (currentContext.mounted) {
+          ScaffoldMessenger.of(currentContext).showSnackBar(
+            SnackBar(content: Text('Error updating river name: $e')),
+          );
+        }
       }
     }
   }

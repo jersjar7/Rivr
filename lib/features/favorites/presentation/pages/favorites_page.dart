@@ -401,28 +401,62 @@ class _FavoritesPageState extends State<FavoritesPage>
     );
   }
 
+  // Replace this method in favorites_page.dart
   Future<void> _showEditNameDialog(BuildContext ctx, Favorite favorite) async {
+    // Store a local reference to the context to avoid using a potentially stale context
+    final currentContext = ctx;
+
+    final favoritesProvider = Provider.of<FavoritesProvider>(
+      currentContext,
+      listen: false,
+    );
+
     final result = await showDialog<String>(
-      context: ctx,
+      context: currentContext,
       builder:
-          (_) => EditFavoriteNameDialog(
+          (dialogContext) => EditFavoriteNameDialog(
             currentName: favorite.name,
             stationId: favorite.stationId,
             originalApiName: favorite.originalApiName,
           ),
     );
+
+    // Check if the context is still valid before using it
     if (result != null && result != favorite.name) {
-      final success = await Provider.of<FavoritesProvider>(
-        ctx,
-        listen: false,
-      ).updateFavoriteName(favorite.userId, favorite.stationId, result);
-      ScaffoldMessenger.of(ctx).showSnackBar(
-        SnackBar(
-          content: Text(
-            success ? 'River name updated' : 'Failed to update name',
-          ),
-        ),
-      );
+      try {
+        // Update the name
+        final success = await favoritesProvider.updateFavoriteName(
+          favorite.userId,
+          favorite.stationId,
+          result,
+        );
+
+        // Before showing snackbar, check if the context is still active
+        if (currentContext.mounted) {
+          // Use the context's mounted property
+          ScaffoldMessenger.of(currentContext).showSnackBar(
+            SnackBar(
+              content: Text(
+                success
+                    ? 'River name updated successfully'
+                    : 'Failed to update river name',
+              ),
+            ),
+          );
+        }
+
+        // Force reload favorites to ensure UI updates correctly
+        if (success) {
+          await favoritesProvider.loadFavorites(favorite.userId);
+        }
+      } catch (e) {
+        print('Error updating favorite name: $e');
+        if (currentContext.mounted) {
+          ScaffoldMessenger.of(currentContext).showSnackBar(
+            SnackBar(content: Text('Error updating river name: $e')),
+          );
+        }
+      }
     }
   }
 

@@ -5,18 +5,15 @@ import 'package:flutter/material.dart';
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
 import 'package:provider/provider.dart';
 import 'package:rivr/core/di/service_locator.dart';
-import 'package:rivr/core/repositories/offline_storage_repository.dart';
 import 'package:rivr/core/services/stream_name_service.dart';
 import 'package:rivr/features/map/domain/entities/map_station.dart';
 import 'package:rivr/features/auth/presentation/providers/auth_provider.dart';
-import 'package:rivr/features/favorites/presentation/providers/favorites_provider.dart';
 
 import '../helpers/stream_info_helper.dart';
 import '../providers/enhanced_clustered_map_provider.dart';
 import '../providers/station_provider.dart';
 import '../providers/map_provider.dart';
 import '../widgets/stream_info_panel.dart';
-import '../widgets/dialogs/stream_name_dialog.dart';
 import '../../../../core/constants/map_constants.dart';
 
 class MapTapHandler {
@@ -30,7 +27,7 @@ class MapTapHandler {
 
   // Store provider references to avoid context issues
   late final AuthProvider _authProvider;
-  late final FavoritesProvider _favoritesProvider;
+
   late final StreamNameService _streamNameService;
   late final StreamInfoHelper _streamInfoHelper;
 
@@ -41,7 +38,7 @@ class MapTapHandler {
   }) {
     // Initialize provider references immediately
     _authProvider = Provider.of<AuthProvider>(context, listen: false);
-    _favoritesProvider = Provider.of<FavoritesProvider>(context, listen: false);
+
     _streamNameService = sl<StreamNameService>();
     _streamInfoHelper = StreamInfoHelper(streamNameService: _streamNameService);
   }

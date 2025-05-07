@@ -843,6 +843,170 @@ class FavoritesProvider with ChangeNotifier {
     }
   }
 
+  Future<bool> updateFavoriteImage(
+    String userId,
+    String stationId,
+    int imgNumber,
+  ) async {
+    if (_isProcessing) return false;
+
+    try {
+      _isProcessing = true;
+
+      // Find the favorite to update
+      final favoriteIndex = _favorites.indexWhere(
+        (f) => f.stationId == stationId && f.userId == userId,
+      );
+
+      if (favoriteIndex < 0) {
+        return false; // Not found
+      }
+
+      // Get the current favorite
+      final favorite = _favorites[favoriteIndex];
+
+      // Create updated favorite with new image number
+      final updatedFavorite = FavoriteModel(
+        stationId: favorite.stationId,
+        name: favorite.name,
+        userId: favorite.userId,
+        position: favorite.position,
+        color: favorite.color,
+        description: favorite.description,
+        imgNumber: imgNumber, // Update the image number
+        lastUpdated: DateTime.now().millisecondsSinceEpoch,
+        originalApiName:
+            favorite.originalApiName, // Preserve the original API name
+      );
+
+      // Update local list first for responsive UI
+      _favorites[favoriteIndex] = updatedFavorite;
+      notifyListeners();
+
+      // Check connectivity
+      final bool isConnected = await _networkInfo.isConnected;
+      final bool isOfflineMode = _offlineManager.offlineModeEnabled;
+
+      if (!isConnected || isOfflineMode) {
+        // Offline mode - add to pending operations
+        await _addToPendingOperations('UPDATE', updatedFavorite);
+
+        // Update cache - with debouncing
+        _debounceTimer?.cancel();
+        _debounceTimer = Timer(const Duration(milliseconds: 300), () {
+          _cacheFavorites(userId, _favorites);
+        });
+
+        return true;
+      }
+
+      // Update in database
+      final result = await addFavoriteUseCase(updatedFavorite);
+
+      return result.fold(
+        (failure) {
+          _setError(failure.message);
+          return false;
+        },
+        (_) {
+          // Update cache - with debouncing
+          _debounceTimer?.cancel();
+          _debounceTimer = Timer(const Duration(milliseconds: 300), () {
+            _cacheFavorites(userId, _favorites);
+          });
+          return true;
+        },
+      );
+    } catch (e) {
+      _setError('Failed to update favorite image: ${e.toString()}');
+      return false;
+    } finally {
+      _isProcessing = false;
+    }
+  }
+
+  Future<bool> updateFavoriteCustomImage(
+    String userId,
+    String stationId,
+    String customImagePath,
+  ) async {
+    if (_isProcessing) return false;
+
+    try {
+      _isProcessing = true;
+
+      // Find the favorite to update
+      final favoriteIndex = _favorites.indexWhere(
+        (f) => f.stationId == stationId && f.userId == userId,
+      );
+
+      if (favoriteIndex < 0) {
+        return false; // Not found
+      }
+
+      // Get the current favorite
+      final favorite = _favorites[favoriteIndex];
+
+      // Create updated favorite with new custom image path
+      final updatedFavorite = FavoriteModel(
+        stationId: favorite.stationId,
+        name: favorite.name,
+        userId: favorite.userId,
+        position: favorite.position,
+        color: favorite.color,
+        description: favorite.description,
+        imgNumber: favorite.imgNumber,
+        lastUpdated: DateTime.now().millisecondsSinceEpoch,
+        originalApiName: favorite.originalApiName,
+        customImagePath: customImagePath, // Update the custom image path
+      );
+
+      // Update local list first for responsive UI
+      _favorites[favoriteIndex] = updatedFavorite;
+      notifyListeners();
+
+      // Check connectivity
+      final bool isConnected = await _networkInfo.isConnected;
+      final bool isOfflineMode = _offlineManager.offlineModeEnabled;
+
+      if (!isConnected || isOfflineMode) {
+        // Offline mode - add to pending operations
+        await _addToPendingOperations('UPDATE', updatedFavorite);
+
+        // Update cache - with debouncing
+        _debounceTimer?.cancel();
+        _debounceTimer = Timer(const Duration(milliseconds: 300), () {
+          _cacheFavorites(userId, _favorites);
+        });
+
+        return true;
+      }
+
+      // Update in database
+      final result = await addFavoriteUseCase(updatedFavorite);
+
+      return result.fold(
+        (failure) {
+          _setError(failure.message);
+          return false;
+        },
+        (_) {
+          // Update cache - with debouncing
+          _debounceTimer?.cancel();
+          _debounceTimer = Timer(const Duration(milliseconds: 300), () {
+            _cacheFavorites(userId, _favorites);
+          });
+          return true;
+        },
+      );
+    } catch (e) {
+      _setError('Failed to update custom image: ${e.toString()}');
+      return false;
+    } finally {
+      _isProcessing = false;
+    }
+  }
+
   // Store pending operations for later sync - compatible with OfflineManagerService
   Future<void> _addToPendingOperations(
     String operation,

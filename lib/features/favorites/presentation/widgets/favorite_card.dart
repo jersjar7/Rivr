@@ -1,7 +1,10 @@
 // lib/features/favorites/presentation/widgets/favorite_card.dart
 
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:rivr/features/favorites/services/favorite_image_service.dart';
 import '../../domain/entities/favorite.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../providers/favorites_provider.dart';
@@ -74,21 +77,51 @@ class FavoriteCard extends StatelessWidget {
                   // River Image
                   Hero(
                     tag: 'river_image_${favorite.stationId}',
-                    child: Image.asset(
-                      'assets/img/river_images/$imgNumber.jpeg',
-                      height: 160,
-                      width: double.infinity,
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) {
-                        // Fallback image when the asset fails to load
-                        return Container(
-                          height: 160,
-                          width: double.infinity,
-                          color: cardColor.withValues(alpha: 0.3),
-                          child: Icon(Icons.water, size: 80, color: cardColor),
-                        );
-                      },
-                    ),
+                    child:
+                        favorite.customImagePath != null &&
+                                favorite.customImagePath!.isNotEmpty
+                            ? FutureBuilder<String?>(
+                              future: FavoriteImageService.getImagePath(
+                                favorite.customImagePath!,
+                              ),
+                              builder: (context, snapshot) {
+                                if (snapshot.connectionState ==
+                                    ConnectionState.waiting) {
+                                  return Container(
+                                    height: 160,
+                                    width: double.infinity,
+                                    color: cardColor.withAlpha(50),
+                                    child: const Center(
+                                      child: CircularProgressIndicator(),
+                                    ),
+                                  );
+                                }
+
+                                final imagePath = snapshot.data;
+                                if (imagePath != null) {
+                                  return Image.file(
+                                    File(imagePath),
+                                    height: 160,
+                                    width: double.infinity,
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (context, error, stackTrace) {
+                                      // Fallback to default image
+                                      return _buildDefaultImage(
+                                        imgNumber,
+                                        cardColor,
+                                      );
+                                    },
+                                  );
+                                } else {
+                                  // Fallback to default image
+                                  return _buildDefaultImage(
+                                    imgNumber,
+                                    cardColor,
+                                  );
+                                }
+                              },
+                            )
+                            : _buildDefaultImage(imgNumber, cardColor),
                   ),
 
                   // Gradient Overlay
@@ -319,6 +352,24 @@ class FavoriteCard extends StatelessWidget {
       default:
         return Colors.blue; // Lower than normal
     }
+  }
+
+  Widget _buildDefaultImage(int imgNumber, Color cardColor) {
+    return Image.asset(
+      'assets/img/river_images/$imgNumber.jpeg',
+      height: 160,
+      width: double.infinity,
+      fit: BoxFit.cover,
+      errorBuilder: (context, error, stackTrace) {
+        // Fallback image when the asset fails to load
+        return Container(
+          height: 160,
+          width: double.infinity,
+          color: cardColor.withAlpha(80),
+          child: Icon(Icons.water, size: 80, color: cardColor),
+        );
+      },
+    );
   }
 
   void _showDeleteConfirmation(BuildContext context) {

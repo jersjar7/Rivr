@@ -1,7 +1,10 @@
+// lib/features/favorites/presentation/pages/favorites_page.dart
+
 import 'package:flutter/material.dart';
 import 'package:flutter_slidable/flutter_slidable.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
+import 'package:rivr/features/favorites/services/favorite_image_service.dart';
 
 import '../providers/favorites_provider.dart';
 import '../../../../features/auth/presentation/providers/auth_provider.dart';
@@ -110,22 +113,19 @@ class _FavoritesPageState extends State<FavoritesPage>
                   },
                 ),
                 ListTile(
-                  leading: const Icon(Icons.image),
-                  title: const Text('Change Image'),
+                  leading: const Icon(Icons.photo_library),
+                  title: const Text('Choose From Library'),
                   onTap: () {
                     Navigator.pop(context);
                     _showChangeImageDialog(favorite);
                   },
                 ),
                 ListTile(
-                  leading: const Icon(Icons.upload_file),
-                  title: const Text('Upload Image'),
+                  leading: const Icon(Icons.add_photo_alternate),
+                  title: const Text('Upload Custom Image'),
                   onTap: () {
                     Navigator.pop(context);
-                    // UI-only placeholder
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Upload image (UI only)')),
-                    );
+                    _pickAndUploadImage(favorite);
                   },
                 ),
               ],
@@ -134,38 +134,188 @@ class _FavoritesPageState extends State<FavoritesPage>
     );
   }
 
+  // Let's implement the image upload functionality
+  Future<void> _pickAndUploadImage(Favorite favorite) async {
+    try {
+      final pickedFile = await _picker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 1200,
+        maxHeight: 1200,
+        imageQuality: 85,
+      );
+
+      if (pickedFile == null) {
+        return; // User canceled selection
+      }
+
+      // Show loading indicator
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Processing image...'),
+          duration: Duration(seconds: 1),
+        ),
+      );
+
+      // Read the file
+      final bytes = await pickedFile.readAsBytes();
+
+      // Save the image using our service
+      final fileName = await FavoriteImageService.saveImage(
+        userId: favorite.userId,
+        stationId: favorite.stationId,
+        bytes: bytes,
+      );
+
+      // Update the favorite with the custom image path
+      final favoritesProvider = Provider.of<FavoritesProvider>(
+        context,
+        listen: false,
+      );
+
+      // We need to add a method to update the custom image path in FavoritesProvider
+      final success = await favoritesProvider.updateFavoriteCustomImage(
+        favorite.userId,
+        favorite.stationId,
+        fileName,
+      );
+
+      if (!mounted) return;
+
+      if (success) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Custom image saved successfully'),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Failed to save custom image'),
+            backgroundColor: Colors.red,
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (e) {
+      // Handle errors
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error uploading image: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  Future<void> _updateFavoriteImage(Favorite favorite, int imgNumber) async {
+    if (favorite.imgNumber == imgNumber) {
+      // No change needed
+      return;
+    }
+
+    final favoritesProvider = Provider.of<FavoritesProvider>(
+      context,
+      listen: false,
+    );
+
+    final success = await favoritesProvider.updateFavoriteImage(
+      favorite.userId,
+      favorite.stationId,
+      imgNumber,
+    );
+
+    if (success) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('River image updated')));
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Failed to update river image')),
+      );
+    }
+  }
+
   void _showChangeImageDialog(Favorite favorite) {
     showDialog(
       context: context,
       builder: (context) {
         return Dialog(
-          child: GridView.builder(
-            shrinkWrap: true,
-            padding: const EdgeInsets.all(16),
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 3,
-              crossAxisSpacing: 8,
-              mainAxisSpacing: 8,
-            ),
-            itemCount: 30,
-            itemBuilder: (context, idx) {
-              final imgNumber = idx + 1;
-              return GestureDetector(
-                onTap: () {
-                  Navigator.pop(context);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Picked image #$imgNumber (UI only)'),
-                    ),
-                  );
-                },
-                child: Image.asset(
-                  'assets/img/river_images/$imgNumber.jpeg',
-                  fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => const Icon(Icons.broken_image),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Text(
+                  'Select an Image',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.grey[800],
+                  ),
                 ),
-              );
-            },
+              ),
+              Expanded(
+                child: GridView.builder(
+                  shrinkWrap: true,
+                  padding: const EdgeInsets.all(16),
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 3,
+                    crossAxisSpacing: 8,
+                    mainAxisSpacing: 8,
+                  ),
+                  itemCount: 30,
+                  itemBuilder: (context, idx) {
+                    final imgNumber = idx + 1;
+                    // Highlight the currently selected image
+                    final isSelected = favorite.imgNumber == imgNumber;
+
+                    return GestureDetector(
+                      onTap: () {
+                        Navigator.pop(context);
+                        _updateFavoriteImage(favorite, imgNumber);
+                      },
+                      child: Container(
+                        decoration: BoxDecoration(
+                          border:
+                              isSelected
+                                  ? Border.all(
+                                    color: AppColors.primaryColor,
+                                    width: 3,
+                                  )
+                                  : null,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(6),
+                          child: Image.asset(
+                            'assets/img/river_images/$imgNumber.jpeg',
+                            fit: BoxFit.cover,
+                            errorBuilder:
+                                (_, __, ___) => const Icon(Icons.broken_image),
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: const Text('Cancel'),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
         );
       },

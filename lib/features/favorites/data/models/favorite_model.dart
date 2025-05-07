@@ -13,6 +13,7 @@ class FavoriteModel extends Favorite {
     super.imgNumber,
     super.lastUpdated,
     super.originalApiName,
+    super.customImagePath, // Add support for custom image path
   });
 
   factory FavoriteModel.fromMap(Map<String, dynamic> map) {
@@ -26,6 +27,8 @@ class FavoriteModel extends Favorite {
       imgNumber: map['imgNumber'],
       lastUpdated: map['lastUpdated'],
       originalApiName: map['originalApiName'],
+      customImagePath:
+          map['customImagePath'], // Add support for custom image path
     );
   }
 
@@ -39,7 +42,8 @@ class FavoriteModel extends Favorite {
       'description': description,
       'imgNumber': imgNumber,
       'lastUpdated': lastUpdated ?? DateTime.now().millisecondsSinceEpoch,
-      'originalApiName': originalApiName, // Added field
+      'originalApiName': originalApiName,
+      'customImagePath': customImagePath, // Add support for custom image path
     };
   }
 }

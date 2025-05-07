@@ -10,6 +10,7 @@ class Favorite {
   final int? imgNumber;
   final int? lastUpdated;
   final String? originalApiName;
+  final String? customImagePath;
 
   const Favorite({
     required this.stationId,
@@ -21,5 +22,6 @@ class Favorite {
     this.imgNumber,
     this.lastUpdated,
     this.originalApiName,
+    this.customImagePath,
   });
 }

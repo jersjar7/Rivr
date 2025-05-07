@@ -1,4 +1,5 @@
 import 'package:path/path.dart';
+import 'package:rivr/common/data/local/database_migration_helper.dart';
 import 'package:sqflite/sqflite.dart';
 
 abstract class AppDatabase {
@@ -93,6 +94,10 @@ class AppDatabaseImpl implements AppDatabase {
             UNIQUE(userId, stationId, thresholdType)
           )
         ''');
+      },
+      onOpen: (db) async {
+        // Add this line to run migrations on database open
+        await DatabaseMigrationHelper.ensureMigrations(db);
       },
     );
   }

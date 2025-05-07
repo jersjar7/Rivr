@@ -4,15 +4,19 @@ import 'dart:math' as Math;
 import 'package:flutter/material.dart';
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
 import 'package:provider/provider.dart';
+import 'package:rivr/core/di/service_locator.dart';
 import 'package:rivr/core/repositories/offline_storage_repository.dart';
+import 'package:rivr/core/services/stream_name_service.dart';
 import 'package:rivr/features/map/domain/entities/map_station.dart';
 import 'package:rivr/features/auth/presentation/providers/auth_provider.dart';
 import 'package:rivr/features/favorites/presentation/providers/favorites_provider.dart';
 
+import '../helpers/stream_info_helper.dart';
 import '../providers/enhanced_clustered_map_provider.dart';
 import '../providers/station_provider.dart';
 import '../providers/map_provider.dart';
 import '../widgets/stream_info_panel.dart';
+import '../widgets/dialogs/stream_name_dialog.dart';
 import '../../../../core/constants/map_constants.dart';
 
 class MapTapHandler {
@@ -27,6 +31,8 @@ class MapTapHandler {
   // Store provider references to avoid context issues
   late final AuthProvider _authProvider;
   late final FavoritesProvider _favoritesProvider;
+  late final StreamNameService _streamNameService;
+  late final StreamInfoHelper _streamInfoHelper;
 
   MapTapHandler({
     required this.mapboxMap,
@@ -36,6 +42,8 @@ class MapTapHandler {
     // Initialize provider references immediately
     _authProvider = Provider.of<AuthProvider>(context, listen: false);
     _favoritesProvider = Provider.of<FavoritesProvider>(context, listen: false);
+    _streamNameService = sl<StreamNameService>();
+    _streamInfoHelper = StreamInfoHelper(streamNameService: _streamNameService);
   }
 
   /// Set up the tap handler
@@ -295,8 +303,16 @@ class MapTapHandler {
 
       // Show the info panel for the selected station
       print("Showing info panel for station: ${tappedStation.stationId}");
+
+      // Get the display name from StreamNameService
+      String displayName = await _streamInfoHelper.getDisplayName(
+        tappedStation,
+        stationName,
+      );
+
       _showInfoPanel(
         tappedStation,
+        displayName,
         clusteredMapProvider,
         stationProvider,
         mapProvider,
@@ -309,6 +325,7 @@ class MapTapHandler {
   /// Show the stream info panel for the selected station
   void _showInfoPanel(
     MapStation station,
+    String displayName,
     EnhancedClusteredMapProvider clusteredMapProvider,
     StationProvider stationProvider,
     MapProvider mapProvider,
@@ -321,9 +338,6 @@ class MapTapHandler {
 
       // Find the overlay to add our widget to
       final overlay = Overlay.of(context);
-
-      // Determine the display name
-      String displayName = station.name ?? "";
 
       // Create a new info panel
       _currentInfoPanel = StreamInfoPanel(
@@ -343,9 +357,10 @@ class MapTapHandler {
           Navigator.pushNamed(
             context,
             '/forecast',
-            arguments: {'reachId': reachId, 'stationName': displayName},
+            arguments: {'reachId': reachId, 'stationName': stationName},
           );
         },
+        onNavigateToFavorites: onStationAddedToFavorites,
       );
 
       // Create an overlay entry to show the panel
@@ -359,133 +374,10 @@ class MapTapHandler {
     }
   }
 
-  Future<String?> _showNameInputDialog(MapStation station) {
-    final TextEditingController nameController = TextEditingController();
-
-    return showDialog<String>(
-      context: context,
-      barrierDismissible: false, // User must take an action
-      builder: (BuildContext context) {
-        // Use this to get the screen size
-        final screenSize = MediaQuery.of(context).size;
-
-        return Dialog(
-          // This alignment positions the dialog higher on the screen
-          // The default is Alignment.center (0.0, 0.0)
-          // Using Alignment(0.0, -0.3) will move it up by 30% of the screen height
-          alignment: const Alignment(0.0, -0.3),
-
-          // Use Dialog's insetPadding to control positioning
-          insetPadding: const EdgeInsets.symmetric(
-            horizontal: 40.0,
-            vertical: 24.0,
-          ),
-
-          child: Container(
-            width: screenSize.width * 0.85, // Control width
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              mainAxisSize: MainAxisSize.min, // Keep dialog size to minimum
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                // Title section
-                const Text(
-                  'Name This Stream',
-                  style: TextStyle(fontSize: 18.0, fontWeight: FontWeight.bold),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 16),
-
-                // Message
-                Text(
-                  'This stream does not have a name. Please assign it a name for your device\'s use:',
-                  style: TextStyle(color: Colors.grey[700], fontSize: 14),
-                ),
-                const SizedBox(height: 16),
-
-                // Text field
-                TextField(
-                  controller: nameController,
-                  decoration: const InputDecoration(
-                    hintText: 'Enter a name for this stream',
-                    border: OutlineInputBorder(),
-                  ),
-                  autofocus: true,
-                  maxLength: 100,
-                ),
-                const SizedBox(height: 16),
-
-                // Buttons
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    TextButton(
-                      onPressed: () {
-                        Navigator.of(context).pop(); // Cancel
-                      },
-                      child: const Text('Cancel'),
-                    ),
-                    const SizedBox(width: 8),
-                    ElevatedButton(
-                      onPressed: () {
-                        // Validate input - don't allow empty names
-                        if (nameController.text.trim().isNotEmpty) {
-                          Navigator.of(context).pop(nameController.text.trim());
-                        } else {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Please enter a name'),
-                            ),
-                          );
-                        }
-                      },
-                      child: const Text('Save Name'),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  Future<String> _getDisplayNameFromCache(MapStation station) async {
-    try {
-      // Get the cached data, just like StreamInfoPanel._fetchReachData does
-      final offlineStorage = OfflineStorageRepository();
-      final cachedData = await offlineStorage.getCachedStation(
-        station.stationId,
-      );
-
-      // Check if we have a valid name in the cached data
-      if (cachedData != null &&
-          cachedData['apiData'] != null &&
-          cachedData['apiData'] is Map &&
-          cachedData['apiData']['name'] != null &&
-          cachedData['apiData']['name'].toString().trim().isNotEmpty) {
-        // Found a name in cache - return it
-        final cachedName = cachedData['apiData']['name'].toString();
-        print(
-          "DEBUG: Found cached name: '$cachedName' for station ${station.stationId}",
-        );
-        return cachedName;
-      }
-    } catch (e) {
-      print("DEBUG: Error getting cached display name: $e");
-    }
-
-    // If no name in cache or error occurred, return the station name or default
-    final stationName = station.name ?? "";
-    if (stationName.isEmpty) {
-      return "Stream ${station.stationId}";
-    }
-    return stationName;
-  }
-
   /// Helper method to handle adding to favorites
   Future<bool> _handleAddToFavorites(MapStation station) async {
+    print("Handling add to favorites for station: ${station.stationId}");
+
     // Check if user is logged in using the stored provider reference
     final user = _authProvider.currentUser;
     if (user == null) {
@@ -499,101 +391,23 @@ class MapTapHandler {
     }
 
     try {
-      // CRITICAL FIX: Get the display name from cache just like the StreamInfoPanel does
-      String displayName = await _getDisplayNameFromCache(station);
-      print("DEBUG: Display name from cache: '$displayName'");
-
-      // Check if this is a default/generated name
-      bool needsName =
-          displayName.isEmpty ||
-          displayName == "Stream ${station.stationId}" ||
-          displayName == "Station ${station.stationId}";
-
-      print(
-        "DEBUG: Station display name: '$displayName', needsName: $needsName",
-      );
-
-      // If we need a name, prompt the user
-      if (needsName) {
-        final customName = await _showNameInputDialog(station);
-
-        // If user canceled the name dialog, abort the process
-        if (customName == null) return false;
-
-        // Use the custom name
-        displayName = customName;
-
-        // Cache the custom name
-        final offlineStorage = OfflineStorageRepository();
-
-        // Try to get existing data first to preserve other fields
-        try {
-          final cachedData = await offlineStorage.getCachedStation(
-            station.stationId,
-          );
-          if (cachedData != null && cachedData['apiData'] != null) {
-            // Update existing cache data
-            final Map<String, dynamic> updatedData = Map.from(
-              cachedData['apiData'],
-            );
-            updatedData['name'] = customName;
-            await offlineStorage.cacheStation(station, updatedData);
-            print(
-              "DEBUG: Updated existing cache with custom name: $customName",
-            );
-          } else {
-            // Create new cache data
-            final basicData = {'name': customName};
-            await offlineStorage.cacheStation(station, basicData);
-            print("DEBUG: Created new cache with custom name: $customName");
-          }
-        } catch (e) {
-          // If error accessing cache, just create new basic data
-          print("DEBUG: Error accessing cache: $e");
-          final basicData = {'name': customName};
-          await offlineStorage.cacheStation(station, basicData);
-        }
-      }
-
-      // Add station to favorites using the stored provider reference
-      print(
-        "DEBUG: Adding station ${station.stationId} to favorites with name: $displayName",
-      );
-
-      final success = await _favoritesProvider.addFavoriteFromStation(
-        user.uid,
+      // Use the helper to add to favorites
+      final success = await _streamInfoHelper.addToFavorites(
+        context,
         station,
-        displayName: displayName,
         description: "Added from map view",
       );
 
-      // Continue with existing implementation...
       if (success) {
-        // Show success message
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Added $displayName to favorites'),
-            duration: const Duration(seconds: 2),
-          ),
-        );
-
         // If there's a callback, execute it
         if (onStationAddedToFavorites != null) {
           _removeInfoPanel();
           await Future.delayed(const Duration(milliseconds: 300));
           onStationAddedToFavorites!();
         }
-
-        return true;
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Failed to add to favorites. Please try again.'),
-            duration: Duration(seconds: 2),
-          ),
-        );
-        return false;
       }
+
+      return success;
     } catch (e) {
       print("Error adding station to favorites: $e");
       ScaffoldMessenger.of(context).showSnackBar(

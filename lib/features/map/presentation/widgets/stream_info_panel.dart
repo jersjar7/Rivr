@@ -1,16 +1,13 @@
 // lib/features/map/presentation/widgets/stream_info_panel.dart
 
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 import 'package:rivr/core/di/service_locator.dart';
 import 'package:rivr/core/error/exceptions.dart';
 import 'package:rivr/core/services/stream_name_service.dart';
 import 'package:rivr/core/widgets/loading_indicator.dart';
-
 import '../../domain/entities/map_station.dart';
 import '../helpers/stream_info_helper.dart';
 import '../widgets/stream_info_content.dart';
-import '../widgets/dialogs/stream_name_dialog.dart';
 
 /// Main panel for displaying information about a stream/station
 class StreamInfoPanel extends StatefulWidget {

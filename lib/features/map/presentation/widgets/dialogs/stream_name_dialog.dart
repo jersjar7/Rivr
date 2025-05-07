@@ -76,3 +76,19 @@ class _StreamNameDialogState extends State<StreamNameDialog> {
     );
   }
 }
+
+/// Show the stream name dialog
+/// Returns the entered name or null if canceled
+Future<String?> showStreamNameDialog(
+  BuildContext context, {
+  String? initialName,
+  String? stationId,
+}) {
+  return showDialog<String>(
+    context: context,
+    barrierDismissible: false, // User must take an action
+    builder: (BuildContext context) {
+      return StreamNameDialog(initialName: initialName, stationId: stationId);
+    },
+  );
+}

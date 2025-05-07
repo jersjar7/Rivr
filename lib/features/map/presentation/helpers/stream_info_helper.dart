@@ -165,7 +165,7 @@ class StreamInfoHelper {
 
     // If using the default name pattern, show name input dialog
     if (isDefaultName) {
-      final customName = await StreamNameDialog.show(
+      final customName = await showStreamNameDialog(
         context,
         stationId: stationId,
       );
@@ -274,7 +274,7 @@ class StreamInfoHelper {
       final currentName = await getDisplayName(station, null);
 
       // Show dialog to get new name
-      final newName = await StreamNameDialog.show(
+      final newName = await showStreamNameDialog(
         context,
         initialName: currentName,
       );

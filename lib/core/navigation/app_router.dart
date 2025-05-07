@@ -1,5 +1,6 @@
 // lib/core/navigation/app_router.dart
-// Updated to include enhanced favorites components and offline capabilities
+// Updated to include enhanced favorites components, offline capabilities,
+// and StreamNameService integration
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -18,6 +19,7 @@ import '../pages/offline_manager_page.dart';
 import '../pages/download_current_region_page.dart';
 import 'offline_routes.dart';
 
+/// Router class for handling navigation throughout the app
 class AppRouter {
   static Route<dynamic> generateRoute(RouteSettings settings) {
     // First check if it's an offline route
@@ -84,10 +86,16 @@ class AppRouter {
 
       case '/forecast':
         final args = settings.arguments as Map<String, dynamic>;
+
+        // Pass only the reachId/stationId as required parameter
+        // stationName is now optional - the ForecastPage should fetch the name
+        // from StreamNameService using the reachId
         return MaterialPageRoute(
           builder:
               (_) => ForecastPage(
                 reachId: args['reachId'],
+                // For backward compatibility, still accept stationName if provided
+                // but the page should prefer to get it from StreamNameService
                 stationName: args['stationName'],
               ),
         );

@@ -1,5 +1,5 @@
-// In lib/features/map/presentation/widgets/station_list_drawer.dart
-// We'll enhance the drawer with better UI and clearer indications
+// lib/features/map/presentation/widgets/station_list_drawer.dart
+// Enhanced with StreamNameService integration
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -10,6 +10,8 @@ import '../providers/map_provider.dart';
 import '../providers/station_provider.dart';
 import '../../../../core/utils/location_utils.dart';
 import '../../../../core/widgets/loading_indicator.dart';
+import '../../../../core/services/stream_name_service.dart'; // Add StreamNameService import
+import '../../../../core/di/service_locator.dart'; // For accessing service locator
 
 class StationListDrawer extends StatefulWidget {
   const StationListDrawer({super.key});
@@ -25,10 +27,19 @@ class _StationListDrawerState extends State<StationListDrawer> {
   double? _userLat;
   double? _userLon;
 
+  // Add StreamNameService reference
+  late StreamNameService _streamNameService;
+
+  // Cache for station names to avoid excessive database queries
+  final Map<String, StationNameInfo> _nameCache = {};
+
   @override
   void initState() {
     super.initState();
     _searchController.addListener(_onSearchChanged);
+
+    // Initialize StreamNameService
+    _streamNameService = sl<StreamNameService>();
 
     // Get current map center for distance calculations
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -80,7 +91,7 @@ class _StationListDrawerState extends State<StationListDrawer> {
     // Select the station in the provider
     stationProvider.selectStation(station);
 
-    // Navigate to the station with a close-up zoom level (12.0)
+    // Navigate to the station with a close-up zoom level
     mapProvider.goToLocation(
       Point(coordinates: Position(station.lon, station.lat)),
       zoom: 14.0, // Specify desired zoom level here
@@ -90,16 +101,62 @@ class _StationListDrawerState extends State<StationListDrawer> {
     Navigator.of(context).pop();
   }
 
+  // Get station name information async
+  Future<StationNameInfo> _getStationNameInfo(String stationId) async {
+    // Check cache first
+    if (_nameCache.containsKey(stationId)) {
+      return _nameCache[stationId]!;
+    }
+
+    try {
+      // Get name from StreamNameService
+      final nameInfo = await _streamNameService.getNameInfo(stationId);
+
+      // Cache it for future use
+      _nameCache[stationId] = StationNameInfo(
+        displayName: nameInfo.displayName,
+        isCustomName:
+            nameInfo.originalApiName != null &&
+            nameInfo.originalApiName!.isNotEmpty &&
+            nameInfo.displayName != nameInfo.originalApiName,
+      );
+
+      return _nameCache[stationId]!;
+    } catch (e) {
+      print("Error getting station name: $e");
+      // Return default info on error
+      return StationNameInfo(
+        displayName: 'Station $stationId',
+        isCustomName: false,
+      );
+    }
+  }
+
   List<MapStation> _getFilteredAndSortedStations(List<MapStation> stations) {
-    // First apply search filter
-    List<MapStation> filteredStations =
-        _searchQuery.isEmpty
-            ? stations
-            : stations.where((station) {
-              final name = station.name?.toLowerCase() ?? '';
-              final id = station.stationId.toString();
-              return name.contains(_searchQuery) || id.contains(_searchQuery);
-            }).toList();
+    // First apply search filter - but using our internal name cache when possible
+    List<MapStation> filteredStations = stations;
+
+    if (_searchQuery.isNotEmpty) {
+      filteredStations =
+          stations.where((station) {
+            final id = station.stationId.toString();
+            // Check if ID matches search directly
+            if (id.contains(_searchQuery)) {
+              return true;
+            }
+
+            // For names, check our cache if possible
+            final stationId = station.stationId.toString();
+            if (_nameCache.containsKey(stationId)) {
+              final name = _nameCache[stationId]!.displayName.toLowerCase();
+              return name.contains(_searchQuery);
+            }
+
+            // Fall back to station.name if not in cache
+            final name = station.name?.toLowerCase() ?? '';
+            return name.contains(_searchQuery);
+          }).toList();
+    }
 
     // Then sort them
     if (_sortByDistance && _userLat != null && _userLon != null) {
@@ -119,15 +176,189 @@ class _StationListDrawerState extends State<StationListDrawer> {
         return distA.compareTo(distB);
       });
     } else {
-      // Sort by name or ID if no name
+      // Sort by name - but using our name cache when possible
       filteredStations.sort((a, b) {
-        final nameA = a.name?.toLowerCase() ?? a.stationId.toString();
-        final nameB = b.name?.toLowerCase() ?? b.stationId.toString();
+        final stationIdA = a.stationId.toString();
+        final stationIdB = b.stationId.toString();
+
+        String nameA;
+        String nameB;
+
+        // Use cached names if available
+        if (_nameCache.containsKey(stationIdA)) {
+          nameA = _nameCache[stationIdA]!.displayName.toLowerCase();
+        } else {
+          nameA = a.name?.toLowerCase() ?? a.stationId.toString();
+        }
+
+        if (_nameCache.containsKey(stationIdB)) {
+          nameB = _nameCache[stationIdB]!.displayName.toLowerCase();
+        } else {
+          nameB = b.name?.toLowerCase() ?? b.stationId.toString();
+        }
+
         return nameA.compareTo(nameB);
       });
     }
 
     return filteredStations;
+  }
+
+  // New widget to build a station list item with StreamNameService
+  Widget _buildStationListItem(
+    BuildContext context,
+    MapStation station,
+    bool isSelected,
+    ThemeData theme,
+    String? distanceText,
+  ) {
+    final stationId = station.stationId.toString();
+
+    // Use FutureBuilder to display name asynchronously
+    return FutureBuilder<StationNameInfo>(
+      future: _getStationNameInfo(stationId),
+      initialData: _nameCache[stationId],
+      builder: (context, snapshot) {
+        String displayName;
+        bool isCustomName = false;
+
+        if (snapshot.hasData) {
+          displayName = snapshot.data!.displayName;
+          isCustomName = snapshot.data!.isCustomName;
+        } else if (snapshot.hasError) {
+          displayName = station.name ?? 'Station $stationId';
+        } else {
+          // Loading state, use station name or ID as fallback
+          displayName = station.name ?? 'Station $stationId';
+        }
+
+        return ListTile(
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 16.0,
+            vertical: 8.0,
+          ),
+          title: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  displayName,
+                  style: TextStyle(
+                    fontWeight:
+                        isSelected ? FontWeight.bold : FontWeight.normal,
+                    fontSize: 16,
+                  ),
+                ),
+              ),
+              // Show custom name indicator if applicable
+              if (isCustomName)
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 2,
+                  ),
+                  decoration: BoxDecoration(
+                    color: theme.primaryColor.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    'Custom',
+                    style: TextStyle(
+                      fontSize: 10,
+                      color: theme.primaryColor,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          subtitle: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const SizedBox(height: 4),
+              Row(
+                children: [
+                  Icon(Icons.tag, size: 12, color: Colors.grey[600]),
+                  const SizedBox(width: 4),
+                  Text(
+                    'ID: ${station.stationId}',
+                    style: const TextStyle(fontSize: 12),
+                  ),
+                ],
+              ),
+              if (station.type != null) ...[
+                const SizedBox(height: 2),
+                Row(
+                  children: [
+                    Icon(Icons.category, size: 12, color: Colors.grey[600]),
+                    const SizedBox(width: 4),
+                    Text(
+                      'Type: ${station.type}',
+                      style: const TextStyle(fontSize: 12),
+                    ),
+                  ],
+                ),
+              ],
+              const SizedBox(height: 2),
+              Row(
+                children: [
+                  Icon(Icons.location_on, size: 12, color: Colors.grey[600]),
+                  const SizedBox(width: 4),
+                  Text(
+                    LocationUtils.formatCoordinates(
+                      station.lat,
+                      station.lon,
+                      precision: 4,
+                    ),
+                    style: const TextStyle(fontSize: 12),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          trailing:
+              distanceText != null
+                  ? Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color:
+                          isSelected
+                              ? theme.primaryColor.withOpacity(0.2)
+                              : Colors.grey[200],
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          distanceText,
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color:
+                                isSelected
+                                    ? theme.primaryColor
+                                    : Colors.black87,
+                            fontSize: 14,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Icon(
+                          Icons.place,
+                          color: isSelected ? theme.primaryColor : Colors.grey,
+                          size: 14,
+                        ),
+                      ],
+                    ),
+                  )
+                  : null,
+          selected: isSelected,
+          selectedTileColor: theme.primaryColor.withOpacity(0.1),
+          onTap: () => _selectStation(context, station),
+        );
+      },
+    );
   }
 
   @override
@@ -155,7 +386,7 @@ class _StationListDrawerState extends State<StationListDrawer> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(
+                      const Text(
                         'River Streams',
                         style: TextStyle(
                           color: Colors.white,
@@ -164,7 +395,7 @@ class _StationListDrawerState extends State<StationListDrawer> {
                         ),
                       ),
                       IconButton(
-                        icon: Icon(Icons.close, color: Colors.white),
+                        icon: const Icon(Icons.close, color: Colors.white),
                         onPressed: () => Navigator.of(context).pop(),
                         tooltip: 'Close',
                       ),
@@ -174,7 +405,7 @@ class _StationListDrawerState extends State<StationListDrawer> {
                   Text(
                     'Find and select water monitoring stations',
                     style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.8),
+                      color: Colors.white.withOpacity(0.8),
                       fontSize: 14,
                     ),
                   ),
@@ -183,40 +414,47 @@ class _StationListDrawerState extends State<StationListDrawer> {
                     controller: _searchController,
                     decoration: InputDecoration(
                       hintText: 'Search stations by name or ID',
-                      hintStyle: TextStyle(color: Colors.white70),
-                      prefixIcon: Icon(Icons.search, color: Colors.white70),
+                      hintStyle: const TextStyle(color: Colors.white70),
+                      prefixIcon: const Icon(
+                        Icons.search,
+                        color: Colors.white70,
+                      ),
                       suffixIcon:
                           _searchQuery.isNotEmpty
                               ? IconButton(
-                                icon: Icon(Icons.clear, color: Colors.white70),
+                                icon: const Icon(
+                                  Icons.clear,
+                                  color: Colors.white70,
+                                ),
                                 onPressed: () {
                                   _searchController.clear();
                                 },
                               )
                               : null,
                       filled: true,
-                      fillColor: theme.primaryColor.withValues(alpha: 0.8),
+                      fillColor: theme.primaryColor.withOpacity(0.8),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
                         borderSide: BorderSide.none,
                       ),
                       contentPadding: EdgeInsets.zero,
                     ),
-                    style: TextStyle(color: Colors.white),
+                    style: const TextStyle(color: Colors.white),
                   ),
                   const SizedBox(height: 16),
                   Row(
                     children: [
-                      Text('Sort by:', style: TextStyle(color: Colors.white70)),
+                      const Text(
+                        'Sort by:',
+                        style: TextStyle(color: Colors.white70),
+                      ),
                       const SizedBox(width: 8),
                       ChoiceChip(
-                        label: Text('Distance'),
+                        label: const Text('Distance'),
                         selected: _sortByDistance,
                         onSelected: (_) => _toggleSortOrder(),
                         selectedColor: Colors.white,
-                        backgroundColor: theme.primaryColor.withValues(
-                          alpha: 0.7,
-                        ),
+                        backgroundColor: theme.primaryColor.withOpacity(0.7),
                         labelStyle: TextStyle(
                           color:
                               _sortByDistance
@@ -227,13 +465,11 @@ class _StationListDrawerState extends State<StationListDrawer> {
                       ),
                       const SizedBox(width: 8),
                       ChoiceChip(
-                        label: Text('Name'),
+                        label: const Text('Name'),
                         selected: !_sortByDistance,
                         onSelected: (_) => _toggleSortOrder(),
                         selectedColor: Colors.white,
-                        backgroundColor: theme.primaryColor.withValues(
-                          alpha: 0.7,
-                        ),
+                        backgroundColor: theme.primaryColor.withOpacity(0.7),
                         labelStyle: TextStyle(
                           color:
                               !_sortByDistance
@@ -254,7 +490,7 @@ class _StationListDrawerState extends State<StationListDrawer> {
             child: Consumer<StationProvider>(
               builder: (context, stationProvider, child) {
                 if (stationProvider.status == StationLoadingStatus.loading) {
-                  return Center(
+                  return const Center(
                     child: LoadingIndicator(
                       message: 'Loading stations...',
                       size: 30,
@@ -267,18 +503,22 @@ class _StationListDrawerState extends State<StationListDrawer> {
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.error_outline, color: Colors.red, size: 48),
+                        const Icon(
+                          Icons.error_outline,
+                          color: Colors.red,
+                          size: 48,
+                        ),
                         const SizedBox(height: 12),
                         Text(
                           stationProvider.errorMessage ?? 'An error occurred',
                           textAlign: TextAlign.center,
-                          style: TextStyle(color: Colors.red),
+                          style: const TextStyle(color: Colors.red),
                         ),
                         const SizedBox(height: 16),
                         ElevatedButton.icon(
                           onPressed: () => Navigator.of(context).pop(),
-                          icon: Icon(Icons.refresh),
-                          label: Text('Try Again'),
+                          icon: const Icon(Icons.refresh),
+                          label: const Text('Try Again'),
                         ),
                       ],
                     ),
@@ -321,8 +561,8 @@ class _StationListDrawerState extends State<StationListDrawer> {
                         const SizedBox(height: 16),
                         OutlinedButton.icon(
                           onPressed: () => Navigator.of(context).pop(),
-                          icon: Icon(Icons.map),
-                          label: Text('Back to Map'),
+                          icon: const Icon(Icons.map),
+                          label: const Text('Back to Map'),
                         ),
                       ],
                     ),
@@ -354,12 +594,12 @@ class _StationListDrawerState extends State<StationListDrawer> {
                         const SizedBox(height: 8),
                         Text(
                           '"${_searchController.text}"',
-                          style: TextStyle(fontWeight: FontWeight.bold),
+                          style: const TextStyle(fontWeight: FontWeight.bold),
                         ),
                         const SizedBox(height: 16),
                         ElevatedButton(
                           onPressed: () => _searchController.clear(),
-                          child: Text('Clear Search'),
+                          child: const Text('Clear Search'),
                         ),
                       ],
                     ),
@@ -401,7 +641,7 @@ class _StationListDrawerState extends State<StationListDrawer> {
                       child: ListView.separated(
                         itemCount: filteredStations.length,
                         separatorBuilder:
-                            (context, index) => Divider(height: 1),
+                            (context, index) => const Divider(height: 1),
                         itemBuilder: (context, index) {
                           final station = filteredStations[index];
                           final isSelected =
@@ -424,125 +664,13 @@ class _StationListDrawerState extends State<StationListDrawer> {
                                     : '${distance.toStringAsFixed(1)} km';
                           }
 
-                          return ListTile(
-                            contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 16.0,
-                              vertical: 8.0,
-                            ),
-                            title: Text(
-                              station.name ?? 'Station ${station.stationId}',
-                              style: TextStyle(
-                                fontWeight:
-                                    isSelected
-                                        ? FontWeight.bold
-                                        : FontWeight.normal,
-                                fontSize: 16,
-                              ),
-                            ),
-                            subtitle: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const SizedBox(height: 4),
-                                Row(
-                                  children: [
-                                    Icon(
-                                      Icons.tag,
-                                      size: 12,
-                                      color: Colors.grey[600],
-                                    ),
-                                    const SizedBox(width: 4),
-                                    Text(
-                                      'ID: ${station.stationId}',
-                                      style: TextStyle(fontSize: 12),
-                                    ),
-                                  ],
-                                ),
-                                if (station.type != null) ...[
-                                  const SizedBox(height: 2),
-                                  Row(
-                                    children: [
-                                      Icon(
-                                        Icons.category,
-                                        size: 12,
-                                        color: Colors.grey[600],
-                                      ),
-                                      const SizedBox(width: 4),
-                                      Text(
-                                        'Type: ${station.type}',
-                                        style: TextStyle(fontSize: 12),
-                                      ),
-                                    ],
-                                  ),
-                                ],
-                                const SizedBox(height: 2),
-                                Row(
-                                  children: [
-                                    Icon(
-                                      Icons.location_on,
-                                      size: 12,
-                                      color: Colors.grey[600],
-                                    ),
-                                    const SizedBox(width: 4),
-                                    Text(
-                                      LocationUtils.formatCoordinates(
-                                        station.lat,
-                                        station.lon,
-                                        precision: 4,
-                                      ),
-                                      style: TextStyle(fontSize: 12),
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ),
-                            trailing:
-                                distanceText != null
-                                    ? Container(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 8,
-                                        vertical: 4,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color:
-                                            isSelected
-                                                ? theme.primaryColor.withValues(
-                                                  alpha: 0.2,
-                                                )
-                                                : Colors.grey[200],
-                                        borderRadius: BorderRadius.circular(12),
-                                      ),
-                                      child: Column(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          Text(
-                                            distanceText,
-                                            style: TextStyle(
-                                              fontWeight: FontWeight.bold,
-                                              color:
-                                                  isSelected
-                                                      ? theme.primaryColor
-                                                      : Colors.black87,
-                                              fontSize: 14,
-                                            ),
-                                          ),
-                                          const SizedBox(height: 2),
-                                          Icon(
-                                            Icons.place,
-                                            color:
-                                                isSelected
-                                                    ? theme.primaryColor
-                                                    : Colors.grey,
-                                            size: 14,
-                                          ),
-                                        ],
-                                      ),
-                                    )
-                                    : null,
-                            selected: isSelected,
-                            selectedTileColor: theme.primaryColor.withValues(
-                              alpha: 0.1,
-                            ),
-                            onTap: () => _selectStation(context, station),
+                          // Use our new station list item builder that supports StreamNameService
+                          return _buildStationListItem(
+                            context,
+                            station,
+                            isSelected,
+                            theme,
+                            distanceText,
                           );
                         },
                       ),
@@ -556,4 +684,12 @@ class _StationListDrawerState extends State<StationListDrawer> {
       ),
     );
   }
+}
+
+// Helper class to store station name information
+class StationNameInfo {
+  final String displayName;
+  final bool isCustomName;
+
+  StationNameInfo({required this.displayName, required this.isCustomName});
 }

@@ -2,6 +2,9 @@
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:rivr/core/di/service_locator.dart';
+import 'package:rivr/core/services/stream_name_service.dart';
+import 'package:rivr/features/map/presentation/helpers/stream_info_helper.dart';
 import '../../../features/auth/presentation/providers/auth_provider.dart';
 import '../../../features/favorites/presentation/providers/favorites_provider.dart';
 import '../../../features/map/domain/entities/map_station.dart';
@@ -14,6 +17,7 @@ class FavoritesIntegrationHelper {
     BuildContext context,
     MapStation station, {
     String? description,
+    String? displayName,
     bool showSnackbar = true,
   }) async {
     final scaffoldMessenger = ScaffoldMessenger.of(context);
@@ -21,6 +25,14 @@ class FavoritesIntegrationHelper {
     final favoritesProvider = Provider.of<FavoritesProvider>(
       context,
       listen: false,
+    );
+
+    // Get the StreamNameService from service locator
+    final streamNameService = sl<StreamNameService>();
+
+    // Create a helper instance for name-related operations
+    final streamInfoHelper = StreamInfoHelper(
+      streamNameService: streamNameService,
     );
 
     final user = authProvider.currentUser;
@@ -37,16 +49,39 @@ class FavoritesIntegrationHelper {
     }
 
     try {
+      // Get proper display name from StreamNameService
+      String nameToUse;
+      if (displayName != null && displayName.isNotEmpty) {
+        nameToUse = displayName;
+      } else {
+        nameToUse = await streamInfoHelper.getDisplayName(station, null);
+      }
+
+      // Get original API name if available
+      String? originalApiName;
+      try {
+        final nameInfo = await streamNameService.getNameInfo(
+          station.stationId.toString(),
+        );
+        originalApiName = nameInfo.originalApiName;
+      } catch (e) {
+        print('Error getting original API name: $e');
+        // Continue without original API name
+      }
+
+      // Add to favorites with proper name information
       final success = await favoritesProvider.addFavoriteFromStation(
         user.uid,
-        station,
+        station.stationId.toString(),
+        displayName: nameToUse,
         description: description,
+        originalApiName: originalApiName,
       );
 
       if (success && showSnackbar) {
         scaffoldMessenger.showSnackBar(
           SnackBar(
-            content: Text('${station.name ?? 'River'} added to favorites'),
+            content: Text('$nameToUse added to favorites'),
             duration: const Duration(seconds: 2),
           ),
         );
@@ -164,6 +199,21 @@ class FavoritesIntegrationHelper {
     } catch (e) {
       print('Error checking if station is favorite: $e');
       return false;
+    }
+  }
+
+  /// Get display name for a station using StreamNameService
+  static Future<String> getStationDisplayName(
+    String stationId,
+    String? fallbackName,
+  ) async {
+    try {
+      final streamNameService = sl<StreamNameService>();
+      final displayName = await streamNameService.getDisplayName(stationId);
+      return displayName;
+    } catch (e) {
+      print('Error getting station display name: $e');
+      return fallbackName ?? 'Stream $stationId';
     }
   }
 

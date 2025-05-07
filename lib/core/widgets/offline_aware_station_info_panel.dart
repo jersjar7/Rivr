@@ -4,13 +4,14 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:rivr/core/error/error_handler.dart';
 import 'package:rivr/core/error/exceptions.dart';
+import 'package:rivr/core/services/stream_name_service.dart'; // Add StreamNameService import
+import 'package:rivr/core/di/service_locator.dart'; // For accessing service locator
 import '../../features/map/domain/entities/map_station.dart';
 import '../utils/location_utils.dart';
 import '../widgets/loading_indicator.dart';
 import '../../common/data/remote/reach_service.dart';
 import '../../features/auth/presentation/providers/auth_provider.dart';
 import '../../features/favorites/presentation/providers/favorites_provider.dart';
-import '../../features/favorites/domain/entities/favorite.dart';
 import '../services/offline_manager_service.dart';
 
 class OfflineAwareStationInfoPanel extends StatefulWidget {
@@ -44,6 +45,12 @@ class _OfflineAwareStationInfoPanelState
   Map<String, dynamic>? _reachData;
   bool _usedOfflineData = false;
 
+  // For StreamNameService integration
+  late StreamNameService _streamNameService;
+  String? _displayName;
+  bool _isLoadingName = true;
+  bool _isCustomName = false;
+
   // For note
   final TextEditingController _noteController = TextEditingController();
   String? _note;
@@ -54,13 +61,55 @@ class _OfflineAwareStationInfoPanelState
     print(
       "OfflineAwareStationInfoPanel: initializing for station ID: ${widget.station.stationId}",
     );
+    // Initialize StreamNameService
+    _streamNameService = sl<StreamNameService>();
     _fetchReachData();
+    _loadStationName();
   }
 
   @override
   void dispose() {
     _noteController.dispose();
     super.dispose();
+  }
+
+  // Load the station name from StreamNameService
+  Future<void> _loadStationName() async {
+    if (!mounted) return;
+
+    setState(() => _isLoadingName = true);
+
+    try {
+      // Try to get name info from the service
+      final nameInfo = await _streamNameService.getNameInfo(
+        widget.station.stationId.toString(),
+      );
+
+      // Check if this is a custom name
+      bool isCustom = false;
+      if (nameInfo.originalApiName != null &&
+          nameInfo.originalApiName!.isNotEmpty &&
+          nameInfo.displayName != nameInfo.originalApiName) {
+        isCustom = true;
+      }
+
+      // Update state if still mounted
+      if (mounted) {
+        setState(() {
+          _displayName = nameInfo.displayName;
+          _isCustomName = isCustom;
+          _isLoadingName = false;
+        });
+      }
+    } catch (e) {
+      print("Error loading name from StreamNameService: $e");
+
+      // We'll fall back to using the name from API data
+      // in _getDisplayName method
+      if (mounted) {
+        setState(() => _isLoadingName = false);
+      }
+    }
   }
 
   Future<void> _fetchReachData() async {
@@ -97,6 +146,18 @@ class _OfflineAwareStationInfoPanelState
       if (cachedData['apiData'] is Map &&
           cachedData['apiData']['name'] != null) {
         print("DEBUG: Cached name: ${cachedData['apiData']['name']}");
+
+        // Update the StreamNameService with this name as the original API name
+        try {
+          await _streamNameService.setOriginalApiName(
+            widget.station.stationId.toString(),
+            cachedData['apiData']['name'].toString(),
+          );
+          // Reload station name after setting original API name
+          _loadStationName();
+        } catch (e) {
+          print("Warning: Failed to update original API name: $e");
+        }
       } else {
         print("DEBUG: No name found in cached data");
       }
@@ -127,8 +188,23 @@ class _OfflineAwareStationInfoPanelState
       print("DEBUG: Making API request for reach ID: $reachId");
       final data = await reachService.fetchReach(reachId);
       print("DEBUG: API response received for reach ID $reachId: $data");
+
       if (data != null && data is Map) {
         print("DEBUG: API returned name: ${data['name']}");
+
+        // Update the StreamNameService with this name as the original API name
+        if (data['name'] != null && data['name'].toString().isNotEmpty) {
+          try {
+            await _streamNameService.setOriginalApiName(
+              reachId,
+              data['name'].toString(),
+            );
+            // Reload station name after setting original API name
+            _loadStationName();
+          } catch (e) {
+            print("Warning: Failed to update original API name: $e");
+          }
+        }
       }
 
       if (!mounted) return;
@@ -178,46 +254,106 @@ class _OfflineAwareStationInfoPanelState
 
     final user = authProvider.currentUser;
     if (user != null) {
-      // Get the station name from API data or use a fallback
-      final displayName = _getDisplayName();
+      // Get station name information from StreamNameService
+      String displayName = _getDisplayName();
+      String stationId = station.stationId.toString();
+      String? originalApiName;
 
-      final favorite = Favorite(
-        stationId: station.stationId.toString(),
-        name: displayName,
-        userId: user.uid,
-        position: 0, // This will be updated by the provider
-        color: station.color,
-        description:
-            _note ??
-            (_reachData != null && _reachData!.containsKey('description')
-                ? _reachData!['description'] as String?
-                : null),
-        imgNumber:
-            1, // Default image number, you can assign a random one if desired
-        lastUpdated: DateTime.now().millisecondsSinceEpoch,
-      );
+      // Try to get original API name from StreamNameService
+      try {
+        final nameInfo = await _streamNameService.getNameInfo(stationId);
+        originalApiName = nameInfo.originalApiName;
+      } catch (e) {
+        print("Error getting original API name: $e");
+        // Try to get it from API data as fallback
+        if (_reachData != null &&
+            _reachData!.containsKey('name') &&
+            _reachData!['name'] != null) {
+          originalApiName = _reachData!['name'].toString();
+        }
+      }
 
-      await favoritesProvider.addNewFavorite(favorite);
+      // If using the default name pattern, show name input dialog first
+      if (displayName == 'Stream $stationId') {
+        final customName = await _showNameInputDialog();
 
-      // Show confirmation snackbar
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Added $displayName to favorites'),
-            duration: const Duration(
-              seconds: 1,
-            ), // Short duration since we're navigating away
-          ),
+        // If user canceled the name dialog, abort the process
+        if (customName == null) return;
+
+        // Use the provided name
+        displayName = customName;
+
+        // Update the StreamNameService with the new name
+        try {
+          await _streamNameService.updateDisplayName(stationId, customName);
+
+          // If we have an original API name, ensure it's set
+          if (originalApiName != null && originalApiName.isNotEmpty) {
+            await _streamNameService.setOriginalApiName(
+              stationId,
+              originalApiName,
+            );
+          }
+
+          // Update local state
+          setState(() {
+            _displayName = customName;
+            _isCustomName =
+                originalApiName != null &&
+                originalApiName != customName &&
+                originalApiName.isNotEmpty;
+          });
+        } catch (e) {
+          print(
+            "Warning: Failed to update StreamNameService with new name: $e",
+          );
+        }
+      }
+
+      try {
+        // Add station to favorites with the display name and original API name
+        final success = await favoritesProvider.addFavoriteFromStation(
+          user.uid,
+          stationId,
+          displayName: displayName,
+          description: _note,
+          originalApiName: originalApiName,
         );
 
-        // Close the info panel
-        widget.onClose();
+        if (success) {
+          // Show confirmation snackbar
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Added $displayName to favorites'),
+                duration: const Duration(seconds: 1),
+              ),
+            );
 
-        // Navigate to favorites if callback provided
-        if (widget.onNavigateToFavorites != null) {
-          // Small delay to let the UI update
-          await Future.delayed(const Duration(milliseconds: 300));
-          widget.onNavigateToFavorites!();
+            // Close the info panel
+            widget.onClose();
+
+            // Navigate to favorites if callback provided
+            if (widget.onNavigateToFavorites != null) {
+              // Small delay to let the UI update
+              await Future.delayed(const Duration(milliseconds: 300));
+              widget.onNavigateToFavorites!();
+            }
+          }
+        } else {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Failed to add to favorites. Please try again.'),
+              ),
+            );
+          }
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text('Error: ${e.toString()}')));
         }
       }
     } else {
@@ -227,28 +363,6 @@ class _OfflineAwareStationInfoPanelState
           const SnackBar(content: Text('Please log in to add favorites')),
         );
       }
-    }
-  }
-
-  // Get a reliable display name - prioritizing API data over other sources
-  String _getDisplayName() {
-    print("GET DISPLAY NAME CALLED: Station ID: ${widget.station.stationId}");
-
-    // Prioritize API data name, then fall back to default
-    if (_reachData != null &&
-        _reachData!.containsKey('name') &&
-        _reachData!['name'] != null &&
-        _reachData!['name'].toString().trim().isNotEmpty) {
-      // Added empty string check
-      final result = _reachData!['name'].toString();
-      print("DISPLAY NAME DECISION: Using API name: '$result'");
-      print("DEBUG: _getDisplayName using name from API data: '$result'");
-      return result;
-    } else {
-      final result = 'Stream ${widget.station.stationId}';
-      print("DISPLAY NAME DECISION: Using fallback name: '$result'");
-      print("DEBUG: _getDisplayName using default ID-based name: '$result'");
-      return result;
     }
   }
 
@@ -302,6 +416,97 @@ class _OfflineAwareStationInfoPanelState
             ],
           ),
     );
+  }
+
+  // Dialog for inputting a custom name
+  Future<String?> _showNameInputDialog() {
+    final TextEditingController nameController = TextEditingController();
+
+    return showDialog<String>(
+      context: context,
+      barrierDismissible: false, // User must take an action
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Name This Stream'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'This stream does not have a name. Please assign it a name for your device\'s use:',
+                style: TextStyle(color: Colors.grey[700], fontSize: 14),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: nameController,
+                decoration: const InputDecoration(
+                  hintText: 'Enter a name for this stream',
+                  border: OutlineInputBorder(),
+                ),
+                autofocus: true,
+                maxLength: 100,
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop(); // Cancel
+              },
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                // Validate input - don't allow empty names
+                if (nameController.text.trim().isNotEmpty) {
+                  Navigator.of(context).pop(nameController.text.trim());
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Please enter a name')),
+                  );
+                }
+              },
+              child: const Text('Save Name'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  // Get the display name using StreamNameService
+  String _getDisplayName() {
+    print("GET DISPLAY NAME CALLED: Station ID: ${widget.station.stationId}");
+
+    // First priority: Use name from StreamNameService if available
+    if (!_isLoadingName && _displayName != null && _displayName!.isNotEmpty) {
+      final result = _displayName!;
+      print(
+        "DISPLAY NAME DECISION: Using name from StreamNameService: '$result'",
+      );
+      return result;
+    }
+
+    // Second priority: Use API data name if available
+    if (_reachData != null &&
+        _reachData!.containsKey('name') &&
+        _reachData!['name'] != null &&
+        _reachData!['name'].toString().trim().isNotEmpty) {
+      final result = _reachData!['name'].toString();
+      print("DISPLAY NAME DECISION: Using API name: '$result'");
+      return result;
+    }
+
+    // Last resort: Use station name from widget or default to ID-based name
+    if (widget.station.name != null && widget.station.name!.isNotEmpty) {
+      final result = widget.station.name!;
+      print("DISPLAY NAME DECISION: Using station name: '$result'");
+      return result;
+    }
+
+    // Ultimate fallback: Use ID-based name
+    final result = 'Stream ${widget.station.stationId}';
+    print("DISPLAY NAME DECISION: Using fallback name: '$result'");
+    return result;
   }
 
   @override
@@ -365,13 +570,31 @@ class _OfflineAwareStationInfoPanelState
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Expanded(
-                child: Text(
-                  _getDisplayName(), // Use our robust display name method
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                  overflow: TextOverflow.ellipsis,
+                child: Row(
+                  children: [
+                    if (_isLoadingName)
+                      const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            Colors.black54,
+                          ),
+                        ),
+                      ),
+                    if (_isLoadingName) const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        _getDisplayName(), // Use our enhanced display name method
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
                 ),
               ),
               IconButton(
@@ -382,6 +605,28 @@ class _OfflineAwareStationInfoPanelState
               ),
             ],
           ),
+
+          // Show custom name indicator if applicable
+          if (_isCustomName)
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).primaryColor.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Text(
+                  'Custom Name',
+                  style: TextStyle(
+                    fontSize: 10,
+                    color: Theme.of(context).primaryColor,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+            ),
+
           const SizedBox(height: 16),
           Icon(
             _isNetworkError ? Icons.cloud_off : Icons.error_outline,
@@ -472,7 +717,7 @@ class _OfflineAwareStationInfoPanelState
                     widget.onViewForecast != null
                         ? () => widget.onViewForecast!(
                           widget.station.stationId.toString(),
-                          _getDisplayName(), // Use our robust display name method
+                          _getDisplayName(), // Use our enhanced display name method
                         )
                         : () {
                           Navigator.pushNamed(
@@ -480,8 +725,7 @@ class _OfflineAwareStationInfoPanelState
                             '/forecast',
                             arguments: {
                               'reachId': widget.station.stationId.toString(),
-                              'stationName':
-                                  _getDisplayName(), // Use our display name method
+                              'stationName': _getDisplayName(),
                             },
                           );
                         },
@@ -500,44 +744,8 @@ class _OfflineAwareStationInfoPanelState
   }
 
   Widget _buildInfoPanel(ThemeData theme) {
-    // Prioritize API data name, then fall back to default
-    String streamName;
-
-    if (_reachData != null &&
-        _reachData!.containsKey('name') &&
-        _reachData!['name'] != null &&
-        _reachData!['name'].toString().trim().isNotEmpty) {
-      // Use API data name
-      streamName = _reachData!['name'].toString();
-      print("DEBUG UI: Using name from API data: '$streamName'");
-    } else {
-      // Fall back to a station ID-based name
-      streamName = 'Stream ${widget.station.stationId}';
-      print("DEBUG UI: No API name available, using default: '$streamName'");
-    }
-
-    // Inside _buildInfoPanel method, right after determining streamName:
-    print(
-      "DISPLAY NAME DEBUG: Showing name '$streamName' for station ID ${widget.station.stationId}",
-    );
-    print("DISPLAY NAME DEBUG: API data name value: ${_reachData?['name']}");
-    print(
-      "DISPLAY NAME DEBUG: API data name type: ${_reachData?['name']?.runtimeType}",
-    );
-    print(
-      "DISPLAY NAME DEBUG: API data name empty check: ${_reachData?['name']?.toString().isEmpty}",
-    );
-    print(
-      "DISPLAY NAME DEBUG: API data name whitespace check: ${_reachData?['name']?.toString().trim().isEmpty}",
-    );
-
-    // Inside onTap handler for markers in MapTapHandler:
-    print(
-      "MARKER TAPPED: Station ID: ${widget.station.stationId}, Raw station name: '${widget.station.name}'",
-    );
-
-    print("STATION INFO ROW: Using streamName='$streamName'");
-    print("DEBUG UI: Building info panel with streamName: '$streamName'");
+    // Get the station name - now uses our enhanced method
+    final streamName = _getDisplayName();
 
     String? riverClass;
     String? difficulty;
@@ -562,13 +770,60 @@ class _OfflineAwareStationInfoPanelState
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Expanded(
-                child: Text(
-                  streamName, // Use our determined name
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                  overflow: TextOverflow.ellipsis,
+                child: Row(
+                  children: [
+                    if (_isLoadingName)
+                      const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            Colors.black54,
+                          ),
+                        ),
+                      ),
+                    if (_isLoadingName) const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        streamName,
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    // Optional edit button for renaming
+                    IconButton(
+                      icon: const Icon(Icons.edit, size: 16),
+                      onPressed: () async {
+                        final newName = await _showNameInputDialog();
+                        if (newName != null) {
+                          // Update the name in StreamNameService
+                          try {
+                            await _streamNameService.updateDisplayName(
+                              widget.station.stationId.toString(),
+                              newName,
+                            );
+
+                            // Update local state
+                            if (mounted) {
+                              setState(() {
+                                _displayName = newName;
+                                _isCustomName = true;
+                              });
+                            }
+                          } catch (e) {
+                            print("Error updating name: $e");
+                          }
+                        }
+                      },
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                      tooltip: 'Edit Name',
+                    ),
+                  ],
                 ),
               ),
               // If using offline data, show an indicator
@@ -592,6 +847,28 @@ class _OfflineAwareStationInfoPanelState
               ),
             ],
           ),
+
+          // Show custom name indicator if applicable
+          if (_isCustomName)
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: theme.primaryColor.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Text(
+                  'Custom Name',
+                  style: TextStyle(
+                    fontSize: 10,
+                    color: theme.primaryColor,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+            ),
+
           const SizedBox(height: 8),
 
           // River classification if available
@@ -694,7 +971,7 @@ class _OfflineAwareStationInfoPanelState
                     widget.onViewForecast != null
                         ? () => widget.onViewForecast!(
                           widget.station.stationId.toString(),
-                          streamName, // Use the streamName we determined
+                          streamName,
                         )
                         : () {
                           Navigator.pushNamed(
@@ -702,8 +979,7 @@ class _OfflineAwareStationInfoPanelState
                             '/forecast',
                             arguments: {
                               'reachId': widget.station.stationId.toString(),
-                              'stationName':
-                                  streamName, // Use the streamName we determined
+                              'stationName': streamName,
                             },
                           );
                         },

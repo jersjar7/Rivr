@@ -6,6 +6,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_slidable/flutter_slidable.dart';
 import 'package:provider/provider.dart';
 import 'package:rivr/common/data/local/database_helper.dart';
+import 'package:rivr/core/di/service_locator.dart';
+import 'package:rivr/core/services/stream_name_service.dart';
 import 'package:rivr/features/favorites/data/models/favorite_model.dart';
 
 import '../providers/favorites_provider.dart';
@@ -34,6 +36,9 @@ class _FavoritesPageState extends State<FavoritesPage>
   final GlobalKey<RefreshIndicatorState> _refreshIndicatorKey =
       GlobalKey<RefreshIndicatorState>();
 
+  // Add StreamNameService
+  late StreamNameService _streamNameService;
+
   @override
   void initState() {
     super.initState();
@@ -41,6 +46,9 @@ class _FavoritesPageState extends State<FavoritesPage>
       vsync: this,
       duration: const Duration(milliseconds: 300),
     );
+
+    // Get StreamNameService instance
+    _streamNameService = sl<StreamNameService>();
 
     // Initialize database - ensure columns exist
     _initializeDatabase();
@@ -233,7 +241,7 @@ class _FavoritesPageState extends State<FavoritesPage>
           SnackBar(
             content: Text('Failed to update image: $e'),
             backgroundColor: Colors.red,
-            duration: Duration(seconds: 2),
+            duration: const Duration(seconds: 2),
           ),
         );
       }
@@ -401,7 +409,7 @@ class _FavoritesPageState extends State<FavoritesPage>
     );
   }
 
-  // Replace this method in favorites_page.dart
+  // Updated method to use our new dialog function and integrate with StreamNameService
   Future<void> _showEditNameDialog(BuildContext ctx, Favorite favorite) async {
     // Store a local reference to the context to avoid using a potentially stale context
     final currentContext = ctx;
@@ -411,20 +419,29 @@ class _FavoritesPageState extends State<FavoritesPage>
       listen: false,
     );
 
-    final result = await showDialog<String>(
-      context: currentContext,
-      builder:
-          (dialogContext) => EditFavoriteNameDialog(
-            currentName: favorite.name,
-            stationId: favorite.stationId,
-            originalApiName: favorite.originalApiName,
-          ),
+    // Get the name information from StreamNameService
+    String? originalApiName;
+    try {
+      final nameInfo = await _streamNameService.getNameInfo(favorite.stationId);
+      originalApiName = nameInfo.originalApiName;
+    } catch (e) {
+      print("Error getting original API name from service: $e");
+      // Fallback to the favorite's originalApiName
+      originalApiName = favorite.originalApiName;
+    }
+
+    // Use our new dialog function
+    final result = await showEditFavoriteNameDialog(
+      currentContext,
+      currentName: favorite.name,
+      stationId: favorite.stationId,
+      originalApiName: originalApiName,
     );
 
     // Check if the context is still valid before using it
     if (result != null && result != favorite.name) {
       try {
-        // Update the name
+        // Update the name using the favorites provider
         final success = await favoritesProvider.updateFavoriteName(
           favorite.userId,
           favorite.stationId,
@@ -433,7 +450,6 @@ class _FavoritesPageState extends State<FavoritesPage>
 
         // Before showing snackbar, check if the context is still active
         if (currentContext.mounted) {
-          // Use the context's mounted property
           ScaffoldMessenger.of(currentContext).showSnackBar(
             SnackBar(
               content: Text(
@@ -523,7 +539,6 @@ class _FavoritesPageState extends State<FavoritesPage>
                       color: Colors.grey[800],
                     ),
                   ),
-
                   const SizedBox(height: 8),
                   Text(
                     favoritesProvider.errorMessage ??

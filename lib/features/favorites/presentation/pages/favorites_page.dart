@@ -1,13 +1,16 @@
-// lib/features/favorites/presentation/pages/favorites_page.dart
-
 import 'package:flutter/material.dart';
+import 'package:flutter_slidable/flutter_slidable.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
+
 import '../providers/favorites_provider.dart';
 import '../../../../features/auth/presentation/providers/auth_provider.dart';
 import '../../../../core/widgets/empty_state.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/loading_indicator.dart';
 import '../widgets/favorite_card.dart';
+import '../../domain/entities/favorite.dart';
+import '../widgets/edit_favorite_name_dialog.dart';
 
 class FavoritesPage extends StatefulWidget {
   final double lat;
@@ -25,6 +28,7 @@ class _FavoritesPageState extends State<FavoritesPage>
   late AnimationController _animationController;
   final GlobalKey<RefreshIndicatorState> _refreshIndicatorKey =
       GlobalKey<RefreshIndicatorState>();
+  final ImagePicker _picker = ImagePicker();
 
   @override
   void initState() {
@@ -33,8 +37,6 @@ class _FavoritesPageState extends State<FavoritesPage>
       vsync: this,
       duration: const Duration(milliseconds: 300),
     );
-
-    // Use post-frame callback to avoid setState during build
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _loadFavorites();
     });
@@ -48,18 +50,15 @@ class _FavoritesPageState extends State<FavoritesPage>
 
   Future<void> _loadFavorites() async {
     if (!mounted) return;
-
     setState(() {
       _isRefreshing = true;
     });
-
     try {
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
       final favoritesProvider = Provider.of<FavoritesProvider>(
         context,
         listen: false,
       );
-
       final user = authProvider.currentUser;
       if (user != null) {
         await favoritesProvider.loadFavorites(user.uid);
@@ -81,7 +80,6 @@ class _FavoritesPageState extends State<FavoritesPage>
         'lat': widget.lat,
         'lon': widget.lon,
         'onStationAddedToFavorites': () {
-          // When a station is added to favorites from map, reload the favorites list
           _loadFavorites();
         },
       },
@@ -94,6 +92,148 @@ class _FavoritesPageState extends State<FavoritesPage>
       '/forecast',
       arguments: {'reachId': reachId, 'stationName': stationName},
     );
+  }
+
+  void _showEditOptions(Favorite favorite) {
+    showModalBottomSheet(
+      context: context,
+      builder:
+          (context) => SafeArea(
+            child: Wrap(
+              children: [
+                ListTile(
+                  leading: const Icon(Icons.edit),
+                  title: const Text('Edit Name'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _showEditNameDialog(context, favorite);
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.image),
+                  title: const Text('Change Image'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _showChangeImageDialog(favorite);
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.upload_file),
+                  title: const Text('Upload Image'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    // UI-only placeholder
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Upload image (UI only)')),
+                    );
+                  },
+                ),
+              ],
+            ),
+          ),
+    );
+  }
+
+  void _showChangeImageDialog(Favorite favorite) {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return Dialog(
+          child: GridView.builder(
+            shrinkWrap: true,
+            padding: const EdgeInsets.all(16),
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 3,
+              crossAxisSpacing: 8,
+              mainAxisSpacing: 8,
+            ),
+            itemCount: 30,
+            itemBuilder: (context, idx) {
+              final imgNumber = idx + 1;
+              return GestureDetector(
+                onTap: () {
+                  Navigator.pop(context);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Picked image #$imgNumber (UI only)'),
+                    ),
+                  );
+                },
+                child: Image.asset(
+                  'assets/img/river_images/$imgNumber.jpeg',
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) => const Icon(Icons.broken_image),
+                ),
+              );
+            },
+          ),
+        );
+      },
+    );
+  }
+
+  void _confirmDelete(Favorite favorite) {
+    showDialog(
+      context: context,
+      builder:
+          (_) => AlertDialog(
+            title: const Text('Remove Favorite'),
+            content: Text(
+              favorite.name.isEmpty
+                  ? 'Remove this river from your favorites?'
+                  : 'Remove ${favorite.name} from your favorites?',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Cancel'),
+              ),
+              ElevatedButton(
+                onPressed: () {
+                  Navigator.pop(context);
+                  final userId =
+                      Provider.of<AuthProvider>(
+                        context,
+                        listen: false,
+                      ).currentUser!.uid;
+                  Provider.of<FavoritesProvider>(
+                    context,
+                    listen: false,
+                  ).deleteFavorite(userId, favorite.stationId);
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.redAccent,
+                ),
+                child: const Text('Remove'),
+              ),
+            ],
+          ),
+    );
+  }
+
+  Future<void> _showEditNameDialog(BuildContext ctx, Favorite favorite) async {
+    final result = await showDialog<String>(
+      context: ctx,
+      builder:
+          (_) => EditFavoriteNameDialog(
+            currentName: favorite.name,
+            stationId: favorite.stationId,
+            originalApiName: favorite.originalApiName,
+          ),
+    );
+    if (result != null && result != favorite.name) {
+      final success = await Provider.of<FavoritesProvider>(
+        ctx,
+        listen: false,
+      ).updateFavoriteName(favorite.userId, favorite.stationId, result);
+      ScaffoldMessenger.of(ctx).showSnackBar(
+        SnackBar(
+          content: Text(
+            success ? 'River name updated' : 'Failed to update name',
+          ),
+        ),
+      );
+    }
   }
 
   @override
@@ -159,6 +299,7 @@ class _FavoritesPageState extends State<FavoritesPage>
                       color: Colors.grey[800],
                     ),
                   ),
+
                   const SizedBox(height: 8),
                   Text(
                     favoritesProvider.errorMessage ??
@@ -199,43 +340,43 @@ class _FavoritesPageState extends State<FavoritesPage>
               onReorder: favoritesProvider.reorderFavorites,
               itemBuilder: (context, index) {
                 final favorite = favorites[index];
-
-                return FavoriteCard(
+                return Slidable(
                   key: Key('favorite_${favorite.stationId}'),
-                  favorite: favorite,
-                  onTap:
-                      () => _navigateToForecast(
-                        favorite.stationId,
-                        favorite.name,
+                  startActionPane: ActionPane(
+                    motion: const DrawerMotion(),
+                    extentRatio: 0.5,
+                    children: [
+                      SlidableAction(
+                        onPressed: (_) => _showEditOptions(favorite),
+                        backgroundColor: AppColors.primaryColor,
+                        foregroundColor: Colors.white,
+                        icon: Icons.more_horiz,
+                        label: 'Options',
                       ),
-                  onDelete: () {
-                    final authProvider = Provider.of<AuthProvider>(
-                      context,
-                      listen: false,
-                    );
-                    final user = authProvider.currentUser;
-                    if (user != null) {
-                      // Show a snackbar with undo option
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text('${favorite.name} removed'),
-                          action: SnackBarAction(
-                            label: 'UNDO',
-                            onPressed: () {
-                              // Re-add the favorite
-                              favoritesProvider.addNewFavorite(favorite);
-                            },
-                          ),
-                          duration: const Duration(seconds: 3),
+                    ],
+                  ),
+                  endActionPane: ActionPane(
+                    motion: const DrawerMotion(),
+                    extentRatio: 0.25,
+                    children: [
+                      SlidableAction(
+                        onPressed: (_) => _confirmDelete(favorite),
+                        backgroundColor: Colors.red,
+                        foregroundColor: Colors.white,
+                        icon: Icons.delete,
+                        label: 'Delete',
+                      ),
+                    ],
+                  ),
+                  child: FavoriteCard(
+                    favorite: favorite,
+                    onTap:
+                        () => _navigateToForecast(
+                          favorite.stationId,
+                          favorite.name,
                         ),
-                      );
-
-                      favoritesProvider.deleteFavorite(
-                        user.uid,
-                        favorite.stationId,
-                      );
-                    }
-                  },
+                    onDelete: () => _confirmDelete(favorite),
+                  ),
                 );
               },
             ),

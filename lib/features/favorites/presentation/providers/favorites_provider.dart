@@ -138,8 +138,13 @@ class FavoritesProvider with ChangeNotifier {
           // Only update if the list actually changed
           if (!_areFavoritesEqual(_favorites, loadedFavorites)) {
             _favorites = loadedFavorites;
+            _fixOriginalApiNameNullStrings();
             _isUsingOfflineData = false;
             _lastSyncTime = DateTime.now();
+
+            // Add this line to ensure all favorites have originalApiName set
+            ensureOriginalApiNamesExist(userId);
+
             _setStatus(FavoritesStatus.loaded);
 
             // Cache favorites for offline use - use debouncing
@@ -249,6 +254,7 @@ class FavoritesProvider with ChangeNotifier {
 
   // Convert Favorite to JSON
   Map<String, dynamic> _favoriteToJson(Favorite favorite) {
+    // Only include originalApiName if it's not null
     final json = {
       'stationId': favorite.stationId,
       'name': favorite.name,
@@ -258,9 +264,12 @@ class FavoritesProvider with ChangeNotifier {
       'description': favorite.description,
       'imgNumber': favorite.imgNumber,
       'lastUpdated': favorite.lastUpdated,
-      'originalApiName':
-          favorite.originalApiName, // Make sure this field is included
     };
+
+    // Only add originalApiName if it's not null
+    if (favorite.originalApiName != null) {
+      json['originalApiName'] = favorite.originalApiName;
+    }
 
     print(
       "_favoriteToJson DEBUG: name='${favorite.name}', saving originalApiName=${favorite.originalApiName}",
@@ -270,6 +279,14 @@ class FavoritesProvider with ChangeNotifier {
 
   // Create Favorite from JSON
   Favorite _favoriteFromJson(Map<String, dynamic> json) {
+    // Fix the originalApiName handling
+    String? originalApiName = json['originalApiName'];
+
+    // Convert string "null" to actual null
+    if (originalApiName == "null") {
+      originalApiName = null;
+    }
+
     final favorite = FavoriteModel(
       stationId: json['stationId'],
       name: json['name'],
@@ -279,13 +296,42 @@ class FavoritesProvider with ChangeNotifier {
       description: json['description'],
       imgNumber: json['imgNumber'] ?? 1,
       lastUpdated: json['lastUpdated'],
-      originalApiName: json['originalApiName'], // Make sure to read this field
+      originalApiName: originalApiName, // Use the corrected value
     );
 
     print(
       "_favoriteFromJson DEBUG: deserializing - name='${favorite.name}', originalApiName='${favorite.originalApiName}'",
     );
     return favorite;
+  }
+
+  // Add to FavoritesProvider class
+  void _fixOriginalApiNameNullStrings() {
+    for (int i = 0; i < _favorites.length; i++) {
+      final favorite = _favorites[i];
+
+      // Check if originalApiName is the string "null"
+      if (favorite.originalApiName == "null") {
+        // Create a corrected favorite model
+        final fixedFavorite = FavoriteModel(
+          stationId: favorite.stationId,
+          name: favorite.name,
+          userId: favorite.userId,
+          position: favorite.position,
+          color: favorite.color,
+          description: favorite.description,
+          imgNumber: favorite.imgNumber,
+          lastUpdated: favorite.lastUpdated,
+          originalApiName: null, // Set to null instead of "null" string
+          customImagePath: favorite.customImagePath,
+        );
+
+        // Replace in the list
+        _favorites[i] = fixedFavorite;
+
+        print("Fixed 'null' string for favorite: ${favorite.stationId}");
+      }
+    }
   }
 
   // Add a new favorite from a MapStation with offline awareness
@@ -327,16 +373,57 @@ class FavoritesProvider with ChangeNotifier {
       final randomImgNumber = random.nextInt(30) + 1;
 
       // Determine station name with priority to displayName
-      String riverName;
+      String riverName = "";
       String? originalApiName;
 
+      // First priority: Use the provided displayName if available
       if (displayName != null && displayName.isNotEmpty) {
         riverName = displayName;
-      } else {
-        // Try to get name from offline cache
-        riverName = ""; // Default fallback
+
+        // If user provides a custom name at creation time, attempt to get the original
+        // name from station or cache for future comparison
+        if (station.name != null && station.name!.isNotEmpty) {
+          originalApiName = station.name;
+          print(
+            "DEBUG NAME: Using station.name as originalApiName: $originalApiName",
+          );
+        } else {
+          // Try to get original name from cached data
+          try {
+            final cachedStation = await _offlineManager.getCachedStation(
+              station.stationId,
+            );
+
+            if (cachedStation != null && cachedStation['apiData'] != null) {
+              final apiData = cachedStation['apiData'];
+              if (apiData is Map<String, dynamic> &&
+                  apiData.containsKey('name') &&
+                  apiData['name'] != null &&
+                  apiData['name'].toString().isNotEmpty) {
+                originalApiName = apiData['name'].toString();
+                print(
+                  "DEBUG NAME: Using cached API name as originalApiName: $originalApiName",
+                );
+              }
+            }
+          } catch (e) {
+            print("Error getting original API name from cache: $e");
+          }
+        }
+      }
+      // Second priority: Use the station name if available
+      else if (station.name != null && station.name!.isNotEmpty) {
+        riverName = station.name!;
+        originalApiName =
+            station
+                .name!; // When using the actual station name, it is both current and original
+        print(
+          "DEBUG NAME: Using station.name for both riverName and originalApiName: $riverName",
+        );
+      }
+      // Third priority: Try to get name from cached data
+      else {
         try {
-          // Check cached station data
           final cachedStation = await _offlineManager.getCachedStation(
             station.stationId,
           );
@@ -348,20 +435,10 @@ class FavoritesProvider with ChangeNotifier {
                 apiData['name'] != null &&
                 apiData['name'].toString().isNotEmpty) {
               riverName = apiData['name'].toString();
-              originalApiName = riverName; // Store the API name
+              originalApiName =
+                  riverName; // Since we're using the API name directly, it's both current and original
               print(
-                "DEBUG NAME: Got name '$riverName' from cached station data",
-              );
-            }
-          }
-
-          // Check if station has name from another source
-          if (station.name != null && station.name!.isNotEmpty) {
-            riverName = station.name!;
-            if (originalApiName == null) {
-              originalApiName = station.name!;
-              print(
-                "DEBUG NAME: Using station.name as originalApiName: $originalApiName",
+                "DEBUG NAME: Got name '$riverName' from cached station data for both riverName and originalApiName",
               );
             }
           }
@@ -370,11 +447,11 @@ class FavoritesProvider with ChangeNotifier {
         }
       }
 
-      // If we have a name but no original API name, set the original to the current name
+      // IMPORTANT: Ensure originalApiName is never null if we have a riverName
       if (riverName.isNotEmpty && originalApiName == null) {
         originalApiName = riverName;
         print(
-          "DEBUG NAME: Setting originalApiName to current riverName: $originalApiName",
+          "DEBUG NAME: Setting originalApiName to current riverName as fallback: $originalApiName",
         );
       }
 
@@ -785,6 +862,16 @@ class FavoritesProvider with ChangeNotifier {
         "updateFavoriteName: BEFORE update - stationId=$stationId, name='${favorite.name}', originalApiName='${favorite.originalApiName}'",
       );
 
+      // IMPORTANT: If originalApiName is null but we're renaming,
+      // store the current name as originalApiName first
+      String? originalApiNameToUse = favorite.originalApiName;
+      if (originalApiNameToUse == null || originalApiNameToUse.isEmpty) {
+        originalApiNameToUse = favorite.name;
+        print(
+          "updateFavoriteName: Setting missing originalApiName to current name: '$originalApiNameToUse'",
+        );
+      }
+
       // Create updated favorite - preserve original API name
       final updatedFavorite = FavoriteModel(
         stationId: favorite.stationId,
@@ -796,8 +883,8 @@ class FavoritesProvider with ChangeNotifier {
         imgNumber: favorite.imgNumber,
         lastUpdated: DateTime.now().millisecondsSinceEpoch,
         originalApiName:
-            favorite
-                .originalApiName, // IMPORTANT: Preserve the original API name
+            originalApiNameToUse, // Use the preserved originalApiName
+        customImagePath: favorite.customImagePath,
       );
 
       print(
@@ -845,6 +932,72 @@ class FavoritesProvider with ChangeNotifier {
     } catch (e) {
       _setError('Failed to update favorite name: ${e.toString()}');
       return false;
+    } finally {
+      _isProcessing = false;
+    }
+  }
+
+  // Add to FavoritesProvider class
+  Future<void> ensureOriginalApiNamesExist(String userId) async {
+    if (_isProcessing) return;
+
+    try {
+      _isProcessing = true;
+
+      // Check each favorite
+      bool needsUpdate = false;
+
+      for (int i = 0; i < _favorites.length; i++) {
+        final favorite = _favorites[i];
+
+        // If originalApiName is missing, set it to the current name
+        if (favorite.originalApiName == null ||
+            favorite.originalApiName!.isEmpty) {
+          print(
+            "Fixing missing originalApiName for stationId: ${favorite.stationId}",
+          );
+
+          // Create an updated favorite
+          final updatedFavorite = FavoriteModel(
+            stationId: favorite.stationId,
+            name: favorite.name,
+            userId: favorite.userId,
+            position: favorite.position,
+            color: favorite.color,
+            description: favorite.description,
+            imgNumber: favorite.imgNumber,
+            lastUpdated: DateTime.now().millisecondsSinceEpoch,
+            originalApiName: favorite.name, // Set to current name
+            customImagePath: favorite.customImagePath,
+          );
+
+          // Update in list
+          _favorites[i] = updatedFavorite;
+          needsUpdate = true;
+
+          // Update in database
+          final db = await _databaseHelper.database;
+          await db.update(
+            DatabaseHelper.tableFavorites,
+            {'originalApiName': favorite.name},
+            where: 'stationId = ? AND userId = ?',
+            whereArgs: [favorite.stationId, favorite.userId],
+          );
+        }
+      }
+
+      // Notify if we made changes
+      if (needsUpdate) {
+        notifyListeners();
+
+        // Update cache
+        _debounceTimer?.cancel();
+        _debounceTimer = Timer(const Duration(milliseconds: 300), () {
+          _cacheFavorites(userId, _favorites);
+        });
+      }
+    } catch (e) {
+      print("Error ensuring originalApiName values: $e");
     } finally {
       _isProcessing = false;
     }

@@ -53,11 +53,15 @@ class FavoriteCard extends StatelessWidget {
     // Check if this is a custom name by comparing with original API name
     // Improved logic that handles null originalApiName better
     // Modify the isCustomName check to handle "null" string
+    final String? apiName =
+        favorite.originalApiName == "null" ? null : favorite.originalApiName;
     final isCustomName =
-        favorite.originalApiName != null &&
-        favorite.originalApiName != "null" &&
-        favorite.name != favorite.originalApiName &&
-        favorite.originalApiName!.isNotEmpty;
+        apiName != null && favorite.name != apiName && apiName.isNotEmpty;
+
+    // Debug print to track values
+    print(
+      "FavoriteCard DEBUG: name='${favorite.name}', originalApiName='$apiName', isCustomName=$isCustomName",
+    );
 
     // Debug print
     print(
@@ -420,39 +424,49 @@ class FavoriteCard extends StatelessWidget {
 
   // Show dialog to edit the river name
   void _showEditNameDialog(BuildContext context) async {
+    // Store a local reference to the context to avoid using a potentially stale context
+    final currentContext = context;
+
     final favoritesProvider = Provider.of<FavoritesProvider>(
-      context,
+      currentContext,
       listen: false,
     );
 
     final result = await showDialog<String>(
-      context: context,
+      context: currentContext,
       builder:
-          (context) => EditFavoriteNameDialog(
+          (dialogContext) => EditFavoriteNameDialog(
             currentName: favorite.name,
             stationId: favorite.stationId,
-            originalApiName:
-                favorite.originalApiName, // Pass the original API name
+            originalApiName: favorite.originalApiName,
           ),
     );
 
-    // If we got a new name and it's different from the current one
+    // Check if the context is still valid before using it
     if (result != null && result != favorite.name) {
-      // Update the name
-      final success = await favoritesProvider.updateFavoriteName(
-        favorite.userId,
-        favorite.stationId,
-        result,
-      );
-
-      if (success) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('River name updated successfully')),
+      try {
+        // Update the name
+        final success = await favoritesProvider.updateFavoriteName(
+          favorite.userId,
+          favorite.stationId,
+          result,
         );
-      } else {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Failed to update river name')));
+
+        // Before showing snackbar, check if the context is still active
+        if (currentContext.mounted) {
+          // Use the context's mounted property
+          ScaffoldMessenger.of(currentContext).showSnackBar(
+            SnackBar(
+              content: Text(
+                success
+                    ? 'River name updated successfully'
+                    : 'Failed to update river name',
+              ),
+            ),
+          );
+        }
+      } catch (e) {
+        print('Error updating favorite name: $e');
       }
     }
   }

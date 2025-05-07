@@ -330,7 +330,8 @@ class OfflineManagerService extends ChangeNotifier {
     _isRefreshingCacheStats = true;
 
     try {
-      final db = await (_cacheService as dynamic)._cacheDatabase.database;
+      // Use the public method instead of accessing private property
+      final db = await _cacheService.getDatabase();
 
       // Count station entries
       final stationCount = await db.rawQuery(

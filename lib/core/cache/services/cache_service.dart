@@ -74,6 +74,10 @@ class CacheService {
     }
   }
 
+  Future<Database> getDatabase() async {
+    return await _cacheDatabase.database;
+  }
+
   /// Set value in cache
   Future<void> set(
     String key,

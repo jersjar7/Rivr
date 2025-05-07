@@ -279,13 +279,9 @@ class FavoritesProvider with ChangeNotifier {
 
   // Create Favorite from JSON
   Favorite _favoriteFromJson(Map<String, dynamic> json) {
-    // Fix the originalApiName handling
-    String? originalApiName = json['originalApiName'];
-
-    // Convert string "null" to actual null
-    if (originalApiName == "null") {
-      originalApiName = null;
-    }
+    // Check if originalApiName is the string "null" and convert to actual null
+    final originalApiName =
+        json['originalApiName'] == "null" ? null : json['originalApiName'];
 
     final favorite = FavoriteModel(
       stationId: json['stationId'],
@@ -296,7 +292,8 @@ class FavoritesProvider with ChangeNotifier {
       description: json['description'],
       imgNumber: json['imgNumber'] ?? 1,
       lastUpdated: json['lastUpdated'],
-      originalApiName: originalApiName, // Use the corrected value
+      originalApiName: originalApiName,
+      customImagePath: json['customImagePath'],
     );
 
     print(

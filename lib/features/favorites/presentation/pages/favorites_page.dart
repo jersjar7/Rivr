@@ -649,7 +649,13 @@ class _FavoritesPageState extends State<FavoritesPage>
                           favorite.stationId,
                           favorite.name,
                         ),
-                    onDelete: () => _confirmDelete(favorite),
+                    onDelete: () {
+                      final uid = authProvider.currentUser!.uid;
+                      Provider.of<FavoritesProvider>(
+                        context,
+                        listen: false,
+                      ).deleteFavorite(uid, favorite.stationId);
+                    },
                   ),
                 );
               },

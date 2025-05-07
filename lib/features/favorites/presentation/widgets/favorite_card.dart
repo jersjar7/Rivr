@@ -54,7 +54,6 @@ class FavoriteCard extends StatelessWidget {
     // Improved logic that handles null originalApiName better
     final isCustomName =
         favorite.originalApiName != null &&
-        favorite.originalApiName != "null" &&
         favorite.name != favorite.originalApiName &&
         favorite.originalApiName!.isNotEmpty;
 

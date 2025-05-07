@@ -26,6 +26,7 @@ class DatabaseHelper {
   static const String tableForecastCache = 'forecast_cache';
   static const String tableReturnPeriodCache = 'return_period_cache';
   static const String tableCachedForecasts = 'CachedForecasts';
+  static const String tableStreamNames = 'stream_names';
 
   Future<Database> get database async {
     if (_database != null) return _database!;
@@ -124,6 +125,7 @@ class DatabaseHelper {
     await createForecastCacheTable(database);
     await createReturnPeriodCacheTable(database);
     await createCachedForecastsTable(database);
+    await createStreamNamesTable(database);
   }
 
   // Check if a table exists
@@ -180,6 +182,95 @@ class DatabaseHelper {
     } catch (e) {
       print("ERROR: Failed to add column $columnName to $tableName: $e");
       return false;
+    }
+  }
+
+  // Create stream_names table if it doesn't exist - can be called on demand
+  Future<void> createStreamNamesTable([Database? providedDb]) async {
+    final db = providedDb ?? await database;
+
+    if (!await tableExists(tableStreamNames, db)) {
+      print("DEBUG: Creating stream_names table");
+      try {
+        await db.execute('''
+          CREATE TABLE $tableStreamNames (
+            station_id TEXT PRIMARY KEY,
+            display_name TEXT NOT NULL,
+            original_api_name TEXT,
+            last_updated INTEGER NOT NULL
+          )
+        ''');
+        print("DEBUG: Stream names table created successfully");
+      } catch (e) {
+        print("ERROR: Failed to create stream_names table: $e");
+        // Don't throw an exception - just log the error
+      }
+    } else {
+      print("DEBUG: Stream names table already exists");
+    }
+  }
+
+  // Migrate data from favorites to stream_names table
+  Future<void> migrateNamesFromFavorites() async {
+    final db = await database;
+
+    // Ensure both tables exist
+    await createFavoritesTable();
+    await createStreamNamesTable();
+
+    try {
+      // Check if there's data to migrate
+      final favCount = Sqflite.firstIntValue(
+        await db.rawQuery("SELECT COUNT(*) FROM $tableFavorites"),
+      );
+
+      if (favCount == null || favCount == 0) {
+        print("DEBUG: No favorites to migrate names from");
+        return;
+      }
+
+      // Get all favorites with names and original API names
+      final favorites = await db.query(
+        tableFavorites,
+        columns: ['stationId', 'name', 'originalApiName', 'lastUpdated'],
+      );
+
+      print("DEBUG: Found ${favorites.length} favorites to migrate names from");
+
+      // Insert or update each name in the stream_names table
+      int migrated = 0;
+      for (final favorite in favorites) {
+        final stationId = favorite['stationId']?.toString();
+        final name = favorite['name']?.toString();
+
+        if (stationId != null && name != null && name.isNotEmpty) {
+          // Check if this station already has a name in stream_names
+          final existing = await db.query(
+            tableStreamNames,
+            where: 'station_id = ?',
+            whereArgs: [stationId],
+          );
+
+          if (existing.isEmpty) {
+            // Insert new record
+            await db.insert(tableStreamNames, {
+              'station_id': stationId,
+              'display_name': name,
+              'original_api_name': favorite['originalApiName'],
+              'last_updated':
+                  favorite['lastUpdated'] ??
+                  DateTime.now().millisecondsSinceEpoch,
+            });
+            migrated++;
+          }
+        }
+      }
+
+      print(
+        "DEBUG: Migrated $migrated names from favorites to stream_names table",
+      );
+    } catch (e) {
+      print("ERROR: Failed to migrate names from favorites: $e");
     }
   }
 

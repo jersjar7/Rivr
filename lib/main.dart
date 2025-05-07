@@ -12,6 +12,7 @@ import 'features/auth/presentation/providers/auth_provider.dart';
 import 'features/favorites/presentation/providers/favorites_provider.dart';
 import 'features/forecast/presentation/providers/forecast_provider.dart';
 import 'features/forecast/presentation/providers/return_period_provider.dart';
+import 'core/services/stream_name_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -82,6 +83,32 @@ Future<void> main() async {
 
   await setupServiceLocator();
 
+  // Initialize the StreamNameService and migrate data from favorites
+  try {
+    print("MAIN: Initializing StreamNameService");
+    final streamNameService = sl<StreamNameService>();
+    await streamNameService.initialize();
+
+    // Import names from existing favorites
+    print("MAIN: Migrating names from existing favorites");
+    final favoritesDb = await databaseHelper.database;
+    if (await databaseHelper.tableExists(DatabaseHelper.tableFavorites)) {
+      final favorites = await favoritesDb.query(DatabaseHelper.tableFavorites);
+      if (favorites.isNotEmpty) {
+        print("MAIN: Found ${favorites.length} favorites to import");
+        await streamNameService.importFromFavorites(favorites);
+        print("MAIN: Favorites migration completed");
+      } else {
+        print("MAIN: No favorites found to import");
+      }
+    } else {
+      print("MAIN: Favorites table does not exist yet, skipping migration");
+    }
+  } catch (e) {
+    print("MAIN: Error initializing StreamNameService: $e");
+    // Non-fatal error, continue with app startup
+  }
+
   runApp(
     MultiProvider(
       providers: [
@@ -100,6 +127,8 @@ Future<void> main() async {
                   previousReturnPeriodProvider!
                     ..updateForecastProvider(forecastProvider),
         ),
+        // Add StreamNameService to providers so widgets can access it
+        Provider<StreamNameService>(create: (_) => sl<StreamNameService>()),
       ],
       child: const RivrApp(),
     ),

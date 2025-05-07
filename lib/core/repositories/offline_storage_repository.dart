@@ -6,6 +6,8 @@ import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
 import '../../features/map/domain/entities/map_station.dart';
+import '../services/stream_name_service.dart';
+import '../di/service_locator.dart';
 
 /// Repository for managing offline storage
 class OfflineStorageRepository {
@@ -20,6 +22,13 @@ class OfflineStorageRepository {
   Database? _db;
   String? _cacheDirPath;
   String? _dbPath;
+
+  // Reference to StreamNameService
+  final StreamNameService? _streamNameService;
+
+  /// Constructor with optional StreamNameService injection
+  OfflineStorageRepository({StreamNameService? streamNameService})
+    : _streamNameService = streamNameService ?? sl<StreamNameService>();
 
   /// Initialize the repository
   Future<void> initialize() async {
@@ -111,12 +120,14 @@ class OfflineStorageRepository {
   }
 
   /// Cache a station with its API data
+  /// Now also updates the StreamNameService with name data
   Future<void> cacheStation(
     MapStation station,
     Map<String, dynamic>? apiData,
   ) async {
     if (_db == null) await _initDatabase();
 
+    // First, cache in the database for backward compatibility
     await _db!.insert(_stationsTable, {
       'station_id': station.stationId.toString(),
       'name': station.name,
@@ -127,9 +138,23 @@ class OfflineStorageRepository {
       'api_data': apiData != null ? jsonEncode(apiData) : null,
       'cached_at': DateTime.now().millisecondsSinceEpoch,
     }, conflictAlgorithm: ConflictAlgorithm.replace);
+
+    // Then, update the names in StreamNameService if available
+    try {
+      if (_streamNameService != null) {
+        await _streamNameService.setNamesFromApiData(station, apiData);
+        print(
+          "Cached station names in StreamNameService: ${station.stationId}",
+        );
+      }
+    } catch (e) {
+      print("Error updating StreamNameService: $e");
+      // We don't want to fail the entire operation if name service fails
+    }
   }
 
   /// Get a cached station by ID
+  /// Still provides names for backward compatibility
   Future<Map<String, dynamic>?> getCachedStation(int stationId) async {
     if (_db == null) await _initDatabase();
 
@@ -142,15 +167,42 @@ class OfflineStorageRepository {
     if (results.isEmpty) return null;
 
     final stationData = results.first;
-    final Map<String, dynamic> apiData =
-        stationData['api_data'] != null
-            ? jsonDecode(stationData['api_data'] as String)
-            : {};
+    Map<String, dynamic> apiData = {};
 
+    // Parse API data if available
+    if (stationData['api_data'] != null) {
+      try {
+        apiData = jsonDecode(stationData['api_data'] as String);
+      } catch (e) {
+        print("Error parsing API data: $e");
+      }
+    }
+
+    // Try to get the most up-to-date name from StreamNameService if available
+    String? displayName;
+    if (_streamNameService != null) {
+      try {
+        displayName = await _streamNameService.getDisplayName(
+          stationId.toString(),
+        );
+
+        // If API data exists, update it with the current display name
+        if (apiData.isNotEmpty) {
+          apiData['name'] = displayName;
+        }
+      } catch (e) {
+        print("Error getting name from StreamNameService: $e");
+        // Fall back to stored name if error occurs
+      }
+    }
+
+    // Build the response with the station data
     return {
       'station': {
         'id': stationId,
-        'name': stationData['name'],
+        'name':
+            displayName ??
+            stationData['name'], // Use the display name if available
         'lat': stationData['latitude'],
         'lon': stationData['longitude'],
         'elevation': stationData['elevation'],
@@ -159,6 +211,67 @@ class OfflineStorageRepository {
       'apiData': apiData,
       'cachedAt': stationData['cached_at'],
     };
+  }
+
+  /// Get only the station data without names
+  /// Useful when names will be handled separately by StreamNameService
+  Future<Map<String, dynamic>?> getStationDataOnly(int stationId) async {
+    if (_db == null) await _initDatabase();
+
+    final results = await _db!.query(
+      _stationsTable,
+      columns: [
+        'station_id',
+        'latitude',
+        'longitude',
+        'elevation',
+        'color',
+        'cached_at',
+      ],
+      where: 'station_id = ?',
+      whereArgs: [stationId.toString()],
+    );
+
+    if (results.isEmpty) return null;
+
+    final stationData = results.first;
+
+    return {
+      'station': {
+        'id': stationId,
+        'lat': stationData['latitude'],
+        'lon': stationData['longitude'],
+        'elevation': stationData['elevation'],
+        'color': stationData['color'],
+      },
+      'cachedAt': stationData['cached_at'],
+    };
+  }
+
+  /// Get only the API data for a station
+  Future<Map<String, dynamic>?> getStationApiData(int stationId) async {
+    if (_db == null) await _initDatabase();
+
+    final results = await _db!.query(
+      _stationsTable,
+      columns: ['api_data', 'cached_at'],
+      where: 'station_id = ?',
+      whereArgs: [stationId.toString()],
+    );
+
+    if (results.isEmpty) return null;
+
+    final stationData = results.first;
+
+    if (stationData['api_data'] == null) return null;
+
+    try {
+      final apiData = jsonDecode(stationData['api_data'] as String);
+      return {'data': apiData, 'cachedAt': stationData['cached_at']};
+    } catch (e) {
+      print("Error parsing API data: $e");
+      return null;
+    }
   }
 
   /// Cache a forecast
@@ -221,6 +334,52 @@ class OfflineStorageRepository {
       'cachedAt': forecast['cached_at'],
       'expiresAt': forecast['expires_at'],
     };
+  }
+
+  /// Get all cached stations
+  Future<List<Map<String, dynamic>>> getAllCachedStations() async {
+    if (_db == null) await _initDatabase();
+
+    final results = await _db!.query(_stationsTable);
+    final stations = <Map<String, dynamic>>[];
+
+    for (final data in results) {
+      final stationId = data['station_id'].toString();
+      String? displayName;
+
+      // Try to get name from StreamNameService if available
+      if (_streamNameService != null) {
+        try {
+          displayName = await _streamNameService.getDisplayName(stationId);
+        } catch (e) {
+          print("Error getting name for station $stationId: $e");
+        }
+      }
+
+      Map<String, dynamic> apiData = {};
+      if (data['api_data'] != null) {
+        try {
+          apiData = jsonDecode(data['api_data'] as String);
+        } catch (e) {
+          print("Error parsing API data for station $stationId: $e");
+        }
+      }
+
+      stations.add({
+        'station': {
+          'id': int.tryParse(stationId) ?? 0,
+          'name': displayName ?? data['name'],
+          'lat': data['latitude'],
+          'lon': data['longitude'],
+          'elevation': data['elevation'],
+          'color': data['color'],
+        },
+        'apiData': apiData,
+        'cachedAt': data['cached_at'],
+      });
+    }
+
+    return stations;
   }
 
   /// Get cache statistics

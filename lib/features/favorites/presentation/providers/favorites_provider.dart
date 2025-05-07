@@ -381,7 +381,21 @@ class FavoritesProvider with ChangeNotifier {
 
   // Reorder favorites
   Future<void> reorderFavorites(int oldIndex, int newIndex) async {
-    await _dataManager.reorderFavorites(oldIndex, newIndex);
+    print(
+      "DEBUG: FavoritesProvider.reorderFavorites called with oldIndex=$oldIndex, newIndex=$newIndex",
+    );
+    print(
+      "DEBUG: Favorites list before reordering - types: ${_favorites.map((f) => f.runtimeType).toList()}",
+    );
+    print("DEBUG: Favorites length: ${_favorites.length}");
+
+    try {
+      await _dataManager.reorderFavorites(oldIndex, newIndex);
+      print("DEBUG: Reordering completed in FavoritesProvider");
+    } catch (e) {
+      print("DEBUG: Error in FavoritesProvider.reorderFavorites: $e");
+      print("DEBUG: Stack trace: ${StackTrace.current}");
+    }
   }
 
   // Update favorite name using new StreamNameService

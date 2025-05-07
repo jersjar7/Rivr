@@ -33,19 +33,36 @@ class FavoritesPersistenceManager {
 
   // Cache favorites for offline use
   Future<void> cacheFavorites(String userId, List<Favorite> favorites) async {
+    print("DEBUG: cacheFavorites called with userId=$userId");
+    print(
+      "DEBUG: Favorites list types in cacheFavorites: ${favorites.map((f) => f.runtimeType).toList()}",
+    );
+    print("DEBUG: Favorites length: ${favorites.length}");
+
     try {
+      print("DEBUG: Creating favoritesData map");
       final Map<String, dynamic> favoritesData = {
         'userId': userId,
         'timestamp': DateTime.now().millisecondsSinceEpoch,
-        'favorites': favorites.map((f) => _favoriteToJson(f)).toList(),
+        'favorites':
+            favorites.map((f) {
+              print(
+                "DEBUG: Converting favorite of type ${f.runtimeType} to JSON",
+              );
+              return _favoriteToJson(f);
+            }).toList(),
       };
+      print("DEBUG: Successfully created favoritesData");
 
       // Create a fake "station" that contains our favorites data
+      print("DEBUG: Creating fake station ID");
       final fakeStationId = int.parse(
         userId.hashCode.toString().replaceAll('-', '').substring(0, 8),
       );
+      print("DEBUG: fakeStationId=$fakeStationId");
 
       // Use cacheStation method which is available in OfflineManagerService
+      print("DEBUG: Creating fake station");
       final MapStation fakeStation = MapStation(
         stationId: fakeStationId,
         name: 'favorites_store',
@@ -54,9 +71,12 @@ class FavoritesPersistenceManager {
       );
 
       // Store our favorites data in the apiData parameter
+      print("DEBUG: Calling _offlineManager.cacheStation");
       await _offlineManager.cacheStation(fakeStation, favoritesData);
+      print("DEBUG: _offlineManager.cacheStation completed successfully");
     } catch (e) {
-      print("Error caching favorites: $e");
+      print("DEBUG: Error in cacheFavorites: $e");
+      print("DEBUG: Error stack trace: ${StackTrace.current}");
       // Non-critical error, don't disrupt the UI
     }
   }
@@ -318,25 +338,40 @@ class FavoritesPersistenceManager {
 
   // Convert Favorite to JSON
   Map<String, dynamic> _favoriteToJson(Favorite favorite) {
-    final json = {
-      'stationId': favorite.stationId,
-      'name': favorite.name,
-      'userId': favorite.userId,
-      'position': favorite.position,
-      'color': favorite.color,
-      'description': favorite.description,
-      'imgNumber': favorite.imgNumber,
-      'lastUpdated': favorite.lastUpdated,
-      'customImagePath': favorite.customImagePath,
-    };
+    print(
+      "DEBUG: _favoriteToJson called with favorite type: ${favorite.runtimeType}",
+    );
+    print(
+      "DEBUG: favorite.stationId=${favorite.stationId}, favorite.name=${favorite.name}",
+    );
 
-    // Only add originalApiName if it's not null and not "null"
-    if (favorite.originalApiName != null &&
-        favorite.originalApiName != "null") {
-      json['originalApiName'] = favorite.originalApiName;
+    try {
+      final json = {
+        'stationId': favorite.stationId,
+        'name': favorite.name,
+        'userId': favorite.userId,
+        'position': favorite.position,
+        'color': favorite.color,
+        'description': favorite.description,
+        'imgNumber': favorite.imgNumber,
+        'lastUpdated': favorite.lastUpdated,
+        'customImagePath': favorite.customImagePath,
+      };
+
+      // Only add originalApiName if it's not null and not "null"
+      if (favorite.originalApiName != null &&
+          favorite.originalApiName != "null") {
+        json['originalApiName'] = favorite.originalApiName;
+        print("DEBUG: Added originalApiName=${favorite.originalApiName}");
+      }
+
+      print("DEBUG: Successfully created JSON for favorite");
+      return json;
+    } catch (e) {
+      print("DEBUG: Error in _favoriteToJson: $e");
+      print("DEBUG: Stack trace: ${StackTrace.current}");
+      rethrow; // Re-throw to see where this might be coming from
     }
-
-    return json;
   }
 
   // Create Favorite from JSON

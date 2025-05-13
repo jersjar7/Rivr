@@ -275,19 +275,6 @@ class _FavoriteCardState extends State<FavoriteCard> {
                             ],
                           ),
                         ),
-
-                        // Flow indicator color dot (could be tied to water level in future)
-                        Container(
-                          width: 12,
-                          height: 12,
-                          decoration: BoxDecoration(
-                            color: _getFlowStatusColor(
-                              widget.favorite.stationId,
-                            ),
-                            shape: BoxShape.circle,
-                            border: Border.all(color: Colors.white, width: 2),
-                          ),
-                        ),
                       ],
                     ),
                   ),
@@ -418,23 +405,6 @@ class _FavoriteCardState extends State<FavoriteCard> {
         ),
       ),
     );
-  }
-
-  // This would ideally come from real-time data
-  Color _getFlowStatusColor(String stationId) {
-    // Mock implementation - in reality would be based on flow data
-    final value = stationId.hashCode % 4;
-
-    switch (value) {
-      case 0:
-        return Colors.green; // Normal flow
-      case 1:
-        return Colors.orange; // Higher than normal
-      case 2:
-        return Colors.red; // High/dangerous
-      default:
-        return Colors.blue; // Lower than normal
-    }
   }
 
   Widget _buildDefaultImage(int imgNumber, Color cardColor) {

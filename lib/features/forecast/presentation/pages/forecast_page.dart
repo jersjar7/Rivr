@@ -104,6 +104,12 @@ class _ForecastPageState extends State<ForecastPage>
         title: Text('${widget.stationName} Forecast'),
         bottom: TabBar(
           controller: _tabController,
+          labelColor:
+              Theme.of(
+                context,
+              ).colorScheme.secondary, // Color for the selected tab
+          unselectedLabelColor: Theme.of(context).colorScheme.surface
+              .withValues(alpha: 0.7), // Color for unselected tabs
           tabs: const [
             Tab(text: 'Hourly'),
             Tab(text: 'Daily'),

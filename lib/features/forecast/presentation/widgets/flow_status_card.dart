@@ -238,7 +238,7 @@ class FlowStatusCard extends StatelessWidget {
                       padding: const EdgeInsets.only(top: 8.0),
                       child: Icon(
                         Icons.keyboard_arrow_down,
-                        color: Colors.white.withOpacity(0.5),
+                        color: Colors.white.withValues(alpha: 0.5),
                       ),
                     ),
                   ),

@@ -5,6 +5,7 @@ enum ForecastType {
   mediumRange,
   longRange;
 
+  /// Overrides toString() so `forecastType.toString()` → "short_range", etc.
   @override
   String toString() {
     switch (this) {
@@ -17,6 +18,7 @@ enum ForecastType {
     }
   }
 
+  /// Human-friendly label
   String get displayName {
     switch (this) {
       case ForecastType.shortRange:
@@ -28,6 +30,7 @@ enum ForecastType {
     }
   }
 
+  /// Cache duration in hours
   int get cacheDuration {
     switch (this) {
       case ForecastType.shortRange:

@@ -10,6 +10,7 @@ import 'package:rivr/features/forecast/domain/entities/forecast_types.dart';
 import 'package:rivr/features/forecast/presentation/providers/forecast_provider.dart';
 import 'package:rivr/features/forecast/presentation/providers/return_period_provider.dart';
 import 'package:rivr/features/forecast/presentation/widgets/flow_status_card.dart';
+import 'package:rivr/features/forecast/presentation/widgets/horizontal_flow_timeline.dart';
 import 'package:rivr/features/forecast/presentation/widgets/hydrograph/hydrograph_factory.dart';
 import 'package:rivr/features/forecast/presentation/widgets/long_range_calendar.dart';
 
@@ -231,6 +232,25 @@ class _ForecastPageState extends State<ForecastPage>
             returnPeriod: returnPeriod,
             expanded: true,
             onTap: () {},
+          ),
+
+          const SizedBox(height: 24),
+
+          // New Horizontal Flow Timeline Widget
+          Card(
+            elevation: 2,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(8.0),
+              child: HorizontalFlowTimeline(
+                forecasts: forecasts,
+                returnPeriod: returnPeriod,
+                hoursToShow: 18,
+                initialViewType: TimelineViewType.hourCards,
+              ),
+            ),
           ),
 
           const SizedBox(height: 24),

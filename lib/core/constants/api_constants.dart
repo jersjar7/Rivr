@@ -3,29 +3,32 @@
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 class ApiConstants {
-  /// Base URL for your NWM API (forecast + return‐period endpoints)
-  static String get baseUrl =>
-      dotenv.env['API_BASE_URL'] ??
-      'https://nwm-api-updt-9f6idmxh.uc.gateway.dev';
+  // 1) Read straight from .env
+  static final _forecastBase = dotenv.env['FORECAST_BASE_URL']!;
+  static final _returnBase = dotenv.env['RETURN_BASE_URL']!;
+  static final _apiKey = dotenv.env['API_KEY']!;
 
-  /// The specific return‐period path (no query params)
-  static String get returnPeriodPath =>
-      dotenv.env['RETURN_PERIOD_PATH'] ?? '/return-period';
+  /// Builds e.g. https://api.water.noaa.gov/nwps/v1/reaches/23021904/streamflow?series=short_range
+  static String getForecastUrl(String reachId, String series) {
+    final uri = Uri.parse(_forecastBase).replace(
+      pathSegments: [
+        ...Uri.parse(_forecastBase).pathSegments, // in case v1 is a path
+        'reaches',
+        reachId,
+        'streamflow',
+      ],
+      queryParameters: {'series': series},
+    );
+    return uri.toString();
+  }
 
-  /// Your API key for both forecast & return‐period
-  static String get apiKey =>
-      dotenv.env['API_KEY'] ?? 'AIzaSyArCbLaEevrqrVPJDzu2OioM_kNmCBtsx8';
-
-  /// NOAA‐style forecast URL (if you’re still pulling forecasts from the old service,
-  /// otherwise point this at your new endpoint too)
-  static String getForecastUrl(String reachId) =>
-      '$baseUrl/reaches/$reachId/streamflow?key=$apiKey';
-
-  /// Return period URL: builds e.g.
-  /// https://…/return-period?comids=15039097&key=…
-  static String getReturnPeriodUrl(String reachId) {
-    return '$baseUrl$returnPeriodPath'
-        '?comids=$reachId'
-        '&key=$apiKey';
+  /// Builds e.g.
+  /// https://nwm-api-updt-9f6idmxh.uc.gateway.dev/return-period?comids=15039097&key=AIza…
+  static String getReturnPeriodUrl(String comid) {
+    final uri = Uri.parse(_returnBase).replace(
+      path: '/return-period',
+      queryParameters: {'comids': comid, 'key': _apiKey},
+    );
+    return uri.toString();
   }
 }

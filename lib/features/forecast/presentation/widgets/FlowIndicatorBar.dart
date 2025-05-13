@@ -146,6 +146,7 @@ class _FlowIndicatorBarState extends State<FlowIndicatorBar>
           width: widget.width,
           height: widget.height,
           child: Stack(
+            fit: StackFit.expand,
             clipBehavior: Clip.none,
             children: [
               // Background gradient
@@ -176,7 +177,7 @@ class _FlowIndicatorBarState extends State<FlowIndicatorBar>
                     bottom: 0,
                     child: Container(
                       width: 2,
-                      color: Colors.white.withOpacity(0.7),
+                      color: Colors.white.withValues(alpha: 0.7),
                       child: widget.showLabels ? null : const SizedBox(),
                     ),
                   );
@@ -200,7 +201,7 @@ class _FlowIndicatorBarState extends State<FlowIndicatorBar>
                           border: Border.all(color: Colors.white, width: 2),
                           boxShadow: [
                             BoxShadow(
-                              color: markerColor.withOpacity(0.7),
+                              color: markerColor.withValues(alpha: 0.7),
                               blurRadius: 10,
                               spreadRadius: 2,
                             ),
@@ -221,6 +222,7 @@ class _FlowIndicatorBarState extends State<FlowIndicatorBar>
             padding: const EdgeInsets.only(top: 8.0),
             child: SizedBox(
               width: widget.width,
+              height: 14,
               child: Stack(
                 children:
                     returnPeriodPositions.entries.map((entry) {

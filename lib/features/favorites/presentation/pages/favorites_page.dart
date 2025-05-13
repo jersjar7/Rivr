@@ -13,7 +13,6 @@ import 'package:rivr/features/favorites/data/models/favorite_model.dart';
 import '../providers/favorites_provider.dart';
 import '../../../../features/auth/presentation/providers/auth_provider.dart';
 import '../../../../core/widgets/empty_state.dart';
-import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/loading_indicator.dart';
 import '../widgets/favorite_card.dart';
 import '../../domain/entities/favorite.dart';
@@ -255,7 +254,11 @@ class _FavoritesPageState extends State<FavoritesPage>
   }
 
   void _showChangeImageDialog(Favorite favorite) {
-    showDialog(
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    final textTheme = theme.textTheme;
+
+    showDialog<int>(
       context: context,
       barrierDismissible: true,
       builder: (context) {
@@ -267,18 +270,20 @@ class _FavoritesPageState extends State<FavoritesPage>
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
+              // Header
               Padding(
                 padding: const EdgeInsets.all(16.0),
                 child: Text(
                   'Select River Image',
-                  style: TextStyle(
-                    fontSize: 18,
+                  style: textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.bold,
-                    color: Colors.grey[800],
+                    color: colors.onSurface,
                   ),
                 ),
               ),
-              const Divider(height: 1),
+              Divider(color: theme.dividerColor, height: 1),
+
+              // Image grid
               Expanded(
                 child: GridView.builder(
                   shrinkWrap: true,
@@ -289,29 +294,23 @@ class _FavoritesPageState extends State<FavoritesPage>
                     crossAxisSpacing: 8,
                     mainAxisSpacing: 8,
                   ),
-                  itemCount: 30, // We have 30 river images
-                  itemBuilder: (context, idx) {
+                  itemCount: 30,
+                  itemBuilder: (ctx, idx) {
                     final imgNumber = idx + 1;
-                    // Highlight the currently selected image
                     final isSelected = favorite.imgNumber == imgNumber;
 
                     return InkWell(
-                      onTap: () {
-                        Navigator.pop(context, imgNumber);
-                      },
+                      onTap: () => Navigator.pop(context, imgNumber),
                       borderRadius: BorderRadius.circular(8),
                       child: Container(
                         decoration: BoxDecoration(
-                          border:
-                              isSelected
-                                  ? Border.all(
-                                    color: AppColors.primaryColor,
-                                    width: 3,
-                                  )
-                                  : Border.all(
-                                    color: Colors.grey[300]!,
-                                    width: 1,
-                                  ),
+                          border: Border.all(
+                            color:
+                                isSelected
+                                    ? colors.primary
+                                    : colors.onSurface.withOpacity(0.12),
+                            width: isSelected ? 3 : 1,
+                          ),
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: ClipRRect(
@@ -319,12 +318,12 @@ class _FavoritesPageState extends State<FavoritesPage>
                           child: Image.asset(
                             'assets/img/river_images/$imgNumber.jpeg',
                             fit: BoxFit.cover,
-                            errorBuilder: (context, error, stackTrace) {
+                            errorBuilder: (c, e, st) {
                               return Container(
-                                color: Colors.grey[200],
+                                color: colors.surfaceContainerHighest,
                                 child: Icon(
                                   Icons.broken_image,
-                                  color: Colors.grey[500],
+                                  color: colors.onSurfaceVariant,
                                 ),
                               );
                             },
@@ -335,6 +334,8 @@ class _FavoritesPageState extends State<FavoritesPage>
                   },
                 ),
               ),
+
+              // Actions
               Padding(
                 padding: const EdgeInsets.all(12.0),
                 child: Row(
@@ -342,17 +343,20 @@ class _FavoritesPageState extends State<FavoritesPage>
                   children: [
                     TextButton(
                       onPressed: () => Navigator.pop(context),
+                      style: TextButton.styleFrom(
+                        foregroundColor: colors.primary,
+                      ),
                       child: const Text('Cancel'),
                     ),
                     ElevatedButton(
                       onPressed: () {
-                        // Generate a random image number
                         final random = math.Random();
-                        final randomImgNumber = random.nextInt(30) + 1;
-                        Navigator.pop(context, randomImgNumber);
+                        final randomImg = random.nextInt(30) + 1;
+                        Navigator.pop(context, randomImg);
                       },
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.secondaryColor,
+                        backgroundColor: colors.secondary,
+                        foregroundColor: colors.onSecondary,
                       ),
                       child: const Text('Random'),
                     ),
@@ -364,7 +368,7 @@ class _FavoritesPageState extends State<FavoritesPage>
         );
       },
     ).then((selectedImgNumber) {
-      if (selectedImgNumber != null && selectedImgNumber is int) {
+      if (selectedImgNumber != null) {
         _updateFavoriteImage(favorite, selectedImgNumber);
       }
     });
@@ -478,32 +482,35 @@ class _FavoritesPageState extends State<FavoritesPage>
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    final textTheme = theme.textTheme;
+
     return Scaffold(
-      backgroundColor: Colors.grey[100],
+      backgroundColor: colors.surface,
       appBar: AppBar(
-        title: const Text(
+        title: Text(
           'My Rivers',
-          style: TextStyle(fontWeight: FontWeight.bold),
+          style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
         ),
         elevation: 0,
-        backgroundColor: AppColors.primaryColor,
+        backgroundColor: colors.primary,
         actions: [
           IconButton(
             icon: AnimatedBuilder(
               animation: _animationController,
-              builder: (context, child) {
-                return Transform.rotate(
-                  angle: _animationController.value * 2.0 * 3.14,
-                  child: child,
-                );
-              },
-              child: const Icon(Icons.refresh),
+              builder:
+                  (ctx, child) => Transform.rotate(
+                    angle: _animationController.value * 2 * math.pi,
+                    child: child,
+                  ),
+              child: Icon(Icons.refresh, color: colors.onPrimary),
             ),
             onPressed:
                 _isRefreshing
                     ? null
                     : () {
-                      _animationController.forward(from: 0.0);
+                      _animationController.forward(from: 0);
                       _loadFavorites();
                     },
             tooltip: 'Refresh',
@@ -519,7 +526,7 @@ class _FavoritesPageState extends State<FavoritesPage>
             return Center(
               child: LoadingIndicator(
                 message: 'Loading your favorite rivers...',
-                color: AppColors.primaryColor,
+                color: colors.primary,
               ),
             );
           }
@@ -529,31 +536,35 @@ class _FavoritesPageState extends State<FavoritesPage>
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.error_outline, color: Colors.red[300], size: 60),
+                  Icon(Icons.error_outline, color: colors.error, size: 60),
                   const SizedBox(height: 16),
                   Text(
                     'Something went wrong',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.grey[800],
+                    style: textTheme.titleMedium?.copyWith(
+                      color: colors.onSurface,
                     ),
                   ),
                   const SizedBox(height: 8),
                   Text(
                     favoritesProvider.errorMessage ??
                         'Could not load your favorites',
+                    style: textTheme.bodyMedium?.copyWith(
+                      color: colors.onSurface,
+                    ),
                     textAlign: TextAlign.center,
-                    style: TextStyle(color: Colors.grey[600]),
                   ),
                   const SizedBox(height: 24),
                   ElevatedButton.icon(
                     onPressed: _loadFavorites,
-                    icon: const Icon(Icons.refresh),
-                    label: const Text('Try Again'),
+                    icon: Icon(Icons.refresh, color: colors.onPrimary),
+                    label: Text(
+                      'Try Again',
+                      style: textTheme.bodyMedium?.copyWith(
+                        color: colors.onPrimary,
+                      ),
+                    ),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primaryColor,
-                      foregroundColor: Colors.white,
+                      backgroundColor: colors.primary,
                       padding: const EdgeInsets.symmetric(
                         horizontal: 24,
                         vertical: 12,
@@ -571,7 +582,7 @@ class _FavoritesPageState extends State<FavoritesPage>
 
           return RefreshIndicator(
             key: _refreshIndicatorKey,
-            color: AppColors.primaryColor,
+            color: colors.primary,
             onRefresh: _loadFavorites,
             child: ReorderableListView.builder(
               padding: const EdgeInsets.all(16.0),
@@ -587,8 +598,8 @@ class _FavoritesPageState extends State<FavoritesPage>
                     children: [
                       SlidableAction(
                         onPressed: (_) => _showEditOptions(favorite),
-                        backgroundColor: AppColors.primaryColor,
-                        foregroundColor: Colors.white,
+                        backgroundColor: colors.primary,
+                        foregroundColor: colors.onPrimary,
                         icon: Icons.more_horiz,
                         label: 'Options',
                       ),
@@ -600,8 +611,8 @@ class _FavoritesPageState extends State<FavoritesPage>
                     children: [
                       SlidableAction(
                         onPressed: (_) => _confirmDelete(favorite),
-                        backgroundColor: Colors.red,
-                        foregroundColor: Colors.white,
+                        backgroundColor: colors.error,
+                        foregroundColor: colors.onError,
                         icon: Icons.delete,
                         label: 'Delete',
                       ),
@@ -628,13 +639,15 @@ class _FavoritesPageState extends State<FavoritesPage>
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _navigateToMap,
-        backgroundColor: AppColors.secondaryColor,
-        icon: const Icon(Icons.add),
-        label: const Text(
+        backgroundColor: colors.secondary,
+        icon: Icon(Icons.add, color: colors.onSecondary),
+        label: Text(
           'Add River',
-          style: TextStyle(fontWeight: FontWeight.bold),
+          style: textTheme.labelLarge?.copyWith(
+            fontWeight: FontWeight.bold,
+            color: colors.onSecondary,
+          ),
         ),
-        elevation: 4,
       ),
     );
   }

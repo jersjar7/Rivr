@@ -1,6 +1,5 @@
 // lib/core/widgets/loading_indicator.dart
 import 'package:flutter/material.dart';
-import 'package:rivr/core/theme/app_theme.dart';
 
 /// A reusable loading indicator with consistent styling
 class LoadingIndicator extends StatelessWidget {
@@ -19,6 +18,15 @@ class LoadingIndicator extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Grab ThemeData and ColorScheme for auto light/dark support
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+
+    // Fallback to theme.primary / theme.onSurface if no override provided
+    final indicatorColor = color ?? colors.primary;
+    final messageColor = color ?? colors.onSurface;
+
+    // Build the spinner + optional message
     final indicator = Column(
       mainAxisSize: MainAxisSize.min,
       mainAxisAlignment: MainAxisAlignment.center,
@@ -27,9 +35,7 @@ class LoadingIndicator extends StatelessWidget {
           width: size,
           height: size,
           child: CircularProgressIndicator(
-            valueColor: AlwaysStoppedAnimation<Color>(
-              color ?? AppColors.primaryColor,
-            ),
+            valueColor: AlwaysStoppedAnimation<Color>(indicatorColor),
             strokeWidth: 3.0,
           ),
         ),
@@ -37,22 +43,30 @@ class LoadingIndicator extends StatelessWidget {
           const SizedBox(height: 16),
           Text(
             message!,
-            style: TextStyle(color: color ?? AppColors.textColor, fontSize: 14),
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: messageColor,
+              fontSize: 14,
+            ),
             textAlign: TextAlign.center,
           ),
         ],
       ],
     );
 
+    // Wrap in a card-like container if requested
     if (withBackground) {
       return Container(
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
-          color: Colors.white,
+          // Use surface color for the “card” background
+          color: colors.surface,
           borderRadius: BorderRadius.circular(8),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.1),
+              // soften shadow based on brightness
+              color: Colors.black.withOpacity(
+                theme.brightness == Brightness.light ? 0.1 : 0.4,
+              ),
               blurRadius: 10,
               offset: const Offset(0, 3),
             ),

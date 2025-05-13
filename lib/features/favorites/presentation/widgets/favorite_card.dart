@@ -6,7 +6,6 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:rivr/features/favorites/services/favorite_image_service.dart';
 import '../../domain/entities/favorite.dart';
-import '../../../../core/theme/app_theme.dart';
 import '../../../../core/services/stream_name_service.dart';
 import '../../../../core/di/service_locator.dart';
 import '../providers/favorites_provider.dart';
@@ -102,35 +101,31 @@ class _FavoriteCardState extends State<FavoriteCard> {
 
   @override
   Widget build(BuildContext context) {
-    // Default image if none specified - use river_images subfolder
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    final textTheme = theme.textTheme;
+
+    // Default image if none specified
     final imgNumber =
         widget.favorite.imgNumber ??
         (widget.favorite.stationId.hashCode % 30 + 1);
 
-    // Parse color or use default
+    // Parse custom color or fall back to primary
     Color cardColor;
-    if (widget.favorite.color != null) {
-      // Convert hex color to Color object
-      try {
-        final colorValue = int.parse(
-          widget.favorite.color!.replaceAll('#', '0xff'),
-        );
-        cardColor = Color(colorValue);
-      } catch (_) {
-        cardColor = AppColors.primaryColor;
-      }
-    } else {
-      cardColor = AppColors.primaryColor;
+    try {
+      cardColor =
+          widget.favorite.color != null
+              ? Color(int.parse(widget.favorite.color!.replaceAll('#', '0xff')))
+              : colors.primary;
+    } catch (_) {
+      cardColor = colors.primary;
     }
 
-    // Get the display name to use
+    // Determine display name
     final displayName =
         _isLoadingName
-            ? widget
-                .favorite
-                .name // Use favorite's name as fallback while loading
-            : (_displayName ??
-                widget.favorite.name); // Use name from service or fallback
+            ? widget.favorite.name
+            : (_displayName ?? widget.favorite.name);
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 16.0),
@@ -138,7 +133,7 @@ class _FavoriteCardState extends State<FavoriteCard> {
         elevation: 2,
         borderRadius: BorderRadius.circular(12),
         clipBehavior: Clip.antiAlias,
-        color: Colors.white,
+        color: colors.surface,
         child: InkWell(
           onTap: widget.onTap,
           splashColor: cardColor.withValues(alpha: 0.1),
@@ -165,9 +160,14 @@ class _FavoriteCardState extends State<FavoriteCard> {
                                   return Container(
                                     height: 160,
                                     width: double.infinity,
-                                    color: cardColor.withAlpha(50),
-                                    child: const Center(
-                                      child: CircularProgressIndicator(),
+                                    color: cardColor.withValues(alpha: 0.2),
+                                    child: Center(
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        valueColor: AlwaysStoppedAnimation(
+                                          colors.primary,
+                                        ),
+                                      ),
                                     ),
                                   );
                                 }
@@ -209,7 +209,7 @@ class _FavoriteCardState extends State<FavoriteCard> {
                         end: Alignment.bottomCenter,
                         colors: [
                           Colors.transparent,
-                          Colors.black.withValues(alpha: 0.7),
+                          colors.surface.withValues(alpha: 0.7),
                         ],
                         stops: const [0.6, 1.0],
                       ),
@@ -244,13 +244,12 @@ class _FavoriteCardState extends State<FavoriteCard> {
                               Expanded(
                                 child: Text(
                                   displayName,
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 20,
+                                  style: textTheme.titleMedium?.copyWith(
+                                    color: colors.onPrimary,
                                     fontWeight: FontWeight.bold,
                                     shadows: [
                                       Shadow(
-                                        offset: Offset(1, 1),
+                                        offset: const Offset(1, 1),
                                         blurRadius: 3,
                                         color: Colors.black54,
                                       ),
@@ -262,10 +261,10 @@ class _FavoriteCardState extends State<FavoriteCard> {
                               ),
                               // Edit button next to the title
                               IconButton(
-                                icon: const Icon(
+                                icon: Icon(
                                   Icons.edit,
-                                  color: Colors.white,
                                   size: 18,
+                                  color: colors.onPrimary,
                                 ),
                                 onPressed: () => _showEditNameDialog(context),
                                 padding: EdgeInsets.zero,
@@ -286,13 +285,13 @@ class _FavoriteCardState extends State<FavoriteCard> {
                     child: Container(
                       padding: const EdgeInsets.all(4),
                       decoration: BoxDecoration(
-                        color: Colors.black38,
+                        color: colors.onSurface.withValues(alpha: 0.3),
                         borderRadius: BorderRadius.circular(4),
                       ),
-                      child: const Icon(
+                      child: Icon(
                         Icons.drag_handle,
-                        color: Colors.white70,
                         size: 16,
+                        color: colors.onSurfaceVariant,
                       ),
                     ),
                   ),
@@ -308,7 +307,7 @@ class _FavoriteCardState extends State<FavoriteCard> {
                           vertical: 4,
                         ),
                         decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.7),
+                          color: colors.surface.withValues(alpha: 0.7),
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Row(
@@ -317,15 +316,14 @@ class _FavoriteCardState extends State<FavoriteCard> {
                             Icon(
                               Icons.edit_attributes,
                               size: 12,
-                              color: AppColors.primaryColor,
+                              color: colors.primary,
                             ),
                             const SizedBox(width: 4),
                             Text(
                               'Custom Name',
-                              style: TextStyle(
-                                fontSize: 10,
+                              style: textTheme.labelSmall?.copyWith(
+                                color: colors.primary,
                                 fontWeight: FontWeight.bold,
-                                color: AppColors.primaryColor,
                               ),
                             ),
                           ],
@@ -347,14 +345,13 @@ class _FavoriteCardState extends State<FavoriteCard> {
                         Icon(
                           Icons.location_on,
                           size: 16,
-                          color: Colors.grey[600],
+                          color: colors.onSurfaceVariant,
                         ),
                         const SizedBox(width: 6),
                         Text(
                           'Station ID: ${widget.favorite.stationId}',
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: Colors.grey[700],
+                          style: textTheme.bodySmall?.copyWith(
+                            color: colors.onSurfaceVariant,
                           ),
                         ),
                       ],
@@ -366,32 +363,38 @@ class _FavoriteCardState extends State<FavoriteCard> {
                         // View button
                         ElevatedButton.icon(
                           onPressed: widget.onTap,
-                          icon: const Icon(Icons.analytics, size: 16),
-                          label: const Text('View'),
+                          icon: Icon(
+                            Icons.analytics,
+                            size: 16,
+                            color: colors.onPrimary,
+                          ),
+                          label: Text(
+                            'View',
+                            style: textTheme.bodySmall?.copyWith(
+                              color: colors.onPrimary,
+                            ),
+                          ),
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.primaryColor,
-                            foregroundColor: Colors.white,
+                            backgroundColor: colors.primary,
                             elevation: 0,
                             padding: const EdgeInsets.symmetric(
                               horizontal: 12,
                               vertical: 8,
                             ),
-                            textStyle: const TextStyle(
-                              fontSize: 14,
+                            textStyle: textTheme.bodySmall?.copyWith(
                               fontWeight: FontWeight.w500,
                             ),
                           ),
                         ),
+
+                        const SizedBox(width: 8),
 
                         // Delete button
                         IconButton(
                           onPressed: () {
                             _showDeleteConfirmation(context);
                           },
-                          icon: Icon(
-                            Icons.delete_outline,
-                            color: Colors.grey[600],
-                          ),
+                          icon: Icon(Icons.delete_outline, color: colors.error),
                           tooltip: 'Remove from favorites',
                           splashRadius: 24,
                         ),
@@ -425,7 +428,9 @@ class _FavoriteCardState extends State<FavoriteCard> {
     );
   }
 
+  // Confirmation dialog for deletion
   void _showDeleteConfirmation(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
     showDialog(
       context: context,
       builder:
@@ -433,18 +438,23 @@ class _FavoriteCardState extends State<FavoriteCard> {
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),
             ),
-            title: const Text('Remove Favorite'),
+            title: Text(
+              'Remove Favorite',
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
             content: Text(
               _displayName == null || _displayName!.isEmpty
                   ? 'Are you sure you want to remove this river from your favorites?'
-                  : 'Are you sure you want to remove $_displayName from your favorites?',
+                  : 'Remove $_displayName from your favorites?',
             ),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(context),
                 child: Text(
                   'Cancel',
-                  style: TextStyle(color: Colors.grey[700]),
+                  style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                    color: colors.onSurfaceVariant,
+                  ),
                 ),
               ),
               ElevatedButton(
@@ -453,8 +463,8 @@ class _FavoriteCardState extends State<FavoriteCard> {
                   widget.onDelete();
                 },
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.red[400],
-                  foregroundColor: Colors.white,
+                  backgroundColor: colors.error,
+                  foregroundColor: colors.onError,
                   elevation: 0,
                 ),
                 child: const Text('Remove'),
@@ -464,7 +474,7 @@ class _FavoriteCardState extends State<FavoriteCard> {
     );
   }
 
-  // Show dialog to edit the river name
+  // Dialog to edit the river name
   void _showEditNameDialog(BuildContext context) async {
     final currentContext = context;
     final favoritesProvider = Provider.of<FavoritesProvider>(

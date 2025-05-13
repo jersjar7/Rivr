@@ -1,6 +1,5 @@
 // lib/core/widgets/empty_state.dart
 import 'package:flutter/material.dart';
-import 'package:rivr/core/theme/app_theme.dart';
 
 /// A reusable empty state widget
 class EmptyStateView extends StatelessWidget {
@@ -68,19 +67,21 @@ class EmptyFavoritesView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+
     return EmptyStateView(
       title: 'No Favorite Rivers Yet',
       message:
           'Add your favorite rivers to track their flow conditions easily.',
       icon: Icons.favorite_border,
-      iconColor: Colors.blue.shade200,
+      iconColor: colors.primaryContainer, // lighter “primary” accent
       actionButton: ElevatedButton.icon(
         onPressed: onExploreMap,
         icon: const Icon(Icons.map),
         label: const Text('Explore Map'),
         style: ElevatedButton.styleFrom(
-          backgroundColor: AppColors.primaryColor,
-          foregroundColor: Colors.white,
+          backgroundColor: colors.primary, // primary button fill
+          foregroundColor: colors.onPrimary, // text/icon on primary
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
         ),
       ),
@@ -103,11 +104,16 @@ class ErrorStateView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+
     return EmptyStateView(
       title: title,
       message: message,
       icon: Icons.error_outline,
-      iconColor: Colors.red.shade400,
+
+      // use your theme’s error color
+      iconColor: colors.error,
+
       actionButton:
           onRetry != null
               ? OutlinedButton.icon(
@@ -115,8 +121,9 @@ class ErrorStateView extends StatelessWidget {
                 icon: const Icon(Icons.refresh),
                 label: const Text('Try Again'),
                 style: OutlinedButton.styleFrom(
-                  foregroundColor: AppColors.primaryColor,
-                  side: BorderSide(color: AppColors.primaryColor),
+                  // use your theme’s primary color
+                  foregroundColor: colors.primary,
+                  side: BorderSide(color: colors.primary),
                   padding: const EdgeInsets.symmetric(
                     horizontal: 24,
                     vertical: 12,
@@ -141,12 +148,16 @@ class NoForecastDataView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+
     return EmptyStateView(
       title: 'No Forecast Data Available',
       message:
           'We couldn\'t find forecast data for $stationName. This could be temporary or the station might not have forecast data.',
       icon: Icons.cloud_off,
-      iconColor: Colors.grey.shade400,
+
+      // use your theme’s error color
+      iconColor: colors.error,
       actionButton:
           onRefresh != null
               ? OutlinedButton.icon(
@@ -154,8 +165,9 @@ class NoForecastDataView extends StatelessWidget {
                 icon: const Icon(Icons.refresh),
                 label: const Text('Refresh'),
                 style: OutlinedButton.styleFrom(
-                  foregroundColor: AppColors.primaryColor,
-                  side: BorderSide(color: AppColors.primaryColor),
+                  // use your theme’s primary color
+                  foregroundColor: colors.primary,
+                  side: BorderSide(color: colors.primary),
                   padding: const EdgeInsets.symmetric(
                     horizontal: 24,
                     vertical: 12,
@@ -180,6 +192,8 @@ class NetworkErrorView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+
     return EmptyStateView(
       title: 'Connection Issue',
       message:
@@ -187,7 +201,7 @@ class NetworkErrorView extends StatelessWidget {
               ? 'No internet connection detected. Check your network settings and try again.'
               : 'We\'re having trouble connecting to the server. This might be temporary.',
       icon: Icons.cloud_off,
-      iconColor: Colors.orange.shade400,
+      iconColor: colors.tertiary, // “call-out” accent (warm coral)
       actionButton:
           onRetry != null
               ? ElevatedButton.icon(
@@ -195,8 +209,8 @@ class NetworkErrorView extends StatelessWidget {
                 icon: const Icon(Icons.refresh),
                 label: const Text('Retry Connection'),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primaryColor,
-                  foregroundColor: Colors.white,
+                  backgroundColor: colors.primary,
+                  foregroundColor: colors.onPrimary,
                   padding: const EdgeInsets.symmetric(
                     horizontal: 24,
                     vertical: 12,
@@ -216,12 +230,14 @@ class NoStationsFoundView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+
     return EmptyStateView(
       title: 'No Stations Found',
       message:
           'We couldn\'t find any river stations in this area. Try a different location or zoom out to see more.',
       icon: Icons.location_off,
-      iconColor: Colors.indigo.shade200,
+      iconColor: colors.secondary, // secondary (sea green)
       actionButton:
           onChangeLocation != null
               ? OutlinedButton.icon(
@@ -229,8 +245,8 @@ class NoStationsFoundView extends StatelessWidget {
                 icon: const Icon(Icons.search),
                 label: const Text('Search New Location'),
                 style: OutlinedButton.styleFrom(
-                  foregroundColor: AppColors.primaryColor,
-                  side: BorderSide(color: AppColors.primaryColor),
+                  foregroundColor: colors.primary,
+                  side: BorderSide(color: colors.primary),
                   padding: const EdgeInsets.symmetric(
                     horizontal: 24,
                     vertical: 12,

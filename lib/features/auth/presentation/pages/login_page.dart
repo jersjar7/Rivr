@@ -9,7 +9,6 @@ import '../../../../core/widgets/enhanced_error_display.dart';
 import '../../../../core/network/connection_monitor.dart';
 import '../../../../core/widgets/empty_state.dart';
 import '../../../../core/validators/password_validator.dart';
-import '../../../../core/theme/app_theme.dart';
 
 class LoginPage extends StatefulWidget {
   final VoidCallback onRegisterTap;
@@ -193,6 +192,12 @@ class LoginPageState extends State<LoginPage> {
 
   Future<void> _login() async {
     print("LOGIN: Starting login process");
+    final colors = Theme.of(context).colorScheme;
+    final connectionMonitor = Provider.of<ConnectionMonitor>(
+      context,
+      listen: false,
+    );
+
     // Clear previous error messages
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
     authProvider.clearMessages();
@@ -216,10 +221,6 @@ class LoginPageState extends State<LoginPage> {
     await _saveEmail(email);
 
     // Check network connection
-    final connectionMonitor = Provider.of<ConnectionMonitor>(
-      context,
-      listen: false,
-    );
     if (!connectionMonitor.isConnected) {
       print("LOGIN: Network connection check failed");
 
@@ -227,12 +228,12 @@ class LoginPageState extends State<LoginPage> {
       _storePendingLoginAttempt(email, password);
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
+        SnackBar(
+          content: const Text(
             'No internet connection. Your login will be retried when connection is restored.',
           ),
-          backgroundColor: Colors.orange,
-          duration: Duration(seconds: 4),
+          backgroundColor: colors.tertiary,
+          duration: const Duration(seconds: 4),
         ),
       );
       return;
@@ -249,10 +250,10 @@ class LoginPageState extends State<LoginPage> {
       print("LOGIN: User not null and component still mounted");
       // Show success message
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Login successful!'),
-          backgroundColor: Colors.green,
-          duration: Duration(seconds: 1),
+        SnackBar(
+          content: const Text('Login successful!'),
+          backgroundColor: colors.secondary,
+          duration: const Duration(seconds: 1),
         ),
       );
       print("LOGIN: SnackBar shown, about to navigate");
@@ -279,52 +280,30 @@ class LoginPageState extends State<LoginPage> {
   }
 
   Future<void> _loginWithBiometric() async {
+    final colors = Theme.of(context).colorScheme;
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
 
-    // Set biometric loading state
-    setState(() {
-      _isBiometricLoading = true;
-    });
-
+    setState(() => _isBiometricLoading = true);
     try {
       final user = await authProvider.loginWithBiometric();
-
-      if (mounted) {
-        setState(() {
-          _isBiometricLoading = false;
-        });
-      }
-
+      if (mounted) setState(() => _isBiometricLoading = false);
       if (user != null && mounted) {
-        // Show success message
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Login successful!'),
-            backgroundColor: Colors.green,
-            duration: Duration(seconds: 1),
+          SnackBar(
+            content: const Text('Login successful!'),
+            backgroundColor: colors.secondary,
+            duration: const Duration(seconds: 1),
           ),
         );
-
-        // Use the success callback if provided
-        if (widget.onLoginSuccess != null) {
-          widget.onLoginSuccess!();
-        } else {
-          // Default navigation to favorites page
-          Navigator.of(
-            context,
-          ).pushNamedAndRemoveUntil('/favorites', (route) => false);
-        }
+        widget.onLoginSuccess?.call();
       }
     } catch (e) {
       if (mounted) {
-        setState(() {
-          _isBiometricLoading = false;
-        });
-
+        setState(() => _isBiometricLoading = false);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Biometric authentication failed: ${e.toString()}'),
-            backgroundColor: Colors.red,
+            backgroundColor: colors.error,
           ),
         );
       }
@@ -332,7 +311,7 @@ class LoginPageState extends State<LoginPage> {
   }
 
   // Enhanced method to get detailed recovery suggestions based on error message
-  String? _getDetailedRecoverySuggestion(String errorMessage) {
+  String? getDetailedRecoverySuggestion(String errorMessage) {
     final lowerCaseError = errorMessage.toLowerCase();
 
     if (lowerCaseError.contains('wrong password') ||
@@ -360,11 +339,14 @@ class LoginPageState extends State<LoginPage> {
 
   @override
   Widget build(BuildContext context) {
-    final authProvider = Provider.of<AuthProvider>(context);
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    final textTheme = theme.textTheme;
     final connectionMonitor = Provider.of<ConnectionMonitor>(context);
+    final authProvider = Provider.of<AuthProvider>(context);
 
     return Scaffold(
-      backgroundColor: Colors.grey[300],
+      backgroundColor: colors.surface,
       body: ConnectionAwareWidget(
         onReconnect: _processPendingLoginAttempt,
         offlineBuilder:
@@ -381,13 +363,14 @@ class LoginPageState extends State<LoginPage> {
                       isPermanentlyOffline: !status.isConnected,
                       onRetry: () => connectionMonitor.resetOfflineStatus(),
                     ),
-                    // Show this if we have a pending login attempt
                     if (_pendingLoginAttempt != null)
                       Padding(
                         padding: const EdgeInsets.all(16.0),
                         child: Text(
                           'We\'ll try to sign you in automatically when connection is restored.',
-                          style: TextStyle(color: Colors.orange.shade800),
+                          style: textTheme.bodyMedium?.copyWith(
+                            color: colors.tertiary,
+                          ),
                           textAlign: TextAlign.center,
                         ),
                       ),
@@ -406,16 +389,9 @@ class LoginPageState extends State<LoginPage> {
                     Image.asset('assets/img/rivr.png', height: 200),
                     const SizedBox(height: 20),
 
-                    const Text(
-                      'Sign In',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 24,
-                      ),
-                    ),
+                    Text('Sign In', style: textTheme.headlineMedium),
                     const SizedBox(height: 25),
 
-                    // Enhanced email field with live validation
                     LiveValidationField(
                       controller: _emailController,
                       focusNode: _emailFocusNode,
@@ -424,14 +400,12 @@ class LoginPageState extends State<LoginPage> {
                       prefixIcon: Icons.email,
                       validator: _validateEmail,
                       onChanged: (_) {
-                        // Clear auth provider errors when user types
                         if (authProvider.errorMessage.isNotEmpty) {
                           authProvider.clearMessages();
                         }
                       },
                     ),
 
-                    // Enhanced password field with live validation
                     LiveValidationField(
                       controller: _passwordController,
                       focusNode: _passwordFocusNode,
@@ -444,15 +418,12 @@ class LoginPageState extends State<LoginPage> {
                           _obscureText
                               ? Icons.visibility
                               : Icons.visibility_off,
+                          color: colors.onSurface,
                         ),
-                        onPressed: () {
-                          setState(() {
-                            _obscureText = !_obscureText;
-                          });
-                        },
+                        onPressed:
+                            () => setState(() => _obscureText = !_obscureText),
                       ),
                       onChanged: (_) {
-                        // Clear auth provider errors when user types
                         if (authProvider.errorMessage.isNotEmpty) {
                           authProvider.clearMessages();
                         }
@@ -465,14 +436,16 @@ class LoginPageState extends State<LoginPage> {
                         mainAxisAlignment: MainAxisAlignment.end,
                         children: [
                           GestureDetector(
-                            onTap: () {
-                              Navigator.pushNamed(context, '/forgot-password');
-                            },
-                            child: const Text(
+                            onTap:
+                                () => Navigator.pushNamed(
+                                  context,
+                                  '/forgot-password',
+                                ),
+                            child: Text(
                               'Forgot Password?',
-                              style: TextStyle(
+                              style: textTheme.bodyMedium?.copyWith(
                                 fontWeight: FontWeight.bold,
-                                color: Colors.blue,
+                                color: colors.primary,
                               ),
                             ),
                           ),
@@ -481,11 +454,10 @@ class LoginPageState extends State<LoginPage> {
                     ),
                     const SizedBox(height: 20),
 
-                    // Enhanced error display with more detailed recovery suggestions
                     if (authProvider.errorMessage.isNotEmpty)
                       EnhancedErrorDisplay(
                         message: authProvider.errorMessage,
-                        recoverySuggestion: _getDetailedRecoverySuggestion(
+                        recoverySuggestion: getDetailedRecoverySuggestion(
                           authProvider.errorMessage,
                         ),
                         collapsible: true,
@@ -493,20 +465,20 @@ class LoginPageState extends State<LoginPage> {
 
                     const SizedBox(height: 20),
 
-                    // Managed async button for login
                     ManagedAsyncButton(
                       text: 'Sign In',
                       loadingText: 'Signing in...',
                       isLoading: authProvider.isLoading,
                       onPressed: _login,
-                      icon: const Icon(Icons.login, color: Colors.white),
+                      icon: Icon(Icons.login, color: colors.onPrimary),
+                      color: colors.primary,
+                      textColor: colors.onPrimary,
                     ),
 
-                    // Biometric login button with loading state
                     if (_showBiometricButton) ...[
                       const SizedBox(height: 16),
                       _isBiometricLoading
-                          ? Container(
+                          ? Padding(
                             padding: const EdgeInsets.symmetric(vertical: 10),
                             child: Column(
                               children: [
@@ -516,15 +488,15 @@ class LoginPageState extends State<LoginPage> {
                                   child: CircularProgressIndicator(
                                     strokeWidth: 2,
                                     valueColor: AlwaysStoppedAnimation<Color>(
-                                      AppColors.primaryColor,
+                                      colors.primary,
                                     ),
                                   ),
                                 ),
                                 const SizedBox(height: 10),
                                 Text(
                                   'Verifying biometric...',
-                                  style: TextStyle(
-                                    color: AppColors.primaryColor,
+                                  style: textTheme.bodyMedium?.copyWith(
+                                    color: colors.primary,
                                   ),
                                 ),
                               ],
@@ -532,10 +504,18 @@ class LoginPageState extends State<LoginPage> {
                           )
                           : TextButton.icon(
                             onPressed: _loginWithBiometric,
-                            icon: const Icon(Icons.fingerprint, size: 24),
-                            label: const Text('Sign in with biometrics'),
+                            icon: Icon(
+                              Icons.fingerprint,
+                              size: 24,
+                              color: colors.primary,
+                            ),
+                            label: Text(
+                              'Sign in with biometrics',
+                              style: textTheme.bodyMedium?.copyWith(
+                                color: colors.primary,
+                              ),
+                            ),
                             style: TextButton.styleFrom(
-                              foregroundColor: AppColors.primaryColor,
                               padding: const EdgeInsets.symmetric(
                                 vertical: 12,
                                 horizontal: 24,
@@ -549,30 +529,33 @@ class LoginPageState extends State<LoginPage> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        const Text('Not a member? '),
+                        Text('Not a member? ', style: textTheme.bodyMedium),
                         GestureDetector(
                           onTap: widget.onRegisterTap,
-                          child: const Text(
+                          child: Text(
                             'Register now',
-                            style: TextStyle(
+                            style: textTheme.bodyMedium?.copyWith(
                               fontWeight: FontWeight.bold,
-                              color: Colors.blue,
+                              color: colors.primary,
                             ),
                           ),
                         ),
                       ],
                     ),
 
-                    // Option to setup biometric authentication
                     if (!_showBiometricButton) ...[
                       const SizedBox(height: 16),
                       TextButton(
-                        onPressed: () {
-                          Navigator.of(
-                            context,
-                          ).pushNamed('/biometric-settings');
-                        },
-                        child: const Text('Set up biometric login'),
+                        onPressed:
+                            () => Navigator.of(
+                              context,
+                            ).pushNamed('/biometric-settings'),
+                        child: Text(
+                          'Set up biometric login',
+                          style: textTheme.bodyMedium?.copyWith(
+                            color: colors.primary,
+                          ),
+                        ),
                       ),
                     ],
                   ],

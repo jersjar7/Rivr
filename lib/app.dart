@@ -1,6 +1,7 @@
 // lib/app.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:rivr/core/theme/app_theme.dart';
 import 'core/di/service_locator.dart';
 import 'core/navigation/app_router.dart';
 import 'core/network/connection_monitor.dart';
@@ -26,13 +27,9 @@ class RivrApp extends StatelessWidget {
       ],
       child: MaterialApp(
         title: 'Rivr',
-        theme: ThemeData(
-          primaryColor: const Color(0xFF2B5876),
-          colorScheme: ColorScheme.fromSwatch().copyWith(
-            primary: const Color(0xFF2B5876),
-            secondary: const Color(0xFF4E4376),
-          ),
-        ),
+        theme: primaryTheme,
+        darkTheme: darkTheme,
+        themeMode: ThemeMode.system,
         initialRoute: '/',
         onGenerateRoute: AppRouter.generateRoute,
         builder: (context, child) {

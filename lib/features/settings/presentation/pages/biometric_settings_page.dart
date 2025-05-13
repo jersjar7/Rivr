@@ -2,7 +2,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:rivr/features/auth/presentation/providers/auth_provider.dart';
-import 'package:rivr/core/theme/app_theme.dart';
 
 class BiometricSettingsPage extends StatefulWidget {
   const BiometricSettingsPage({super.key});
@@ -24,10 +23,8 @@ class _BiometricSettingsPageState extends State<BiometricSettingsPage> {
 
   Future<void> _checkBiometricStatus() async {
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
-
     final isAvailable = await authProvider.isBiometricAvailable;
     final isEnabled = await authProvider.isBiometricEnabled;
-
     setState(() {
       _isBiometricAvailable = isAvailable;
       _isBiometricEnabled = isEnabled;
@@ -39,54 +36,55 @@ class _BiometricSettingsPageState extends State<BiometricSettingsPage> {
     setState(() {
       _isLoading = true;
     });
-
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
-
     if (_isBiometricEnabled) {
       await authProvider.disableBiometric();
     } else {
       await authProvider.enableBiometric();
     }
-
     await _checkBiometricStatus();
   }
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    final textTheme = theme.textTheme;
+
     return Scaffold(
-      appBar: AppBar(title: const Text('Biometric Authentication')),
+      appBar: AppBar(
+        title: Text('Biometric Authentication', style: textTheme.titleMedium),
+      ),
       body:
           _isLoading
-              ? const Center(child: CircularProgressIndicator())
+              ? Center(
+                child: CircularProgressIndicator(
+                  valueColor: AlwaysStoppedAnimation<Color>(colors.primary),
+                ),
+              )
               : SingleChildScrollView(
                 padding: const EdgeInsets.all(16.0),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
+                    Text(
                       'Biometric Authentication Settings',
-                      style: TextStyle(
-                        fontSize: 22,
-                        fontWeight: FontWeight.bold,
-                      ),
+                      style: textTheme.headlineSmall,
                     ),
                     const SizedBox(height: 20),
 
                     if (!_isBiometricAvailable) ...[
                       Card(
-                        color: Colors.red.shade50,
+                        color: colors.errorContainer,
                         child: Padding(
                           padding: const EdgeInsets.all(16.0),
                           child: Column(
                             children: [
-                              Icon(
-                                Icons.error_outline,
-                                color: Colors.red.shade700,
-                              ),
+                              Icon(Icons.error_outline, color: colors.error),
                               const SizedBox(height: 8),
-                              const Text(
+                              Text(
                                 'Biometric authentication is not available on this device',
-                                style: TextStyle(fontSize: 16),
+                                style: textTheme.bodyMedium,
                                 textAlign: TextAlign.center,
                               ),
                             ],
@@ -100,34 +98,35 @@ class _BiometricSettingsPageState extends State<BiometricSettingsPage> {
                           _isBiometricEnabled
                               ? 'You can use your fingerprint or face to log in'
                               : 'Enable to log in with your fingerprint or face',
+                          style: textTheme.bodyMedium,
                         ),
                         value: _isBiometricEnabled,
                         onChanged: (value) => _toggleBiometric(),
-                        activeColor: AppColors.primaryColor,
+                        activeColor: colors.primary,
                       ),
 
                       const SizedBox(height: 20),
 
-                      const Card(
+                      Card(
+                        color: colors.surface,
                         child: Padding(
-                          padding: EdgeInsets.all(16.0),
+                          padding: const EdgeInsets.all(16.0),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
                                 'How it works',
-                                style: TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
-                                ),
+                                style: textTheme.titleMedium,
                               ),
-                              SizedBox(height: 8),
+                              const SizedBox(height: 8),
                               Text(
                                 'Biometric login allows you to sign in to the app using your fingerprint or face instead of entering your password each time.',
+                                style: textTheme.bodyMedium,
                               ),
-                              SizedBox(height: 8),
+                              const SizedBox(height: 8),
                               Text(
                                 'Your biometric data never leaves your device and is protected by your device\'s security systems.',
+                                style: textTheme.bodyMedium,
                               ),
                             ],
                           ),

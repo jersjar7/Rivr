@@ -1,10 +1,10 @@
 // lib/core/widgets/empty_state.dart
-// Updating the EmptyFavoritesView class to be more visually appealing
 
 import 'package:flutter/material.dart';
-import 'package:rivr/core/theme/app_theme.dart';
 import 'dart:math' as math;
 
+/// An enhanced empty state view for favorites,
+/// fully themed for light & dark modes.
 class EnhancedEmptyFavoritesView extends StatelessWidget {
   final VoidCallback? onExploreMap;
 
@@ -12,6 +12,10 @@ class EnhancedEmptyFavoritesView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    final textTheme = theme.textTheme;
+
     return Center(
       child: SingleChildScrollView(
         physics: const BouncingScrollPhysics(),
@@ -22,17 +26,16 @@ class EnhancedEmptyFavoritesView extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               // Animation for empty state
-              _buildWaveAnimation(),
+              _buildWaveAnimation(context, colors),
 
               const SizedBox(height: 32),
 
               // Title
               Text(
                 'No Favorite Rivers Yet',
-                style: TextStyle(
-                  fontSize: 24,
+                style: textTheme.headlineSmall?.copyWith(
                   fontWeight: FontWeight.bold,
-                  color: AppColors.titleColor,
+                  color: colors.onSurface,
                 ),
                 textAlign: TextAlign.center,
               ),
@@ -42,9 +45,8 @@ class EnhancedEmptyFavoritesView extends StatelessWidget {
               // Descriptive message
               Text(
                 'Add your favorite rivers to track their flow conditions and get forecasts at a glance.',
-                style: TextStyle(
-                  fontSize: 16,
-                  color: AppColors.textColor,
+                style: textTheme.bodyMedium?.copyWith(
+                  color: colors.onSurfaceVariant,
                   height: 1.4,
                 ),
                 textAlign: TextAlign.center,
@@ -58,19 +60,19 @@ class EnhancedEmptyFavoritesView extends StatelessWidget {
                 icon: const Icon(Icons.map_outlined),
                 label: const Text('Explore Map'),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primaryColor,
-                  foregroundColor: Colors.white,
+                  backgroundColor: colors.primary,
+                  foregroundColor: colors.onPrimary,
                   padding: const EdgeInsets.symmetric(
                     horizontal: 32,
                     vertical: 16,
                   ),
-                  textStyle: const TextStyle(
+                  textStyle: textTheme.labelLarge?.copyWith(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
                     letterSpacing: 0.5,
                   ),
                   elevation: 4,
-                  shadowColor: AppColors.primaryColor.withOpacity(0.4),
+                  shadowColor: colors.primary.withValues(alpha: 0.4),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(30),
                   ),
@@ -82,7 +84,6 @@ class EnhancedEmptyFavoritesView extends StatelessWidget {
               // Secondary text link
               TextButton.icon(
                 onPressed: () {
-                  // Could navigate to help or tutorial page
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
                       content: Text('Feature coming soon!'),
@@ -90,15 +91,19 @@ class EnhancedEmptyFavoritesView extends StatelessWidget {
                     ),
                   );
                 },
-                icon: const Icon(Icons.help_outline, size: 18),
-                label: const Text('How to add favorites?'),
-                style: TextButton.styleFrom(
-                  foregroundColor: AppColors.secondaryColor,
-                  textStyle: const TextStyle(
-                    fontSize: 14,
+                icon: Icon(
+                  Icons.help_outline,
+                  size: 18,
+                  color: colors.secondary,
+                ),
+                label: Text(
+                  'How to add favorites?',
+                  style: textTheme.labelSmall?.copyWith(
                     fontWeight: FontWeight.w500,
+                    color: colors.secondary,
                   ),
                 ),
+                style: TextButton.styleFrom(foregroundColor: colors.secondary),
               ),
             ],
           ),
@@ -107,7 +112,10 @@ class EnhancedEmptyFavoritesView extends StatelessWidget {
     );
   }
 
-  Widget _buildWaveAnimation() {
+  /// Builds the wave animation header, using the current theme's brightness
+  Widget _buildWaveAnimation(BuildContext context, ColorScheme colors) {
+    final brightness = Theme.of(context).brightness;
+
     return SizedBox(
       height: 200,
       child: Stack(
@@ -117,38 +125,36 @@ class EnhancedEmptyFavoritesView extends StatelessWidget {
           Icon(
             Icons.water,
             size: 100,
-            color: AppColors.primaryColor.withOpacity(0.8),
+            color: colors.primary.withValues(alpha: 0.8),
           ),
 
           // Animated waves
           Positioned.fill(
             child: _AnimatedWaves(
-              color: AppColors.primaryAccent.withOpacity(0.3),
+              color: colors.primaryContainer.withValues(alpha: 0.3),
             ),
           ),
 
-          // Favorites icon
+          // Favorites icon overlay
           Positioned(
             top: 40,
             right: 60,
             child: Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: colors.surface,
                 shape: BoxShape.circle,
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.1),
+                    color: Colors.black.withOpacity(
+                      brightness == Brightness.light ? 0.1 : 0.4,
+                    ),
                     blurRadius: 8,
                     offset: const Offset(0, 2),
                   ),
                 ],
               ),
-              child: Icon(
-                Icons.favorite,
-                size: 24,
-                color: AppColors.secondaryColor,
-              ),
+              child: Icon(Icons.favorite, size: 24, color: colors.secondary),
             ),
           ),
         ],
@@ -157,10 +163,9 @@ class EnhancedEmptyFavoritesView extends StatelessWidget {
   }
 }
 
-// Custom animation for the waves effect
+/// A simple animated waves effect beneath the river icon
 class _AnimatedWaves extends StatefulWidget {
   final Color color;
-
   const _AnimatedWaves({required this.color});
 
   @override
@@ -169,7 +174,7 @@ class _AnimatedWaves extends StatefulWidget {
 
 class _AnimatedWavesState extends State<_AnimatedWaves>
     with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
+  late final AnimationController _controller;
 
   @override
   void initState() {
@@ -203,11 +208,11 @@ class _AnimatedWavesState extends State<_AnimatedWaves>
   }
 }
 
+/// Painter that draws wavy lines based on animationValue
 class _WavePainter extends CustomPainter {
   final double animationValue;
   final Color color;
-
-  _WavePainter({required this.animationValue, required this.color});
+  const _WavePainter({required this.animationValue, required this.color});
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -223,16 +228,12 @@ class _WavePainter extends CustomPainter {
     final amplitude = height * 0.1;
 
     path.moveTo(0, centerY);
-
-    for (double i = 0; i < width; i++) {
-      final x = i;
+    for (double i = 0; i <= width; i++) {
       final offset =
-          math.sin((x / width * 4 * math.pi) + (animationValue * 2 * math.pi)) *
+          math.sin((i / width * 4 * math.pi) + (animationValue * 2 * math.pi)) *
           amplitude;
-      final y = centerY + offset;
-      path.lineTo(x, y);
+      path.lineTo(i, centerY + offset);
     }
-
     path.lineTo(width, height);
     path.lineTo(0, height);
     path.close();
@@ -241,6 +242,7 @@ class _WavePainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(_WavePainter oldDelegate) =>
-      oldDelegate.animationValue != animationValue;
+  bool shouldRepaint(covariant _WavePainter oldDelegate) {
+    return oldDelegate.animationValue != animationValue;
+  }
 }

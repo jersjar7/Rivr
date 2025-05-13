@@ -10,10 +10,10 @@ class FlowThresholds {
     'Low': 'Flow is below normal levels',
     'Normal': 'Flow is at normal levels',
     'Moderate': 'Flow is above normal but not concerning',
-    'High': 'Flow is high, use caution when approaching',
-    'Very High': 'Flow is very high, consider postponing activities',
-    'Extreme': 'Flow is at dangerous levels, avoid river',
-    'Catastrophic': 'Flow is at life-threatening levels, stay away',
+    'Elevated': 'Flow is high, use caution when approaching',
+    'High': 'Flow is very high, consider postponing activities',
+    'Very High': 'Flow is at dangerous levels, avoid river',
+    'Extreme': 'Flow is at life-threatening levels, stay away',
   };
 
   /// Get color for flow category
@@ -25,13 +25,13 @@ class FlowThresholds {
         return Colors.green;
       case 'Moderate':
         return Colors.yellow;
-      case 'High':
+      case 'Elevated':
         return Colors.orange;
-      case 'Very High':
+      case 'High':
         return Colors.deepOrange;
-      case 'Extreme':
+      case 'Very High':
         return Colors.red;
-      case 'Catastrophic':
+      case 'Extreme':
         return Colors.purple;
       default:
         return Colors.grey;
@@ -63,10 +63,10 @@ class FlowThresholds {
   /// Evaluate if the flow is at concerning levels
   static bool isFlowConcerning(double flow, ReturnPeriod returnPeriod) {
     final category = returnPeriod.getFlowCategory(flow);
-    return category == 'High' ||
+    return category == 'Elevated' ||
+        category == 'High' ||
         category == 'Very High' ||
-        category == 'Extreme' ||
-        category == 'Catastrophic';
+        category == 'Extreme';
   }
 
   /// Map a flow value to a percentage within the return period scale (0-100%)
@@ -102,14 +102,14 @@ class FlowThresholds {
         return 'The river is flowing at normal levels. $description';
       case 'Moderate':
         return 'The river is flowing at moderate levels. $description';
+      case 'Elevated':
+        return 'The river is flowing higher than normal. $description';
       case 'High':
         return 'The river is flowing high. $description';
       case 'Very High':
         return 'Warning: The river is flowing very high. $description';
       case 'Extreme':
         return 'Danger: The river is at extreme levels. $description';
-      case 'Catastrophic':
-        return 'Emergency: The river is at catastrophic levels. $description';
       default:
         return 'River flow information unavailable.';
     }

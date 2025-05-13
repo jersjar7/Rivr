@@ -31,13 +31,13 @@ class ReturnPeriod {
     } else if (flow < (flowValues[10] ?? double.infinity)) {
       return 'Moderate';
     } else if (flow < (flowValues[25] ?? double.infinity)) {
-      return 'High';
+      return 'Elevated';
     } else if (flow < (flowValues[50] ?? double.infinity)) {
-      return 'Very High';
+      return 'High';
     } else if (flow < (flowValues[100] ?? double.infinity)) {
-      return 'Extreme';
+      return 'Very High';
     } else {
-      return 'Catastrophic';
+      return 'Extreme';
     }
   }
 

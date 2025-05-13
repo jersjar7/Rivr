@@ -1,6 +1,7 @@
 // lib/features/forecast/presentation/widgets/horizontal_flow_timeline.dart
 
 import 'dart:math';
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:rivr/features/forecast/domain/entities/forecast.dart';
@@ -96,6 +97,9 @@ class _HorizontalFlowTimelineState extends State<HorizontalFlowTimeline> {
       String category = 'Unknown';
       if (widget.returnPeriod != null) {
         category = widget.returnPeriod!.getFlowCategory(forecast.flow);
+        if (category == 'Catastrophic') {
+          category = 'Exceptional';
+        }
       }
 
       // Calculate trend (if not first forecast)
@@ -127,6 +131,8 @@ class _HorizontalFlowTimelineState extends State<HorizontalFlowTimeline> {
 
   String _getFlowCategory(double flow) {
     if (widget.returnPeriod == null) return 'Unknown';
+
+    // Simply return the category without any replacement
     return widget.returnPeriod!.getFlowCategory(flow);
   }
 
@@ -254,7 +260,7 @@ class _HorizontalFlowTimelineState extends State<HorizontalFlowTimeline> {
             margin: const EdgeInsets.only(right: 8.0, bottom: 8.0),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),
-              side: BorderSide(color: color.withValues(alpha: 0.5), width: 2),
+              side: BorderSide(color: color.withOpacity(0.5), width: 2),
             ),
             child: Container(
               width: 100,
@@ -279,7 +285,7 @@ class _HorizontalFlowTimelineState extends State<HorizontalFlowTimeline> {
                     height: 60,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: color.withValues(alpha: 0.2),
+                      color: color.withOpacity(0.2),
                       border: Border.all(color: color, width: 2),
                     ),
                     child: Center(
@@ -347,8 +353,9 @@ class _HorizontalFlowTimelineState extends State<HorizontalFlowTimeline> {
           height: 200,
           padding: const EdgeInsets.symmetric(horizontal: 16.0),
           child: Stack(
+            clipBehavior: Clip.none, // Allow content to overflow the Stack
             children: [
-              // Flow wave
+              // Flow wave (in its own ClipPath, but not clipping the whole Stack)
               Positioned.fill(
                 child: ClipPath(
                   clipper: FlowWaveClipper(_sortedForecasts),
@@ -534,10 +541,10 @@ class FlowWavePainter extends CustomPainter {
         'Low',
         'Normal',
         'Moderate',
+        'Elevated',
         'High',
         'Very High',
         'Extreme',
-        'Exceptional',
       ];
 
       for (int i = 0; i < categories.length; i++) {
@@ -612,7 +619,7 @@ class FlowWavePainter extends CustomPainter {
     // Draw the wave line on top
     final linePaint =
         Paint()
-          ..color = Colors.white.withValues(alpha: 0.7)
+          ..color = Colors.white.withOpacity(0.7)
           ..style = PaintingStyle.stroke
           ..strokeWidth = 2.0;
 
@@ -674,7 +681,7 @@ class FlowWavePainter extends CustomPainter {
 
         final paint =
             Paint()
-              ..color = Colors.white.withValues(alpha: 0.6)
+              ..color = Colors.white.withOpacity(0.6)
               ..style = PaintingStyle.stroke
               ..strokeWidth = 1.0
               ..strokeCap = StrokeCap.round;
@@ -703,7 +710,10 @@ class FlowWavePainter extends CustomPainter {
           ),
         );
 
-        final textPainter = TextPainter(text: textSpan);
+        final textPainter = TextPainter(
+          text: textSpan,
+          textDirection: ui.TextDirection.ltr,
+        );
 
         textPainter.layout();
         textPainter.paint(canvas, Offset(5, y - textPainter.height - 2));

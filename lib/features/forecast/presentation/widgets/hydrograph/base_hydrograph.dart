@@ -35,6 +35,23 @@ abstract class BaseHydrographState<T extends BaseHydrograph> extends State<T> {
     left: 10,
   );
 
+  // Gradient colors defined based on current theme
+  List<Color> get gradientColors {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return [colorScheme.primary, colorScheme.secondary];
+  }
+
+  // Background color based on current theme
+  Color get chartBackgroundColor {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+
+    return isDark ? colorScheme.surface : colorScheme.surfaceContainerHighest;
+  }
+
   // Abstract methods that must be implemented by subclasses
   List<FlSpot> generateSpots();
   double getMinY();
@@ -134,12 +151,6 @@ abstract class BaseHydrographState<T extends BaseHydrograph> extends State<T> {
     final colorScheme = theme.colorScheme;
     final isDark = theme.brightness == Brightness.dark;
 
-    // Define gradient colors based on theme
-    final List<Color> gradientColors = [
-      colorScheme.primary,
-      colorScheme.secondary,
-    ];
-
     if (spots.isEmpty) {
       return buildNoDataView();
     }
@@ -154,13 +165,11 @@ abstract class BaseHydrographState<T extends BaseHydrograph> extends State<T> {
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.title),
-        backgroundColor:
-            isDark ? colorScheme.surface : colorScheme.surfaceContainerHighest,
+        backgroundColor: chartBackgroundColor,
         elevation: 0,
       ),
       body: Container(
-        color:
-            isDark ? colorScheme.surface : colorScheme.surfaceContainerHighest,
+        color: chartBackgroundColor,
         child: Padding(
           padding: chartPadding,
           child: LineChart(
@@ -178,7 +187,7 @@ abstract class BaseHydrographState<T extends BaseHydrograph> extends State<T> {
                     gradient: LinearGradient(
                       colors:
                           gradientColors
-                              .map((color) => color.withOpacity(0.3))
+                              .map((color) => color.withValues(alpha: 0.3))
                               .toList(),
                     ),
                   ),
@@ -193,8 +202,8 @@ abstract class BaseHydrographState<T extends BaseHydrograph> extends State<T> {
                   return FlLine(
                     color:
                         isDark
-                            ? colorScheme.primary.withOpacity(0.15)
-                            : colorScheme.primary.withOpacity(0.2),
+                            ? colorScheme.primary.withValues(alpha: 0.15)
+                            : colorScheme.primary.withValues(alpha: 0.2),
                     strokeWidth: 1,
                   );
                 },
@@ -202,8 +211,8 @@ abstract class BaseHydrographState<T extends BaseHydrograph> extends State<T> {
                   return FlLine(
                     color:
                         isDark
-                            ? colorScheme.primary.withOpacity(0.25)
-                            : colorScheme.primary.withOpacity(0.4),
+                            ? colorScheme.primary.withValues(alpha: 0.25)
+                            : colorScheme.primary.withValues(alpha: 0.4),
                     strokeWidth: 1,
                   );
                 },
@@ -211,9 +220,7 @@ abstract class BaseHydrographState<T extends BaseHydrograph> extends State<T> {
               titlesData: buildTitlesData(isDark),
               borderData: FlBorderData(
                 show: true,
-                border: Border.all(
-                  color: isDark ? colorScheme.outline : colorScheme.outline,
-                ),
+                border: Border.all(color: colorScheme.outline),
               ),
               lineTouchData: buildTouchData(isDark),
               minX: getMinX(),
@@ -238,8 +245,8 @@ abstract class BaseHydrographState<T extends BaseHydrograph> extends State<T> {
         getTooltipColor:
             (spot) =>
                 isDark
-                    ? colorScheme.surfaceContainerHighest.withOpacity(0.8)
-                    : Colors.blueGrey.withOpacity(0.8),
+                    ? colorScheme.surfaceContainerHighest.withValues(alpha: 0.8)
+                    : Colors.blueGrey.withValues(alpha: 0.8),
         tooltipRoundedRadius: 8,
         getTooltipItems: (List<LineBarSpot> lineBarsSpot) {
           return lineBarsSpot.map((spot) {
@@ -283,7 +290,7 @@ abstract class BaseHydrographState<T extends BaseHydrograph> extends State<T> {
 
   // Implement default titles data - can be overridden
   FlTitlesData buildTitlesData([bool isDark = false]) {
-    final textColor = isDark ? Colors.white : Colors.black;
+    final textColor = isDark ? Colors.white : Colors.black87;
 
     return FlTitlesData(
       topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),

@@ -145,7 +145,8 @@ class MediumRangeHydrographState
     return maxX;
   }
 
-  String _getTooltipDateText(LineBarSpot spot) {
+  @override
+  String getTooltipDateText(LineBarSpot spot) {
     final forecast = _getForecastAtX(spot.x);
     if (forecast != null) {
       return DateFormat('EEE, MMM d').format(forecast.validDateTime);
@@ -158,6 +159,10 @@ class MediumRangeHydrographState
 
   @override
   AxisTitles buildBottomTitles() {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final textColor = isDark ? Colors.white : Colors.black87;
+
     return AxisTitles(
       sideTitles: SideTitles(
         showTitles: true,
@@ -182,11 +187,12 @@ class MediumRangeHydrographState
             padding: const EdgeInsets.only(top: 8.0),
             child: Text(
               dayText,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 12,
-                color: Colors.black87,
+                color: textColor,
                 fontWeight: FontWeight.bold,
               ),
+              textAlign: TextAlign.center,
             ),
           );
         },
@@ -195,228 +201,83 @@ class MediumRangeHydrographState
   }
 
   @override
-  Widget build(BuildContext context) {
-    final spots = generateSpots();
+  LineTouchData buildTouchData([bool isDark = false]) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
 
-    if (spots.isEmpty) {
-      return Scaffold(
-        appBar: AppBar(title: Text(widget.title)),
-        body: const Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.show_chart, size: 48, color: Colors.grey),
-              SizedBox(height: 16),
-              Text(
-                'No data available to display',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.grey,
-                ),
-              ),
-              SizedBox(height: 8),
-              Text(
-                'Try again later or select a different time range',
-                style: TextStyle(color: Colors.grey),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
+    return LineTouchData(
+      enabled: true,
+      touchTooltipData: LineTouchTooltipData(
+        getTooltipColor:
+            (spot) =>
+                isDark
+                    ? colorScheme.surfaceContainerHighest.withValues(alpha: 0.8)
+                    : Colors.blueGrey.withValues(alpha: 0.8),
+        tooltipRoundedRadius: 8,
+        getTooltipItems: (List<LineBarSpot> lineBarsSpot) {
+          return lineBarsSpot.map((spot) {
+            final forecast = _getForecastAtX(spot.x);
+            String timeInfo = getTooltipDateText(spot);
 
-    // Calculate y-axis bounds
-    final minY = getMinY();
-    final maxY = getMaxY();
+            // Add relative time (e.g. "2 days from now")
+            if (forecast != null) {
+              final now = DateTime.now();
+              final difference = forecast.validDateTime.difference(now);
 
-    // Get return period lines
-    final horizontalLines = getReturnPeriodLines();
+              if (difference.inDays > 0) {
+                final days = difference.inDays;
+                timeInfo += '\n${days}d from now';
+              } else if (difference.inDays < 0) {
+                final days = -difference.inDays;
+                timeInfo += '\n${days}d ago';
+              } else {
+                // Less than a day difference
+                final hours = difference.inHours;
+                if (hours > 0) {
+                  timeInfo += '\nLater today';
+                } else if (hours < 0) {
+                  timeInfo += '\nEarlier today';
+                } else {
+                  timeInfo += '\nNow';
+                }
+              }
+            }
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(widget.title),
-        backgroundColor: const Color(0xFFBFBFBF),
-        elevation: 0,
-      ),
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [Color(0xFFBFBFBF), Color(0xFFBFBFBF), Color(0xFFBFBFBF)],
-            stops: [0.0, 0.8, 1.0],
-          ),
-        ),
-        child: Padding(
-          padding: chartPadding,
-          child: LineChart(
-            LineChartData(
-              lineBarsData: [
-                LineChartBarData(
-                  spots: spots,
-                  isCurved: true,
-                  barWidth: 3,
-                  isStrokeCapRound: true,
-                  gradient: LinearGradient(colors: gradientColors),
-                  dotData: const FlDotData(show: false),
-                  belowBarData: BarAreaData(
-                    show: true,
-                    gradient: LinearGradient(
-                      colors:
-                          gradientColors
-                              .map((color) => color.withOpacity(0.3))
-                              .toList(),
-                    ),
+            return LineTooltipItem(
+              '${flowFormatter.format(spot.y)} ft³/s',
+              const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+              children: [
+                TextSpan(
+                  text: '\n$timeInfo',
+                  style: const TextStyle(
+                    color: Colors.white70,
+                    fontWeight: FontWeight.normal,
+                    fontSize: 12,
                   ),
                 ),
               ],
-              extraLinesData: ExtraLinesData(horizontalLines: horizontalLines),
-              gridData: FlGridData(
-                show: true,
-                drawHorizontalLine: true,
-                drawVerticalLine: true,
-                getDrawingHorizontalLine: (value) {
-                  return FlLine(
-                    color: gradientColors[0].withOpacity(0.2),
-                    strokeWidth: 1,
-                  );
-                },
-                getDrawingVerticalLine: (value) {
-                  return FlLine(
-                    color: gradientColors[0].withOpacity(0.45),
-                    strokeWidth: 1,
-                  );
-                },
-              ),
-              titlesData: FlTitlesData(
-                topTitles: const AxisTitles(
-                  sideTitles: SideTitles(showTitles: false),
-                ),
-                bottomTitles: buildBottomTitles(),
-                leftTitles: AxisTitles(
-                  axisNameWidget: const Text(
-                    'ft³/s',
-                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
-                  ),
-                  axisNameSize: 30,
-                  sideTitles: SideTitles(
-                    showTitles: true,
-                    reservedSize: getReservedSizeForYAxis(getMaxY()),
-                    getTitlesWidget: (value, meta) {
-                      if (value == getMaxY() || value < 0) {
-                        return Container();
-                      }
-                      return Padding(
-                        padding: const EdgeInsets.only(right: 5),
-                        child: Text(
-                          value.toStringAsFixed(0),
-                          style: const TextStyle(
-                            fontSize: 12,
-                            color: Colors.black,
-                          ),
-                          textAlign: TextAlign.right,
-                        ),
-                      );
-                    },
-                  ),
-                ),
-                rightTitles: const AxisTitles(
-                  sideTitles: SideTitles(showTitles: false),
-                ),
-              ),
-              borderData: FlBorderData(
-                show: true,
-                border: Border.all(color: const Color(0xff37434d)),
-              ),
-              lineTouchData: LineTouchData(
-                enabled: true,
-                touchTooltipData: LineTouchTooltipData(
-                  getTooltipColor:
-                      (spot) => Colors.blueGrey.withValues(alpha: 0.8),
-                  tooltipRoundedRadius: 8,
-                  getTooltipItems: (List<LineBarSpot> lineBarsSpot) {
-                    return lineBarsSpot.map((spot) {
-                      final forecast = _getForecastAtX(spot.x);
-                      String timeInfo = _getTooltipDateText(spot);
-
-                      // Add relative time (e.g. "2 days from now")
-                      if (forecast != null) {
-                        final now = DateTime.now();
-                        final difference = forecast.validDateTime.difference(
-                          now,
-                        );
-
-                        if (difference.inDays > 0) {
-                          final days = difference.inDays;
-                          timeInfo += '\n${days}d from now';
-                        } else if (difference.inDays < 0) {
-                          final days = -difference.inDays;
-                          timeInfo += '\n${days}d ago';
-                        } else {
-                          // Less than a day difference
-                          final hours = difference.inHours;
-                          if (hours > 0) {
-                            timeInfo += '\nLater today';
-                          } else if (hours < 0) {
-                            timeInfo += '\nEarlier today';
-                          } else {
-                            timeInfo += '\nNow';
-                          }
-                        }
-                      }
-
-                      return LineTooltipItem(
-                        '${flowFormatter.format(spot.y)} ft³/s',
-                        const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                        ),
-                        children: [
-                          TextSpan(
-                            text: '\n$timeInfo',
-                            style: const TextStyle(
-                              color: Colors.white70,
-                              fontWeight: FontWeight.normal,
-                              fontSize: 12,
-                            ),
-                          ),
-                        ],
-                      );
-                    }).toList();
-                  },
-                ),
-                getTouchedSpotIndicator: (barData, spotIndexes) {
-                  return spotIndexes.map((spotIndex) {
-                    return TouchedSpotIndicatorData(
-                      FlLine(
-                        color: Colors.white,
-                        strokeWidth: 2,
-                        dashArray: [3, 3],
-                      ),
-                      FlDotData(
-                        show: true,
-                        getDotPainter: (spot, percent, barData, index) {
-                          return FlDotCirclePainter(
-                            radius: 6,
-                            color: gradientColors[0],
-                            strokeWidth: 2,
-                            strokeColor: Colors.white,
-                          );
-                        },
-                      ),
-                    );
-                  }).toList();
-                },
-              ),
-              minX: getMinX(),
-              maxX: getMaxX(),
-              minY: minY,
-              maxY: maxY,
-            ),
-          ),
-        ),
+            );
+          }).toList();
+        },
       ),
+      getTouchedSpotIndicator: (barData, spotIndexes) {
+        return spotIndexes.map((spotIndex) {
+          return TouchedSpotIndicatorData(
+            FlLine(color: Colors.white, strokeWidth: 2, dashArray: [3, 3]),
+            FlDotData(
+              show: true,
+              getDotPainter: (spot, percent, barData, index) {
+                return FlDotCirclePainter(
+                  radius: 6,
+                  color: colorScheme.primary,
+                  strokeWidth: 2,
+                  strokeColor: Colors.white,
+                );
+              },
+            ),
+          );
+        }).toList();
+      },
     );
   }
 }

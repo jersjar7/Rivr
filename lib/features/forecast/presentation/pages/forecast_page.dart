@@ -257,7 +257,7 @@ class _ForecastPageState extends State<ForecastPage>
 
           const SizedBox(height: 24),
           Text(
-            'Hourly Forecast (Next 3 Days)',
+            'Hourly Forecast (Next 18 Hours)',
             style: theme.textTheme.titleMedium,
           ),
           const SizedBox(height: 16),

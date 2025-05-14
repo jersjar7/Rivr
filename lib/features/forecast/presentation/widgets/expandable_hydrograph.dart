@@ -6,7 +6,6 @@ import 'package:rivr/features/forecast/domain/entities/forecast.dart';
 import 'package:rivr/features/forecast/domain/entities/forecast_types.dart';
 import 'package:rivr/features/forecast/domain/entities/return_period.dart';
 import 'package:rivr/features/forecast/presentation/widgets/hydrograph/custom_zoomable_chart.dart';
-import 'package:rivr/features/forecast/presentation/widgets/hydrograph/hydrograph_factory.dart';
 
 /// An expandable hydrograph that shows a compact preview and expands to a full interactive chart
 class ExpandableHydrograph extends StatefulWidget {
@@ -44,9 +43,6 @@ class _ExpandableHydrographState extends State<ExpandableHydrograph>
   late AnimationController _animationController;
   late Animation<double> _scaleAnimation;
   late Animation<double> _opacityAnimation;
-
-  // Store the tap position for expansion origin
-  Offset? _tapPosition;
 
   // Global overlay entry
   OverlayEntry? _overlayEntry;
@@ -90,7 +86,6 @@ class _ExpandableHydrographState extends State<ExpandableHydrograph>
         _removeOverlay();
         setState(() {
           _isExpanded = false;
-          _tapPosition = null;
         });
       });
     } else {
@@ -212,17 +207,9 @@ class _ExpandableHydrographState extends State<ExpandableHydrograph>
     _overlayEntry = null;
   }
 
-  // Track tap position for animation origin
-  void _handleTap(TapDownDetails details) {
-    setState(() {
-      _tapPosition = details.globalPosition;
-    });
-  }
-
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTapDown: _handleTap,
       onTap: _toggleExpanded,
       child: _buildPreviewChart(context),
     );
@@ -436,11 +423,11 @@ class _ExpandableHydrographState extends State<ExpandableHydrograph>
   String _getChartTitle() {
     switch (widget.forecastType) {
       case ForecastType.shortRange:
-        return 'Hourly Forecast (3-Day)';
+        return 'Hourly Hydrograph';
       case ForecastType.mediumRange:
-        return 'Daily Forecast (10-Day)';
+        return 'Daily Hydrograph';
       case ForecastType.longRange:
-        return 'Weekly Forecast (8-Week)';
+        return 'Weekly Hydrograph';
     }
   }
 }

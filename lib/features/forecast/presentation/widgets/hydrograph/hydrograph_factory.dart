@@ -205,7 +205,7 @@ class HydrographFactory {
       decoration: BoxDecoration(
         color: theme.cardColor,
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: colorScheme.outline.withOpacity(0.5)),
+        border: Border.all(color: colorScheme.outline.withValues(alpha: 0.5)),
       ),
       padding: const EdgeInsets.all(8),
       child: LineChart(
@@ -227,8 +227,8 @@ class HydrographFactory {
                 show: true,
                 gradient: LinearGradient(
                   colors: [
-                    colorScheme.primary.withOpacity(0.3),
-                    colorScheme.secondary.withOpacity(0.1),
+                    colorScheme.primary.withValues(alpha: 0.3),
+                    colorScheme.secondary.withValues(alpha: 0.1),
                   ],
                 ),
               ),

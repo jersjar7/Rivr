@@ -308,7 +308,7 @@ class _FavoritesPageState extends State<FavoritesPage>
                             color:
                                 isSelected
                                     ? colors.primary
-                                    : colors.onSurface.withOpacity(0.12),
+                                    : colors.onSurface.withValues(alpha: 0.12),
                             width: isSelected ? 3 : 1,
                           ),
                           borderRadius: BorderRadius.circular(8),

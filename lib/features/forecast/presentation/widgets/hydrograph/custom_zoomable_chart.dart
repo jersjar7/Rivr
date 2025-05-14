@@ -6,7 +6,6 @@ import 'package:intl/intl.dart';
 import 'package:rivr/features/forecast/domain/entities/forecast.dart';
 import 'package:rivr/features/forecast/domain/entities/forecast_types.dart';
 import 'package:rivr/features/forecast/domain/entities/return_period.dart';
-import 'package:rivr/features/forecast/utils/flow_thresholds.dart';
 
 /// A custom zoomable chart component specifically for the expandable overlay view
 class CustomZoomableChart extends StatefulWidget {
@@ -83,8 +82,6 @@ class _CustomZoomableChartState extends State<CustomZoomableChart> {
 
   // Generate spots based on forecast type
   List<FlSpot> _generateSpots() {
-    final List<FlSpot> spots = [];
-
     switch (widget.forecastType) {
       case ForecastType.shortRange:
         return _generateShortRangeSpots();
@@ -354,144 +351,41 @@ class _CustomZoomableChartState extends State<CustomZoomableChart> {
   }
 
   // Build bottom axis titles based on forecast type
-  AxisTitles _buildBottomTitles(bool isDark) {
+  FlTitlesData _buildTitlesData(bool isDark) {
     final textColor = isDark ? Colors.white : Colors.black87;
 
-    switch (widget.forecastType) {
-      case ForecastType.shortRange:
-        // Hourly labels
-        return AxisTitles(
-          sideTitles: SideTitles(
-            showTitles: true,
-            reservedSize: 40,
-            interval: 6, // Show every 6 hours
-            getTitlesWidget: (value, meta) {
-              if (value % 6 != 0) return const SizedBox.shrink();
-
-              final sortedForecasts = List<Forecast>.from(widget.forecasts)
-                ..sort((a, b) => a.validDateTime.compareTo(b.validDateTime));
-              final baseTime = sortedForecasts.first.validDateTime;
-
-              // Convert back to datetime
-              final datetime = baseTime.add(Duration(hours: value.toInt()));
-
-              // Format based on hour
-              String timeText;
-              if (value == 0) {
-                timeText = 'Now';
-              } else if (datetime.hour == 0) {
-                // At midnight, show the date
-                timeText = DateFormat('MMM d').format(datetime);
-              } else {
-                // Otherwise show the hour
-                timeText = DateFormat('ha').format(datetime).toLowerCase();
-              }
-
-              return Padding(
-                padding: const EdgeInsets.only(top: 8.0),
-                child: Text(
-                  timeText,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: textColor,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              );
-            },
+    return FlTitlesData(
+      topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+      rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+      leftTitles: AxisTitles(
+        axisNameWidget: Text(
+          'ft³/s',
+          style: TextStyle(
+            fontSize: 15,
+            fontWeight: FontWeight.bold,
+            color: isDark ? Colors.white : Colors.black87,
           ),
-        );
-
-      case ForecastType.mediumRange:
-        // Daily labels
-        return AxisTitles(
-          sideTitles: SideTitles(
-            showTitles: true,
-            reservedSize: 40,
-            interval: 1, // Show every day
-            getTitlesWidget: (value, meta) {
-              final sortedForecasts = List<Forecast>.from(widget.forecasts)
-                ..sort((a, b) => a.validDateTime.compareTo(b.validDateTime));
-              final baseTime = sortedForecasts.first.validDateTime;
-
-              // Convert back to datetime
-              final datetime = baseTime.add(
-                Duration(hours: (value * 24).toInt()),
-              );
-
-              // Format based on day
-              String dayText;
-              if (value == 0) {
-                dayText = 'Today';
-              } else if (value == 1) {
-                dayText = 'Tmrw';
-              } else {
-                // Show day of week and date
-                dayText = DateFormat('E\nM/d').format(datetime);
-              }
-
-              return Padding(
-                padding: const EdgeInsets.only(top: 8.0),
-                child: Text(
-                  dayText,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: textColor,
-                    fontWeight: FontWeight.bold,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-              );
-            },
-          ),
-        );
-
-      case ForecastType.longRange:
-        // Weekly labels
-        return AxisTitles(
-          sideTitles: SideTitles(
-            showTitles: true,
-            reservedSize: 40,
-            interval: 1, // Show every week
-            getTitlesWidget: (value, meta) {
-              final sortedForecasts = List<Forecast>.from(widget.forecasts)
-                ..sort((a, b) => a.validDateTime.compareTo(b.validDateTime));
-              final baseTime = sortedForecasts.first.validDateTime;
-
-              // Convert back to datetime
-              final datetime = baseTime.add(
-                Duration(days: (value * 7).toInt()),
-              );
-
-              // Format based on week
-              String weekText;
-              if (value == 0) {
-                weekText = 'This\nWeek';
-              } else if (value == 1) {
-                weekText = 'Next\nWeek';
-              } else {
-                // Show month and week of month
-                final weekOfMonth = (datetime.day / 7).ceil();
-                weekText =
-                    '${DateFormat('MMM').format(datetime)}\nWk $weekOfMonth';
-              }
-
-              return Padding(
-                padding: const EdgeInsets.only(top: 8.0),
-                child: Text(
-                  weekText,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: textColor,
-                    fontWeight: FontWeight.bold,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-              );
-            },
-          ),
-        );
-    }
+        ),
+        axisNameSize: 30,
+        sideTitles: SideTitles(
+          showTitles: true,
+          reservedSize: 50,
+          getTitlesWidget: (value, meta) {
+            if (value == _baseMaxY || value < 0) {
+              return Container();
+            }
+            return Padding(
+              padding: const EdgeInsets.only(right: 5),
+              child: Text(
+                value.toStringAsFixed(0),
+                style: TextStyle(fontSize: 12, color: textColor),
+                textAlign: TextAlign.right,
+              ),
+            );
+          },
+        ),
+      ),
+    );
   }
 
   // Build touch tooltip data
@@ -567,7 +461,6 @@ class _CustomZoomableChartState extends State<CustomZoomableChart> {
 
     // Get chart elements
     final horizontalLines = _getReturnPeriodLines();
-    final titlesData = _buildBottomTitles(isDark);
     final touchData = _buildTouchData(isDark);
 
     // Gradient colors
@@ -662,7 +555,7 @@ class _CustomZoomableChartState extends State<CustomZoomableChart> {
                     );
                   },
                 ),
-                // titlesData: titlesData,
+                titlesData: _buildTitlesData(isDark),
                 borderData: FlBorderData(
                   show: true,
                   border: Border.all(color: colorScheme.outline),

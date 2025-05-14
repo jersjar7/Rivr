@@ -284,7 +284,7 @@ class _HydrographChartState extends State<HydrographChart> {
                       gradient: LinearGradient(
                         colors:
                             gradientColors
-                                .map((color) => color.withOpacity(0.3))
+                                .map((color) => color.withValues(alpha: 0.3))
                                 .toList(),
                       ),
                     ),
@@ -301,8 +301,8 @@ class _HydrographChartState extends State<HydrographChart> {
                     return FlLine(
                       color:
                           isDark
-                              ? colorScheme.primary.withOpacity(0.15)
-                              : colorScheme.primary.withOpacity(0.2),
+                              ? colorScheme.primary.withValues(alpha: 0.15)
+                              : colorScheme.primary.withValues(alpha: 0.2),
                       strokeWidth: 1,
                     );
                   },
@@ -310,8 +310,8 @@ class _HydrographChartState extends State<HydrographChart> {
                     return FlLine(
                       color:
                           isDark
-                              ? colorScheme.primary.withOpacity(0.25)
-                              : colorScheme.primary.withOpacity(0.4),
+                              ? colorScheme.primary.withValues(alpha: 0.25)
+                              : colorScheme.primary.withValues(alpha: 0.4),
                       strokeWidth: 1,
                     );
                   },
@@ -338,7 +338,7 @@ class _HydrographChartState extends State<HydrographChart> {
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
-                  color: colorScheme.primaryContainer.withOpacity(0.8),
+                  color: colorScheme.primaryContainer.withValues(alpha: 0.8),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Text(
@@ -364,7 +364,7 @@ class _HydrographChartState extends State<HydrographChart> {
                   vertical: 6,
                 ),
                 decoration: BoxDecoration(
-                  color: colorScheme.tertiary.withOpacity(0.7),
+                  color: colorScheme.tertiary.withValues(alpha: 0.7),
                   borderRadius: BorderRadius.circular(16),
                 ),
                 child: Text(
@@ -442,8 +442,8 @@ class _HydrographChartState extends State<HydrographChart> {
         getTooltipColor:
             (spot) =>
                 isDark
-                    ? colorScheme.surfaceContainerHighest.withOpacity(0.8)
-                    : Colors.blueGrey.withOpacity(0.8),
+                    ? colorScheme.surfaceContainerHighest.withValues(alpha: 0.8)
+                    : Colors.blueGrey.withValues(alpha: 0.8),
         tooltipRoundedRadius: 8,
         getTooltipItems: (spots) {
           return spots.map((spot) {

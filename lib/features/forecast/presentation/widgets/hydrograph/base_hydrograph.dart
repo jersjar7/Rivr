@@ -1,5 +1,3 @@
-// lib/features/forecast/presentation/widgets/hydrograph/base_hydrograph.dart
-
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -43,8 +41,8 @@ abstract class BaseHydrographState<T extends BaseHydrograph> extends State<T> {
   double _xOffset = 0.0; // Horizontal pan offset
   double _baseMinX = 0.0; // Original min X value
   double _baseMaxX = 0.0; // Original max X value
-  double _baseMinY = 0.0; // Original min Y value
-  double _baseMaxY = 0.0; // Original max Y value
+  late double _baseMinY; // Original min Y value - using late
+  late double _baseMaxY; // Original max Y value - using late
   bool _initialBoundsSet = false; // Track if we've initialized bounds
 
   // Transformations based on zoom/pan
@@ -201,10 +199,6 @@ abstract class BaseHydrographState<T extends BaseHydrograph> extends State<T> {
     // Initialize zoom bounds on first build
     _initializeZoomBounds();
 
-    // Calculate y-axis bounds
-    final minY = getMinY();
-    final maxY = getMaxY();
-
     // Get return period lines
     final horizontalLines = getReturnPeriodLines();
 
@@ -251,7 +245,7 @@ abstract class BaseHydrographState<T extends BaseHydrograph> extends State<T> {
                 gradient: LinearGradient(
                   colors:
                       gradientColors
-                          .map((color) => color.withOpacity(0.3))
+                          .map((color) => color.withValues(alpha: 0.3))
                           .toList(),
                 ),
               ),
@@ -266,8 +260,8 @@ abstract class BaseHydrographState<T extends BaseHydrograph> extends State<T> {
               return FlLine(
                 color:
                     isDark
-                        ? colorScheme.primary.withOpacity(0.15)
-                        : colorScheme.primary.withOpacity(0.2),
+                        ? colorScheme.primary.withValues(alpha: 0.15)
+                        : colorScheme.primary.withValues(alpha: 0.2),
                 strokeWidth: 1,
               );
             },
@@ -275,8 +269,8 @@ abstract class BaseHydrographState<T extends BaseHydrograph> extends State<T> {
               return FlLine(
                 color:
                     isDark
-                        ? colorScheme.primary.withOpacity(0.25)
-                        : colorScheme.primary.withOpacity(0.4),
+                        ? colorScheme.primary.withValues(alpha: 0.25)
+                        : colorScheme.primary.withValues(alpha: 0.4),
                 strokeWidth: 1,
               );
             },
@@ -290,8 +284,8 @@ abstract class BaseHydrographState<T extends BaseHydrograph> extends State<T> {
           // Apply transformed X bounds based on zoom and pan
           minX: _transformedMinX,
           maxX: _transformedMaxX,
-          minY: minY,
-          maxY: maxY,
+          minY: _baseMinY,
+          maxY: _baseMaxY,
         ),
       ),
     );
@@ -327,7 +321,7 @@ abstract class BaseHydrographState<T extends BaseHydrograph> extends State<T> {
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
-                  color: colorScheme.primaryContainer.withOpacity(0.8),
+                  color: colorScheme.primaryContainer.withValues(alpha: 0.8),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Text(
@@ -353,7 +347,7 @@ abstract class BaseHydrographState<T extends BaseHydrograph> extends State<T> {
                   vertical: 6,
                 ),
                 decoration: BoxDecoration(
-                  color: colorScheme.tertiary.withOpacity(0.7),
+                  color: colorScheme.tertiary.withValues(alpha: 0.7),
                   borderRadius: BorderRadius.circular(16),
                 ),
                 child: Text(
@@ -383,8 +377,8 @@ abstract class BaseHydrographState<T extends BaseHydrograph> extends State<T> {
         getTooltipColor:
             (spot) =>
                 isDark
-                    ? colorScheme.surfaceContainerHighest.withOpacity(0.8)
-                    : Colors.blueGrey.withOpacity(0.8),
+                    ? colorScheme.surfaceContainerHighest.withValues(alpha: 0.8)
+                    : Colors.blueGrey.withValues(alpha: 0.8),
         tooltipRoundedRadius: 8,
         getTooltipItems: (List<LineBarSpot> lineBarsSpot) {
           return lineBarsSpot.map((spot) {
@@ -445,9 +439,9 @@ abstract class BaseHydrographState<T extends BaseHydrograph> extends State<T> {
         axisNameSize: 30,
         sideTitles: SideTitles(
           showTitles: true,
-          reservedSize: getReservedSizeForYAxis(getMaxY()),
+          reservedSize: getReservedSizeForYAxis(_baseMaxY),
           getTitlesWidget: (value, meta) {
-            if (value == getMaxY() || value < 0) {
+            if (value == _baseMaxY || value < 0) {
               return Container();
             }
             return Padding(

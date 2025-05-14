@@ -47,7 +47,6 @@ class _CustomZoomableChartState extends State<CustomZoomableChart> {
 
   // Data for chart
   late List<FlSpot> _spots;
-  late Color _backgroundColor;
   late final DateFormat dateFormatter = DateFormat('MMM d');
   late final DateFormat timeFormatter = DateFormat('h:mm a');
   late final NumberFormat flowFormatter = NumberFormat('#,##0.0');
@@ -72,13 +71,6 @@ class _CustomZoomableChartState extends State<CustomZoomableChart> {
     _baseMaxX = _getMaxX();
     _baseMinY = _getMinY();
     _baseMaxY = _getMaxY();
-
-    // Set background color based on theme
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-    final isDark = theme.brightness == Brightness.dark;
-    _backgroundColor =
-        isDark ? colorScheme.surface : colorScheme.surfaceContainerHighest;
   }
 
   // Reset zoom to original values
@@ -513,8 +505,8 @@ class _CustomZoomableChartState extends State<CustomZoomableChart> {
         getTooltipColor:
             (spot) =>
                 isDark
-                    ? colorScheme.surfaceContainerHighest.withOpacity(0.8)
-                    : Colors.blueGrey.withOpacity(0.8),
+                    ? colorScheme.surfaceContainerHighest.withValues(alpha: 0.8)
+                    : Colors.blueGrey.withValues(alpha: 0.8),
         tooltipRoundedRadius: 8,
         getTooltipItems: (List<LineBarSpot> lineBarsSpot) {
           return lineBarsSpot.map((spot) {
@@ -561,6 +553,8 @@ class _CustomZoomableChartState extends State<CustomZoomableChart> {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final isDark = theme.brightness == Brightness.dark;
+    final backgroundColor =
+        isDark ? colorScheme.surface : colorScheme.surfaceContainerHighest;
 
     if (_spots.isEmpty) {
       return Center(
@@ -619,7 +613,7 @@ class _CustomZoomableChartState extends State<CustomZoomableChart> {
           },
           onDoubleTap: _resetZoom, // Reset zoom on double tap
           child: Container(
-            color: _backgroundColor,
+            color: backgroundColor,
             padding: chartPadding,
             child: LineChart(
               LineChartData(
@@ -636,7 +630,7 @@ class _CustomZoomableChartState extends State<CustomZoomableChart> {
                       gradient: LinearGradient(
                         colors:
                             gradientColors
-                                .map((color) => color.withOpacity(0.3))
+                                .map((color) => color.withValues(alpha: 0.3))
                                 .toList(),
                       ),
                     ),
@@ -653,8 +647,8 @@ class _CustomZoomableChartState extends State<CustomZoomableChart> {
                     return FlLine(
                       color:
                           isDark
-                              ? colorScheme.primary.withOpacity(0.15)
-                              : colorScheme.primary.withOpacity(0.2),
+                              ? colorScheme.primary.withValues(alpha: 0.15)
+                              : colorScheme.primary.withValues(alpha: 0.2),
                       strokeWidth: 1,
                     );
                   },
@@ -662,8 +656,8 @@ class _CustomZoomableChartState extends State<CustomZoomableChart> {
                     return FlLine(
                       color:
                           isDark
-                              ? colorScheme.primary.withOpacity(0.25)
-                              : colorScheme.primary.withOpacity(0.4),
+                              ? colorScheme.primary.withValues(alpha: 0.25)
+                              : colorScheme.primary.withValues(alpha: 0.4),
                       strokeWidth: 1,
                     );
                   },
@@ -692,7 +686,7 @@ class _CustomZoomableChartState extends State<CustomZoomableChart> {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               decoration: BoxDecoration(
-                color: colorScheme.primaryContainer.withOpacity(0.8),
+                color: colorScheme.primaryContainer.withValues(alpha: 0.8),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Text(
@@ -715,7 +709,7 @@ class _CustomZoomableChartState extends State<CustomZoomableChart> {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               decoration: BoxDecoration(
-                color: colorScheme.tertiary.withOpacity(0.7),
+                color: colorScheme.tertiary.withValues(alpha: 0.7),
                 borderRadius: BorderRadius.circular(16),
               ),
               child: Text(

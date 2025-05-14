@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:rivr/features/forecast/domain/entities/forecast.dart';
 import 'package:rivr/features/forecast/domain/entities/return_period.dart';
+import 'package:rivr/features/forecast/presentation/widgets/card_flow_value.dart';
 import 'package:rivr/features/forecast/utils/flow_thresholds.dart';
 
 enum TimelineViewType { hourCards, flowWave }
@@ -291,29 +292,12 @@ class _HorizontalFlowTimelineState extends State<HorizontalFlowTimeline> {
                   ),
                   const SizedBox(height: 12),
 
-                  // Flow indicator
-                  Container(
-                    width: 60,
-                    height: 60,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: color.withValues(alpha: 0.2),
-                      border: Border.all(color: color, width: 2),
-                    ),
-                    child: Center(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            flow.toInt().toString(),
-                            style: textTheme.bodyLarge?.copyWith(
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          Text('ft³/s', style: textTheme.bodySmall),
-                        ],
-                      ),
-                    ),
+                  // Flow indicator with circular decoration and compact format
+                  FlowValueDisplay(
+                    flow: flow,
+                    color: color, // Pass the category color here
+                    containerWidth: 60,
+                    containerHeight: 60,
                   ),
 
                   const SizedBox(height: 8),

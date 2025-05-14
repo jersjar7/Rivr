@@ -16,14 +16,16 @@ String formatFlowCompact(double flow) {
 /// Widget that displays flow value in a space-efficient manner
 class FlowValueDisplay extends StatelessWidget {
   final double flow;
+  final Color color;
   final double containerWidth;
   final double containerHeight;
 
   const FlowValueDisplay({
     super.key,
     required this.flow,
-    this.containerWidth = 56.0,
-    this.containerHeight = 56.0,
+    required this.color,
+    this.containerWidth = 60.0,
+    this.containerHeight = 60.0,
   });
 
   @override
@@ -34,42 +36,16 @@ class FlowValueDisplay extends StatelessWidget {
     // Format the flow value compactly
     final String formattedFlow = formatFlowCompact(flow);
 
-    // For very large numbers, arrange horizontally instead of vertically
-    final bool useHorizontalLayout = flow >= 100000;
-
-    if (useHorizontalLayout) {
-      // Horizontal layout for very large numbers
-      return Container(
-        width: containerWidth,
-        height: containerHeight,
-        alignment: Alignment.center,
-        child: FittedBox(
-          fit: BoxFit.scaleDown,
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Text(
-                formattedFlow,
-                style: textTheme.bodyLarge?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(width: 2),
-              Padding(
-                padding: const EdgeInsets.only(bottom: 2.0),
-                child: Text('ft³/s', style: textTheme.bodySmall),
-              ),
-            ],
-          ),
-        ),
-      );
-    } else {
-      // Vertical layout for smaller numbers
-      return Container(
-        width: containerWidth,
-        height: containerHeight,
-        alignment: Alignment.center,
+    // Always maintain the circular container with dynamic colors
+    return Container(
+      width: containerWidth,
+      height: containerHeight,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: color.withValues(alpha: 0.2),
+        border: Border.all(color: color, width: 2),
+      ),
+      child: Center(
         child: FittedBox(
           fit: BoxFit.scaleDown,
           child: Column(
@@ -79,7 +55,7 @@ class FlowValueDisplay extends StatelessWidget {
             children: [
               Text(
                 formattedFlow,
-                style: textTheme.bodyLarge?.copyWith(
+                style: textTheme.bodySmall?.copyWith(
                   fontWeight: FontWeight.bold,
                 ),
                 textAlign: TextAlign.center,
@@ -92,7 +68,7 @@ class FlowValueDisplay extends StatelessWidget {
             ],
           ),
         ),
-      );
-    }
+      ),
+    );
   }
 }

@@ -31,6 +31,11 @@ class _FlowStatusCardState extends State<FlowStatusCard> {
 
   @override
   Widget build(BuildContext context) {
+    // Get current theme to adapt colors
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+
     // If we don't have flow data yet, show loading
     if (widget.currentFlow == null) {
       return _buildLoadingCard(context);
@@ -73,13 +78,20 @@ class _FlowStatusCardState extends State<FlowStatusCard> {
       'MMM d, h:mm a',
     ).format(widget.currentFlow!.validDateTime);
 
-    final theme = Theme.of(context);
-    final surfaceColor = theme.colorScheme.primary;
+    // Card colors - adapt to theme
+    final Color cardColor =
+        isDark ? colorScheme.secondary : colorScheme.secondary;
+    final Color cardColorDark =
+        isDark
+            ? colorScheme.secondaryContainer
+            : colorScheme.secondary.withValues(alpha: 0.7);
+    final Color textColor =
+        Colors
+            .white; // Text should be white in both themes on this colored card
 
     return GestureDetector(
       onTap: widget.onTap,
       child: Card(
-        color: surfaceColor,
         elevation: 4,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         child: Container(
@@ -88,7 +100,7 @@ class _FlowStatusCardState extends State<FlowStatusCard> {
             gradient: LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
-              colors: [Colors.teal.shade700, Colors.teal.shade900],
+              colors: [cardColor, cardColorDark],
             ),
           ),
           child: Padding(
@@ -103,7 +115,7 @@ class _FlowStatusCardState extends State<FlowStatusCard> {
                     Text(
                       'Current Flow',
                       style: theme.textTheme.bodyMedium!.copyWith(
-                        color: theme.colorScheme.surface,
+                        color: textColor,
                       ),
                     ),
                     Container(
@@ -117,7 +129,7 @@ class _FlowStatusCardState extends State<FlowStatusCard> {
                       ),
                       child: Text(
                         category,
-                        style: const TextStyle(
+                        style: TextStyle(
                           color: Colors.white,
                           fontWeight: FontWeight.bold,
                         ),
@@ -134,8 +146,9 @@ class _FlowStatusCardState extends State<FlowStatusCard> {
                   children: [
                     Text(
                       formattedFlow,
-                      style: theme.textTheme.titleLarge!.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
+                      style: theme.textTheme.displaySmall!.copyWith(
+                        color: textColor,
+                        fontWeight: FontWeight.bold,
                       ),
                     ),
                     const SizedBox(width: 8),
@@ -144,7 +157,7 @@ class _FlowStatusCardState extends State<FlowStatusCard> {
                       child: Text(
                         'ft³/s',
                         style: theme.textTheme.bodyMedium!.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
+                          color: textColor.withValues(alpha: 0.8),
                         ),
                       ),
                     ),
@@ -156,9 +169,7 @@ class _FlowStatusCardState extends State<FlowStatusCard> {
                           vertical: 2,
                         ),
                         decoration: BoxDecoration(
-                          color: theme.colorScheme.onSurface.withValues(
-                            alpha: 0.1,
-                          ),
+                          color: textColor.withValues(alpha: 0.15),
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Text(
@@ -166,7 +177,10 @@ class _FlowStatusCardState extends State<FlowStatusCard> {
                           style: theme.textTheme.bodyMedium!.copyWith(
                             color:
                                 flow > widget.historicalAverage!
-                                    ? Colors.orange
+                                    ? (isDark
+                                        ? Colors.amber
+                                        : Colors
+                                            .orange) // Different colors for light/dark
                                     : Colors.green,
                             fontWeight: FontWeight.bold,
                           ),
@@ -187,22 +201,22 @@ class _FlowStatusCardState extends State<FlowStatusCard> {
                     ),
                   ),
 
-                // const SizedBox(height: 16),
+                const SizedBox(height: 16),
 
                 // Historical comparison
                 if (widget.historicalAverage != null)
                   Row(
                     children: [
-                      const Icon(
+                      Icon(
                         Icons.history,
-                        color: Colors.white70,
+                        color: textColor.withValues(alpha: 0.7),
                         size: 18,
                       ),
                       const SizedBox(width: 8),
                       Text(
                         'Historical Average: $formattedHistorical ft³/s',
                         style: theme.textTheme.bodyMedium!.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
+                          color: textColor.withValues(alpha: 0.9),
                         ),
                       ),
                     ],
@@ -211,30 +225,32 @@ class _FlowStatusCardState extends State<FlowStatusCard> {
                 const SizedBox(height: 8),
 
                 // Timestamp information
-                // Row(
-                //   children: [
-                //     const Icon(
-                //       Icons.access_time_rounded,
-                //       color: Colors.white70,
-                //       size: 18,
-                //     ),
-                //     const SizedBox(width: 8),
-                //     Text(
-                //       'As of $formattedTime',
-                //       style: const TextStyle(color: Colors.white70),
-                //     ),
-                //   ],
-                // ),
+                Row(
+                  children: [
+                    Icon(
+                      Icons.access_time_rounded,
+                      color: textColor.withValues(alpha: 0.7),
+                      size: 18,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      'As of $formattedTime',
+                      style: theme.textTheme.bodySmall!.copyWith(
+                        color: textColor.withValues(alpha: 0.9),
+                      ),
+                    ),
+                  ],
+                ),
 
                 // Additional information in expanded mode
                 if (widget.expanded) ...[
-                  const SizedBox(height: 8),
-                  const Divider(color: Colors.white24),
+                  const SizedBox(height: 16),
+                  Divider(color: textColor.withValues(alpha: 0.2)),
                   const SizedBox(height: 8),
                   Text(
                     statusDescription,
                     style: theme.textTheme.bodyMedium!.copyWith(
-                      color: theme.colorScheme.surface,
+                      color: textColor,
                     ),
                   ),
                   const SizedBox(height: 16),
@@ -243,7 +259,7 @@ class _FlowStatusCardState extends State<FlowStatusCard> {
                   if (widget.returnPeriod != null) ...[
                     // Clickable header row with arrow indicator and button styling
                     Material(
-                      color: Colors.black26,
+                      color: Colors.black.withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(8),
                       child: InkWell(
                         borderRadius: BorderRadius.circular(8),
@@ -263,12 +279,13 @@ class _FlowStatusCardState extends State<FlowStatusCard> {
                               Text(
                                 'Return Period Information',
                                 style: theme.textTheme.bodyMedium!.copyWith(
+                                  color: textColor,
                                   fontWeight: FontWeight.bold,
                                 ),
                               ),
                               Container(
                                 decoration: BoxDecoration(
-                                  color: Colors.white24,
+                                  color: textColor.withValues(alpha: 0.2),
                                   shape: BoxShape.circle,
                                 ),
                                 padding: const EdgeInsets.all(4),
@@ -276,7 +293,8 @@ class _FlowStatusCardState extends State<FlowStatusCard> {
                                   _returnPeriodExpanded
                                       ? Icons.keyboard_arrow_up
                                       : Icons.keyboard_arrow_down,
-                                  color: theme.colorScheme.onSurfaceVariant,
+                                  color: textColor,
+                                  size: 16,
                                 ),
                               ),
                             ],
@@ -294,6 +312,7 @@ class _FlowStatusCardState extends State<FlowStatusCard> {
                                 padding: const EdgeInsets.only(top: 12.0),
                                 child: _buildReturnPeriodTable(
                                   widget.returnPeriod!,
+                                  textColor,
                                 ),
                               )
                               : const SizedBox.shrink(),
@@ -306,9 +325,7 @@ class _FlowStatusCardState extends State<FlowStatusCard> {
                       padding: const EdgeInsets.only(top: 8.0),
                       child: Icon(
                         Icons.keyboard_arrow_down,
-                        color: theme.colorScheme.onSurfaceVariant.withValues(
-                          alpha: 0.6,
-                        ),
+                        color: textColor.withValues(alpha: 0.6),
                       ),
                     ),
                   ),
@@ -322,7 +339,7 @@ class _FlowStatusCardState extends State<FlowStatusCard> {
   }
 
   // Build a table showing return period flows
-  Widget _buildReturnPeriodTable(ReturnPeriod returnPeriod) {
+  Widget _buildReturnPeriodTable(ReturnPeriod returnPeriod, Color textColor) {
     final theme = Theme.of(context);
     final rows = <TableRow>[];
 
@@ -330,23 +347,25 @@ class _FlowStatusCardState extends State<FlowStatusCard> {
     rows.add(
       TableRow(
         decoration: BoxDecoration(
-          border: Border(bottom: BorderSide(color: theme.dividerColor)),
+          border: Border(bottom: BorderSide(color: textColor.withOpacity(0.3))),
         ),
         children: [
           Padding(
-            padding: EdgeInsets.symmetric(vertical: 4.0),
+            padding: const EdgeInsets.symmetric(vertical: 4.0),
             child: Text(
               'Return Period',
               style: theme.textTheme.bodyMedium!.copyWith(
+                color: textColor,
                 fontWeight: FontWeight.bold,
               ),
             ),
           ),
           Padding(
-            padding: EdgeInsets.symmetric(vertical: 4.0),
+            padding: const EdgeInsets.symmetric(vertical: 4.0),
             child: Text(
               'Flow (ft³/s)',
               style: theme.textTheme.bodyMedium!.copyWith(
+                color: textColor,
                 fontWeight: FontWeight.bold,
               ),
               textAlign: TextAlign.right,
@@ -365,13 +384,20 @@ class _FlowStatusCardState extends State<FlowStatusCard> {
             children: [
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 4.0),
-                child: Text('$year-year', style: theme.textTheme.bodyMedium),
+                child: Text(
+                  '$year-year',
+                  style: theme.textTheme.bodyMedium!.copyWith(
+                    color: textColor.withOpacity(0.9),
+                  ),
+                ),
               ),
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 4.0),
                 child: Text(
                   NumberFormat('#,##0.0').format(flow),
-                  style: theme.textTheme.bodyMedium,
+                  style: theme.textTheme.bodyMedium!.copyWith(
+                    color: textColor.withOpacity(0.9),
+                  ),
                   textAlign: TextAlign.right,
                 ),
               ),
@@ -390,8 +416,18 @@ class _FlowStatusCardState extends State<FlowStatusCard> {
   // Loading state card
   Widget _buildLoadingCard(BuildContext context) {
     final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+
+    // Card colors - adapt to theme
+    final Color cardColor =
+        isDark ? colorScheme.secondary : colorScheme.secondary;
+    final Color cardColorLight =
+        isDark
+            ? colorScheme.secondary.withOpacity(0.7)
+            : colorScheme.secondary.withOpacity(0.8);
+
     return Card(
-      color: theme.colorScheme.surfaceContainerHighest,
       elevation: 4,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Container(
@@ -400,7 +436,7 @@ class _FlowStatusCardState extends State<FlowStatusCard> {
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: [Colors.blueGrey.shade800, Colors.blueGrey.shade900],
+            colors: [cardColorLight, cardColor],
           ),
         ),
         height: 180,
@@ -409,13 +445,13 @@ class _FlowStatusCardState extends State<FlowStatusCard> {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               CircularProgressIndicator(
-                valueColor: AlwaysStoppedAnimation(theme.colorScheme.primary),
+                valueColor: AlwaysStoppedAnimation(Colors.white),
               ),
-              SizedBox(height: 16),
+              const SizedBox(height: 16),
               Text(
                 'Loading flow data...',
                 style: theme.textTheme.bodyMedium!.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
+                  color: Colors.white,
                 ),
               ),
             ],

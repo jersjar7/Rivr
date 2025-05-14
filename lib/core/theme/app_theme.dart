@@ -123,9 +123,9 @@ final ThemeData primaryTheme = ThemeData(
     error: AppColors.error,
     onError: AppColors.pureWhite,
     outline: AppColors.lightGray,
-    outlineVariant: AppColors.teal.withOpacity(0.2),
-    scrim: AppColors.darkCharcoal.withOpacity(0.3),
-    shadow: AppColors.darkCharcoal.withOpacity(0.2),
+    outlineVariant: AppColors.teal.withValues(alpha: 0.2),
+    scrim: AppColors.darkCharcoal.withValues(alpha: 0.3),
+    shadow: AppColors.darkCharcoal.withValues(alpha: 0.2),
   ),
 
   // AppBar styling
@@ -251,7 +251,7 @@ final ThemeData primaryTheme = ThemeData(
       borderSide: const BorderSide(color: AppColors.primary, width: 2),
     ),
     contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-    hintStyle: TextStyle(color: AppColors.textSecondary.withOpacity(0.7)),
+    hintStyle: TextStyle(color: AppColors.textSecondary.withValues(alpha: 0.7)),
   ),
 
   // Divider color
@@ -271,9 +271,9 @@ final ThemeData primaryTheme = ThemeData(
     }),
     trackColor: WidgetStateProperty.resolveWith((states) {
       if (states.contains(WidgetState.selected)) {
-        return AppColors.primary.withOpacity(0.3);
+        return AppColors.primary.withValues(alpha: 0.3);
       }
-      return AppColors.lightGray.withOpacity(0.5);
+      return AppColors.lightGray.withValues(alpha: 0.5);
     }),
   ),
 
@@ -354,10 +354,10 @@ final ThemeData darkTheme = ThemeData(
     // Other standard colors
     error: AppColors.darkError,
     onError: AppColors.darkOnPrimary,
-    outline: AppColors.darkTextSecondary.withOpacity(0.5),
-    outlineVariant: AppColors.darkSecondary.withOpacity(0.2),
-    scrim: Colors.black.withOpacity(0.5),
-    shadow: Colors.black.withOpacity(0.2),
+    outline: AppColors.darkTextSecondary.withValues(alpha: 0.5),
+    outlineVariant: AppColors.darkSecondary.withValues(alpha: 0.2),
+    scrim: Colors.black.withValues(alpha: 0.5),
+    shadow: Colors.black.withValues(alpha: 0.2),
   ),
 
   // AppBar styling
@@ -483,7 +483,9 @@ final ThemeData darkTheme = ThemeData(
       borderSide: const BorderSide(color: AppColors.darkPrimary, width: 2),
     ),
     contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-    hintStyle: TextStyle(color: AppColors.darkTextSecondary.withOpacity(0.7)),
+    hintStyle: TextStyle(
+      color: AppColors.darkTextSecondary.withValues(alpha: 0.7),
+    ),
   ),
 
   // Divider color
@@ -503,9 +505,9 @@ final ThemeData darkTheme = ThemeData(
     }),
     trackColor: WidgetStateProperty.resolveWith((states) {
       if (states.contains(WidgetState.selected)) {
-        return AppColors.darkPrimary.withOpacity(0.3);
+        return AppColors.darkPrimary.withValues(alpha: 0.3);
       }
-      return AppColors.darkTextSecondary.withOpacity(0.3);
+      return AppColors.darkTextSecondary.withValues(alpha: 0.3);
     }),
   ),
 

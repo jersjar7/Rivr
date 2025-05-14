@@ -1,5 +1,4 @@
 // lib/features/forecast/presentation/pages/forecast_page.dart
-// Integrated version with loading states and error handling
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -100,17 +99,18 @@ class _ForecastPageState extends State<ForecastPage>
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
     return Scaffold(
       appBar: AppBar(
         title: Text('${widget.stationName} Forecast'),
         bottom: TabBar(
           controller: _tabController,
           labelColor:
-              Theme.of(
-                context,
-              ).colorScheme.secondary, // Color for the selected tab
-          unselectedLabelColor: Theme.of(context).colorScheme.surface
-              .withValues(alpha: 0.7), // Color for unselected tabs
+              theme.colorScheme.tertiary, // Will adapt to light/dark theme
+          unselectedLabelColor: theme.colorScheme.surfaceContainerHighest
+              .withValues(alpha: 0.7),
+          indicatorColor: theme.colorScheme.tertiary,
           tabs: const [
             Tab(text: 'Hourly'),
             Tab(text: 'Daily'),
@@ -176,6 +176,7 @@ class _ForecastPageState extends State<ForecastPage>
 
     return RefreshIndicator(
       onRefresh: _handleRefresh,
+      color: Theme.of(context).colorScheme.primary, // Will adapt to theme
       child: TabBarView(
         controller: _tabController,
         children: [
@@ -196,6 +197,7 @@ class _ForecastPageState extends State<ForecastPage>
     ForecastProvider forecastProvider,
     ReturnPeriodProvider returnPeriodProvider,
   ) {
+    final theme = Theme.of(context);
     final latestFlow = forecastProvider.getLatestFlowFor(widget.reachId);
     final returnPeriod = returnPeriodProvider.getCachedReturnPeriod(
       widget.reachId,
@@ -254,9 +256,9 @@ class _ForecastPageState extends State<ForecastPage>
           ),
 
           const SizedBox(height: 24),
-          const Text(
+          Text(
             'Hourly Forecast (Next 3 Days)',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            style: theme.textTheme.titleMedium,
           ),
           const SizedBox(height: 16),
 
@@ -272,8 +274,11 @@ class _ForecastPageState extends State<ForecastPage>
                 height: 300,
                 child:
                     forecasts.isEmpty
-                        ? const Center(
-                          child: Text('No hourly forecast data available'),
+                        ? Center(
+                          child: Text(
+                            'No hourly forecast data available',
+                            style: theme.textTheme.bodyMedium,
+                          ),
                         )
                         : HydrographFactory.createHydrograph(
                           reachId: widget.reachId,
@@ -290,7 +295,7 @@ class _ForecastPageState extends State<ForecastPage>
           // Last Updated Info
           Text(
             'Last updated: ${DateTime.now().toString().substring(0, 16)}',
-            style: const TextStyle(color: Colors.grey, fontSize: 12),
+            style: theme.textTheme.bodySmall,
           ),
 
           const SizedBox(height: 40),
@@ -303,6 +308,7 @@ class _ForecastPageState extends State<ForecastPage>
     ForecastProvider forecastProvider,
     ReturnPeriodProvider returnPeriodProvider,
   ) {
+    final theme = Theme.of(context);
     final latestFlow = forecastProvider.getLatestFlowFor(widget.reachId);
     final returnPeriod = returnPeriodProvider.getCachedReturnPeriod(
       widget.reachId,
@@ -343,9 +349,9 @@ class _ForecastPageState extends State<ForecastPage>
           ),
 
           const SizedBox(height: 24),
-          const Text(
+          Text(
             'Daily Forecast (Next 10 Days)',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            style: theme.textTheme.titleMedium,
           ),
           const SizedBox(height: 16),
 
@@ -382,7 +388,7 @@ class _ForecastPageState extends State<ForecastPage>
           // Last Updated Info
           Text(
             'Last updated: ${DateTime.now().toString().substring(0, 16)}',
-            style: const TextStyle(color: Colors.grey, fontSize: 12),
+            style: theme.textTheme.bodySmall,
           ),
 
           const SizedBox(height: 40),
@@ -395,6 +401,7 @@ class _ForecastPageState extends State<ForecastPage>
     ForecastProvider forecastProvider,
     ReturnPeriodProvider returnPeriodProvider,
   ) {
+    final theme = Theme.of(context);
     final latestFlow = forecastProvider.getLatestFlowFor(widget.reachId);
     final returnPeriod = returnPeriodProvider.getCachedReturnPeriod(
       widget.reachId,
@@ -435,9 +442,9 @@ class _ForecastPageState extends State<ForecastPage>
           ),
 
           const SizedBox(height: 24),
-          const Text(
+          Text(
             'Monthly View (Long-Range Forecast)',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            style: theme.textTheme.titleMedium,
           ),
           const SizedBox(height: 16),
 
@@ -462,7 +469,7 @@ class _ForecastPageState extends State<ForecastPage>
           // Last Updated Info
           Text(
             'Last updated: ${DateTime.now().toString().substring(0, 16)}',
-            style: const TextStyle(color: Colors.grey, fontSize: 12),
+            style: theme.textTheme.bodySmall,
           ),
 
           const SizedBox(height: 40),

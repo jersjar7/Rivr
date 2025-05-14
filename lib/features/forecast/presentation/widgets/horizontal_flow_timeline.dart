@@ -62,6 +62,25 @@ class _HorizontalFlowTimelineState extends State<HorizontalFlowTimeline> {
     _sortedForecasts = List<Forecast>.from(widget.forecasts)
       ..sort((a, b) => a.validDateTime.compareTo(b.validDateTime));
 
+    // Filter out past forecasts BUT KEEP THE CURRENT HOUR
+    final now = DateTime.now();
+    final currentHour = now.hour;
+
+    _sortedForecasts =
+        _sortedForecasts.where((forecast) {
+          final forecastTime = forecast.validDateTime.toLocal();
+          // Keep if it's in the future OR if it's in the current hour
+          return forecastTime.isAfter(now) || forecastTime.hour == currentHour;
+        }).toList();
+
+    // If all forecasts are in the past, keep the most recent one
+    if (_sortedForecasts.isEmpty && widget.forecasts.isNotEmpty) {
+      widget.forecasts.sort(
+        (a, b) => b.validDateTime.compareTo(a.validDateTime),
+      );
+      _sortedForecasts = [widget.forecasts.first];
+    }
+
     // Limit to the next X hours
     if (_sortedForecasts.length > widget.hoursToShow) {
       _sortedForecasts = _sortedForecasts.sublist(0, widget.hoursToShow);
@@ -92,7 +111,9 @@ class _HorizontalFlowTimelineState extends State<HorizontalFlowTimeline> {
     print('\nHOURLY FORECAST DATA:');
     for (int i = 0; i < _sortedForecasts.length; i++) {
       final forecast = _sortedForecasts[i];
-      final time = DateFormat('MMM d, h:mm a').format(forecast.validDateTime);
+      final time = DateFormat(
+        'MMM d, h:mm a',
+      ).format(forecast.validDateTimeLocal);
       final flow = _flowFormatter.format(forecast.flow);
 
       String category = 'Unknown';
@@ -245,6 +266,10 @@ class _HorizontalFlowTimelineState extends State<HorizontalFlowTimeline> {
   Widget _buildHourCardsView() {
     final theme = Theme.of(context);
     final textTheme = theme.textTheme;
+    final now = DateTime.now();
+
+    // Get the current hour (e.g., for 3:47 PM, this will be 15)
+    final currentHour = now.hour;
 
     return SizedBox(
       height: 180,
@@ -259,11 +284,12 @@ class _HorizontalFlowTimelineState extends State<HorizontalFlowTimeline> {
           final category = _getFlowCategory(flow);
           final color = _getCategoryColor(flow);
 
-          // Format time
+          // Format time - show "Now" if the forecast hour matches the current hour
+          final forecastHour = forecast.validDateTimeLocal.hour;
           final timeFormat =
-              index == 0
+              forecastHour == currentHour
                   ? 'Now'
-                  : DateFormat('h a').format(forecast.validDateTime);
+                  : DateFormat('h a').format(forecast.validDateTimeLocal);
 
           // Get trend data
           final trendIcon = _getTrendIcon(index);
@@ -400,7 +426,9 @@ class _HorizontalFlowTimelineState extends State<HorizontalFlowTimeline> {
     for (int i = 0; i < _sortedForecasts.length; i++) {
       final forecast = _sortedForecasts[i];
       final timeStr =
-          i == 0 ? 'Now' : DateFormat('h a').format(forecast.validDateTime);
+          i == 0
+              ? 'Now'
+              : DateFormat('h a').format(forecast.validDateTimeLocal);
 
       markers.add(
         Positioned(
@@ -460,8 +488,8 @@ class _HorizontalFlowTimelineState extends State<HorizontalFlowTimeline> {
                 BoxShadow(
                   color:
                       isDark
-                          ? Colors.black.withOpacity(0.3)
-                          : Colors.black.withOpacity(0.1),
+                          ? Colors.black.withValues(alpha: 0.3)
+                          : Colors.black.withValues(alpha: 0.1),
                   blurRadius: 2,
                   offset: const Offset(0, 1),
                 ),

@@ -31,19 +31,19 @@ class ShortRangeHydrographState
     super.initState();
     // Sort forecasts by time
     final sortedForecasts = List<Forecast>.from(widget.forecasts)
-      ..sort((a, b) => a.validDateTime.compareTo(b.validDateTime));
+      ..sort((a, b) => a.validDateTimeLocal.compareTo(b.validDateTimeLocal));
 
     // Use the first valid time as the base time for x-axis normalization
     _baseTime =
         sortedForecasts.isNotEmpty
-            ? sortedForecasts.first.validDateTime
+            ? sortedForecasts.first.validDateTimeLocal
             : DateTime.now();
 
     // Pre-calculate normalized times for better performance
     for (var forecast in sortedForecasts) {
       final hours =
-          forecast.validDateTime.difference(_baseTime).inHours.toDouble();
-      _normalizedTimeMap[forecast.validDateTime] = hours;
+          forecast.validDateTimeLocal.difference(_baseTime).inHours.toDouble();
+      _normalizedTimeMap[forecast.validDateTimeLocal] = hours;
     }
   }
 
@@ -53,7 +53,7 @@ class ShortRangeHydrographState
 
     for (var forecast in widget.forecasts) {
       // Get normalized hours from base time
-      final xValue = _normalizedTimeMap[forecast.validDateTime] ?? 0.0;
+      final xValue = _normalizedTimeMap[forecast.validDateTimeLocal] ?? 0.0;
       spots.add(FlSpot(xValue, forecast.flow));
     }
 
@@ -70,7 +70,8 @@ class ShortRangeHydrographState
     double minDifference = double.infinity;
 
     for (var forecast in widget.forecasts) {
-      final normalizedTime = _normalizedTimeMap[forecast.validDateTime] ?? 0.0;
+      final normalizedTime =
+          _normalizedTimeMap[forecast.validDateTimeLocal] ?? 0.0;
       final difference = (normalizedTime - x).abs();
 
       if (difference < minDifference) {
@@ -121,7 +122,7 @@ class ShortRangeHydrographState
 
     // Get maximum normalized time
     double maxX = widget.forecasts
-        .map((f) => _normalizedTimeMap[f.validDateTime] ?? 0.0)
+        .map((f) => _normalizedTimeMap[f.validDateTimeLocal] ?? 0.0)
         .reduce((a, b) => a > b ? a : b);
 
     return maxX;
@@ -131,7 +132,7 @@ class ShortRangeHydrographState
   String getTooltipDateText(LineBarSpot spot) {
     final forecast = _getForecastAtX(spot.x);
     if (forecast != null) {
-      return DateFormat('MMM d, h:mm a').format(forecast.validDateTime);
+      return DateFormat('MMM d, h:mm a').format(forecast.validDateTimeLocal);
     }
 
     // Fallback if forecast not found
@@ -206,7 +207,7 @@ class ShortRangeHydrographState
             // Add relative time (e.g. "2 hours from now")
             if (forecast != null) {
               final now = DateTime.now();
-              final difference = forecast.validDateTime.difference(now);
+              final difference = forecast.validDateTimeLocal.difference(now);
 
               if (difference.inHours > 0) {
                 final hours = difference.inHours;

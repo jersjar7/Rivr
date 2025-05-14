@@ -516,4 +516,20 @@ class ForecastProvider extends ChangeNotifier {
     }
     return 'An unexpected error occurred';
   }
+
+  List<Forecast> getFilteredForecastsForDisplay(List<Forecast> forecasts) {
+    final now = DateTime.now();
+
+    // Filter forecasts to only include those in the future (based on local time)
+    return forecasts.where((forecast) {
+      final localTime = forecast.validDateTime.toLocal();
+      return localTime.isAfter(now);
+    }).toList();
+
+    // If there are no future forecasts, you might want to keep at least one:
+    // if (filtered.isEmpty && forecasts.isNotEmpty) {
+    //   return [forecasts.last];
+    // }
+    // return filtered;
+  }
 }

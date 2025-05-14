@@ -19,6 +19,10 @@ class Forecast {
     this.member,
   }) : retrievedAt = retrievedAt ?? DateTime.now();
 
+  // Add this helper method
+  DateTime get validDateTimeLocal => validDateTime.toLocal();
+
+  // Keep the existing method that returns UTC time
   DateTime get validDateTime => DateTime.parse(validTime);
 
   bool get isToday {

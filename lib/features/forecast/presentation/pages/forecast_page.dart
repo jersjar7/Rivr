@@ -236,7 +236,7 @@ class _ForecastPageState extends State<ForecastPage>
             onTap: () {},
           ),
 
-          const SizedBox(height: 24),
+          const SizedBox(height: 12),
 
           // New Horizontal Flow Timeline Widget
           Card(
@@ -255,39 +255,47 @@ class _ForecastPageState extends State<ForecastPage>
             ),
           ),
 
-          const SizedBox(height: 24),
-          Text(
-            'Hourly Forecast (Next 18 Hours)',
-            style: theme.textTheme.titleMedium,
-          ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 12),
+          // Text(
+          //   'Hourly Forecast (Next 18 Hours)',
+          //   style: theme.textTheme.titleMedium,
+          // ),
+          // const SizedBox(height: 16),
 
           // Hourly Hydrograph
-          Card(
-            elevation: 2,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.all(8.0),
-              child: SizedBox(
-                height: 300,
-                child:
-                    forecasts.isEmpty
-                        ? Center(
-                          child: Text(
-                            'No hourly forecast data available',
-                            style: theme.textTheme.bodyMedium,
-                          ),
-                        )
-                        : HydrographFactory.createHydrograph(
-                          reachId: widget.reachId,
-                          forecastType: ForecastType.shortRange,
-                          forecasts: forecasts,
-                          returnPeriod: returnPeriod,
-                        ),
-              ),
-            ),
+          // Card(
+          //   elevation: 2,
+          //   shape: RoundedRectangleBorder(
+          //     borderRadius: BorderRadius.circular(12),
+          //   ),
+          //   child: Padding(
+          //     padding: const EdgeInsets.all(8.0),
+          //     child: SizedBox(
+          //       height: 300,
+          //       child:
+          //           forecasts.isEmpty
+          //               ? Center(
+          //                 child: Text(
+          //                   'No hourly forecast data available',
+          //                   style: theme.textTheme.bodyMedium,
+          //                 ),
+          //               )
+          //               : HydrographFactory.createHydrograph(
+          //                 reachId: widget.reachId,
+          //                 forecastType: ForecastType.shortRange,
+          //                 forecasts: forecasts,
+          //                 returnPeriod: returnPeriod,
+          //               ),
+          //     ),
+          //   ),
+          // ),
+
+          // Use expandable hydrograph instead of fixed height chart
+          HydrographFactory.createExpandableHydrograph(
+            reachId: widget.reachId,
+            forecastType: ForecastType.shortRange,
+            forecasts: forecasts,
+            returnPeriod: returnPeriod,
           ),
 
           const SizedBox(height: 24),

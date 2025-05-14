@@ -73,11 +73,6 @@ class _FlowStatusCardState extends State<FlowStatusCard> {
       }
     }
 
-    // Format timestamp
-    final String formattedTime = DateFormat(
-      'MMM d, h:mm a',
-    ).format(widget.currentFlow!.validDateTime);
-
     // Card colors - adapt to theme
     final Color cardColor =
         isDark ? colorScheme.secondary : colorScheme.secondary;
@@ -201,7 +196,7 @@ class _FlowStatusCardState extends State<FlowStatusCard> {
                     ),
                   ),
 
-                const SizedBox(height: 16),
+                const SizedBox(height: 8),
 
                 // Historical comparison
                 if (widget.historicalAverage != null)
@@ -224,7 +219,7 @@ class _FlowStatusCardState extends State<FlowStatusCard> {
 
                 // Additional information in expanded mode
                 if (widget.expanded) ...[
-                  const SizedBox(height: 8),
+                  // const SizedBox(height: 8),
                   Divider(color: textColor.withValues(alpha: 0.2)),
                   const SizedBox(height: 8),
                   Text(

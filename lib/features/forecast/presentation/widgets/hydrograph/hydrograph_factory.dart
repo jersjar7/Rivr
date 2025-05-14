@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:rivr/features/forecast/domain/entities/forecast.dart';
 import 'package:rivr/features/forecast/domain/entities/forecast_types.dart';
 import 'package:rivr/features/forecast/domain/entities/return_period.dart';
+import 'package:rivr/features/forecast/presentation/widgets/expandable_hydrograph.dart';
 import 'package:rivr/features/forecast/presentation/widgets/long_range_hydrograph.dart';
 import 'package:rivr/features/forecast/presentation/widgets/medium_range_hydrograph.dart';
 import 'package:rivr/features/forecast/presentation/widgets/short_range_hydrograph.dart';
@@ -46,6 +47,27 @@ class HydrographFactory {
     }
   }
 
+  /// Creates an expandable hydrograph widget that shows a preview and expands to full view
+  static Widget createExpandableHydrograph({
+    required String reachId,
+    required ForecastType forecastType,
+    required List<Forecast> forecasts,
+    ReturnPeriod? returnPeriod,
+    Map<DateTime, Map<String, double>>? dailyStats,
+    Map<String, Map<String, double>>? longRangeFlows,
+    double previewHeight = 180,
+  }) {
+    return ExpandableHydrograph(
+      reachId: reachId,
+      forecastType: forecastType,
+      forecasts: forecasts,
+      returnPeriod: returnPeriod,
+      dailyStats: dailyStats,
+      longRangeFlows: longRangeFlows,
+      previewHeight: previewHeight,
+    );
+  }
+
   /// Creates a hydrograph widget from a forecast collection
   static Widget createFromForecastCollection({
     required String reachId,
@@ -53,15 +75,27 @@ class HydrographFactory {
     ReturnPeriod? returnPeriod,
     Map<DateTime, Map<String, double>>? dailyStats,
     Map<String, Map<String, double>>? longRangeFlows,
+    bool expandable = false,
   }) {
-    return createHydrograph(
-      reachId: reachId,
-      forecastType: collection.forecastType,
-      forecasts: collection.forecasts,
-      returnPeriod: returnPeriod,
-      dailyStats: dailyStats,
-      longRangeFlows: longRangeFlows,
-    );
+    if (expandable) {
+      return createExpandableHydrograph(
+        reachId: reachId,
+        forecastType: collection.forecastType,
+        forecasts: collection.forecasts,
+        returnPeriod: returnPeriod,
+        dailyStats: dailyStats,
+        longRangeFlows: longRangeFlows,
+      );
+    } else {
+      return createHydrograph(
+        reachId: reachId,
+        forecastType: collection.forecastType,
+        forecasts: collection.forecasts,
+        returnPeriod: returnPeriod,
+        dailyStats: dailyStats,
+        longRangeFlows: longRangeFlows,
+      );
+    }
   }
 
   /// Shows a hydrograph in a modal dialog
@@ -91,49 +125,13 @@ class HydrographFactory {
   }
 
   /// Creates a small preview hydrograph for embedding in cards or thumbnails
-  static Widget createPreviewHydrograph({
+  static Widget createPreviewChart({
     required BuildContext context,
-    required String reachId,
-    required ForecastType forecastType,
     required List<Forecast> forecasts,
+    required ForecastType forecastType,
     double height = 120,
     double width = 200,
   }) {
-    // This is an example of how you might create a miniature preview version
-    // of the hydrographs for embedding in other UI elements
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-
-    // Use a simpler chart for the preview
-    return Container(
-      height: height,
-      width: width,
-      decoration: BoxDecoration(
-        color: theme.cardColor,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: colorScheme.outline.withValues(alpha: 0.5)),
-      ),
-      padding: const EdgeInsets.all(8),
-      child: Center(
-        child:
-            forecasts.isEmpty
-                ? Text(
-                  'No data available',
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: colorScheme.onSurfaceVariant,
-                  ),
-                )
-                : _buildPreviewChart(context, forecasts, forecastType),
-      ),
-    );
-  }
-
-  // Helper method to build a simplified preview chart
-  static Widget _buildPreviewChart(
-    BuildContext context,
-    List<Forecast> forecasts,
-    ForecastType forecastType,
-  ) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
@@ -142,7 +140,18 @@ class HydrographFactory {
       ..sort((a, b) => a.validDateTime.compareTo(b.validDateTime));
 
     if (sortedForecasts.isEmpty) {
-      return const SizedBox();
+      return SizedBox(
+        height: height,
+        width: width,
+        child: Center(
+          child: Text(
+            'No data available',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ),
+      );
     }
 
     // Use first time as reference point
@@ -174,35 +183,45 @@ class HydrographFactory {
         .map((f) => f.flow)
         .reduce((a, b) => a > b ? a : b);
 
-    return LineChart(
-      LineChartData(
-        gridData: FlGridData(show: false),
-        titlesData: FlTitlesData(show: false),
-        borderData: FlBorderData(show: false),
-        lineTouchData: LineTouchData(enabled: false),
-        lineBarsData: [
-          LineChartBarData(
-            spots: spots,
-            isCurved: true,
-            barWidth: 2,
-            isStrokeCapRound: true,
-            gradient: LinearGradient(
-              colors: [colorScheme.primary, colorScheme.secondary],
-            ),
-            belowBarData: BarAreaData(
-              show: true,
+    return Container(
+      height: height,
+      width: width,
+      decoration: BoxDecoration(
+        color: theme.cardColor,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: colorScheme.outline.withValues(alpha: 0.5)),
+      ),
+      padding: const EdgeInsets.all(8),
+      child: LineChart(
+        LineChartData(
+          gridData: FlGridData(show: false),
+          titlesData: FlTitlesData(show: false),
+          borderData: FlBorderData(show: false),
+          lineTouchData: LineTouchData(enabled: false),
+          lineBarsData: [
+            LineChartBarData(
+              spots: spots,
+              isCurved: true,
+              barWidth: 2,
+              isStrokeCapRound: true,
               gradient: LinearGradient(
-                colors: [
-                  colorScheme.primary.withValues(alpha: 0.3),
-                  colorScheme.secondary.withValues(alpha: 0.3),
-                ],
+                colors: [colorScheme.primary, colorScheme.secondary],
               ),
+              belowBarData: BarAreaData(
+                show: true,
+                gradient: LinearGradient(
+                  colors: [
+                    colorScheme.primary.withValues(alpha: 0.3),
+                    colorScheme.secondary.withValues(alpha: 0.1),
+                  ],
+                ),
+              ),
+              dotData: FlDotData(show: false),
             ),
-            dotData: FlDotData(show: false),
-          ),
-        ],
-        minY: minFlow * 0.9,
-        maxY: maxFlow * 1.1,
+          ],
+          minY: minFlow * 0.9,
+          maxY: maxFlow * 1.1,
+        ),
       ),
     );
   }

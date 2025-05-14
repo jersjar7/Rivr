@@ -5,6 +5,7 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:rivr/features/forecast/domain/entities/forecast.dart';
 import 'package:rivr/features/forecast/domain/entities/forecast_types.dart';
 import 'package:rivr/features/forecast/domain/entities/return_period.dart';
+import 'package:rivr/features/forecast/presentation/widgets/hydrograph/custom_zoomable_chart.dart';
 import 'package:rivr/features/forecast/presentation/widgets/hydrograph/hydrograph_factory.dart';
 
 /// An expandable hydrograph that shows a compact preview and expands to a full interactive chart
@@ -409,13 +410,17 @@ class _ExpandableHydrographState extends State<ExpandableHydrograph>
   }
 
   // Build the full hydrograph for the expanded view
+  // Updated _buildFullHydrograph method in expandable_hydrograph.dart to use the zoomable chart
+
   Widget _buildFullHydrograph() {
-    // We no longer wrap this in a Scaffold, since we're using a custom header
+    // Use our custom zoomable chart instead of the standard hydrograph
     return Container(
       color: Theme.of(context).scaffoldBackgroundColor,
       child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: HydrographFactory.createHydrograph(
+        padding: const EdgeInsets.all(
+          8.0,
+        ), // Slightly less padding to give more space to the chart
+        child: CustomZoomableChart(
           reachId: widget.reachId,
           forecastType: widget.forecastType,
           forecasts: widget.forecasts,

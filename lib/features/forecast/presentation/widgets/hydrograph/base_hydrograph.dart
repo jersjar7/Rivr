@@ -35,6 +35,23 @@ abstract class BaseHydrographState<T extends BaseHydrograph> extends State<T> {
     left: 10,
   );
 
+  // Variables for zoom/pan capabilities
+  double _currentZoomLevel = 1.0;
+  final double _minZoomLevel = 0.5; // Allow zooming out to see more data
+  final double _maxZoomLevel = 5.0; // Allow zooming in up to 5x
+  late double _zoomStartLevel;
+  double _xOffset = 0.0; // Horizontal pan offset
+  double _baseMinX = 0.0; // Original min X value
+  double _baseMaxX = 0.0; // Original max X value
+  double _baseMinY = 0.0; // Original min Y value
+  double _baseMaxY = 0.0; // Original max Y value
+  bool _initialBoundsSet = false; // Track if we've initialized bounds
+
+  // Transformations based on zoom/pan
+  double get _transformedMinX => _baseMinX + _xOffset;
+  double get _transformedMaxX =>
+      _baseMinX + (_baseMaxX - _baseMinX) / _currentZoomLevel + _xOffset;
+
   // Gradient colors defined based on current theme
   List<Color> get gradientColors {
     final theme = Theme.of(context);
@@ -58,6 +75,32 @@ abstract class BaseHydrographState<T extends BaseHydrograph> extends State<T> {
   double getMaxY();
   double getMinX();
   double getMaxX();
+
+  // Initialize zoom-related values
+  void _initializeZoomBounds() {
+    if (!_initialBoundsSet) {
+      _baseMinX = getMinX();
+      _baseMaxX = getMaxX();
+      _baseMinY = getMinY();
+      _baseMaxY = getMaxY();
+      _initialBoundsSet = true;
+    }
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    // initialize it to the default zoom
+    _zoomStartLevel = _currentZoomLevel;
+  }
+
+  // Reset zoom to original values
+  void _resetZoom() {
+    setState(() {
+      _currentZoomLevel = 1.0;
+      _xOffset = 0.0;
+    });
+  }
 
   // Return period horizontal lines
   List<HorizontalLine> getReturnPeriodLines() {
@@ -155,6 +198,9 @@ abstract class BaseHydrographState<T extends BaseHydrograph> extends State<T> {
       return buildNoDataView();
     }
 
+    // Initialize zoom bounds on first build
+    _initializeZoomBounds();
+
     // Calculate y-axis bounds
     final minY = getMinY();
     final maxY = getMaxY();
@@ -162,74 +208,166 @@ abstract class BaseHydrographState<T extends BaseHydrograph> extends State<T> {
     // Get return period lines
     final horizontalLines = getReturnPeriodLines();
 
+    // Create the chart with gesture detection for zoom/pan
+    final chart = GestureDetector(
+      onScaleStart: (details) {
+        // Store the initial zoom level when gesture starts
+        // store the current zoom so we can multiply by the gesture scale
+        _zoomStartLevel = _currentZoomLevel;
+      },
+      onScaleUpdate: (details) {
+        setState(() {
+          // Update zoom level based on scale gesture
+          _currentZoomLevel = (_zoomStartLevel * details.scale).clamp(
+            _minZoomLevel,
+            _maxZoomLevel,
+          );
+
+          // Handle horizontal panning
+          if (details.pointerCount == 1) {
+            // Only apply horizontal pan for single finger gestures
+            _xOffset -= details.focalPointDelta.dx * 0.01 / _currentZoomLevel;
+
+            // Constrain panning to valid range
+            final visibleRange = (_baseMaxX - _baseMinX) / _currentZoomLevel;
+            final maxOffset = _baseMaxX - visibleRange - _baseMinX;
+            _xOffset = _xOffset.clamp(-maxOffset, 0);
+          }
+        });
+      },
+      onDoubleTap: _resetZoom, // Reset zoom on double tap
+      child: LineChart(
+        LineChartData(
+          lineBarsData: [
+            LineChartBarData(
+              spots: spots,
+              isCurved: true,
+              barWidth: 3,
+              isStrokeCapRound: true,
+              gradient: LinearGradient(colors: gradientColors),
+              dotData: const FlDotData(show: false),
+              belowBarData: BarAreaData(
+                show: true,
+                gradient: LinearGradient(
+                  colors:
+                      gradientColors
+                          .map((color) => color.withOpacity(0.3))
+                          .toList(),
+                ),
+              ),
+            ),
+          ],
+          extraLinesData: ExtraLinesData(horizontalLines: horizontalLines),
+          gridData: FlGridData(
+            show: true,
+            drawHorizontalLine: true,
+            drawVerticalLine: true,
+            getDrawingHorizontalLine: (value) {
+              return FlLine(
+                color:
+                    isDark
+                        ? colorScheme.primary.withOpacity(0.15)
+                        : colorScheme.primary.withOpacity(0.2),
+                strokeWidth: 1,
+              );
+            },
+            getDrawingVerticalLine: (value) {
+              return FlLine(
+                color:
+                    isDark
+                        ? colorScheme.primary.withOpacity(0.25)
+                        : colorScheme.primary.withOpacity(0.4),
+                strokeWidth: 1,
+              );
+            },
+          ),
+          titlesData: buildTitlesData(isDark),
+          borderData: FlBorderData(
+            show: true,
+            border: Border.all(color: colorScheme.outline),
+          ),
+          lineTouchData: buildTouchData(isDark),
+          // Apply transformed X bounds based on zoom and pan
+          minX: _transformedMinX,
+          maxX: _transformedMaxX,
+          minY: minY,
+          maxY: maxY,
+        ),
+      ),
+    );
+
+    // Build the complete UI with scaffold and zoom indicator
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.title),
         backgroundColor: chartBackgroundColor,
         elevation: 0,
+        actions: [
+          // Add a reset zoom button
+          IconButton(
+            icon: const Icon(Icons.zoom_out_map),
+            onPressed: _resetZoom,
+            tooltip: 'Reset zoom',
+          ),
+        ],
       ),
-      body: Container(
-        color: chartBackgroundColor,
-        child: Padding(
-          padding: chartPadding,
-          child: LineChart(
-            LineChartData(
-              lineBarsData: [
-                LineChartBarData(
-                  spots: spots,
-                  isCurved: true,
-                  barWidth: 3,
-                  isStrokeCapRound: true,
-                  gradient: LinearGradient(colors: gradientColors),
-                  dotData: const FlDotData(show: false),
-                  belowBarData: BarAreaData(
-                    show: true,
-                    gradient: LinearGradient(
-                      colors:
-                          gradientColors
-                              .map((color) => color.withValues(alpha: 0.3))
-                              .toList(),
-                    ),
+      body: Stack(
+        children: [
+          // Chart background
+          Container(
+            color: chartBackgroundColor,
+            child: Padding(padding: chartPadding, child: chart),
+          ),
+
+          // Zoom indicator
+          if (_currentZoomLevel > 1.05)
+            Positioned(
+              top: 8,
+              right: 8,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: colorScheme.primaryContainer.withOpacity(0.8),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  '${_currentZoomLevel.toStringAsFixed(1)}x',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: colorScheme.onPrimaryContainer,
                   ),
                 ),
-              ],
-              extraLinesData: ExtraLinesData(horizontalLines: horizontalLines),
-              gridData: FlGridData(
-                show: true,
-                drawHorizontalLine: true,
-                drawVerticalLine: true,
-                getDrawingHorizontalLine: (value) {
-                  return FlLine(
-                    color:
-                        isDark
-                            ? colorScheme.primary.withValues(alpha: 0.15)
-                            : colorScheme.primary.withValues(alpha: 0.2),
-                    strokeWidth: 1,
-                  );
-                },
-                getDrawingVerticalLine: (value) {
-                  return FlLine(
-                    color:
-                        isDark
-                            ? colorScheme.primary.withValues(alpha: 0.25)
-                            : colorScheme.primary.withValues(alpha: 0.4),
-                    strokeWidth: 1,
-                  );
-                },
               ),
-              titlesData: buildTitlesData(isDark),
-              borderData: FlBorderData(
-                show: true,
-                border: Border.all(color: colorScheme.outline),
+            ),
+
+          // Zoom instructions hint - show briefly or on first view
+          Positioned(
+            bottom: 12,
+            left: 0,
+            right: 0,
+            child: Center(
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 6,
+                ),
+                decoration: BoxDecoration(
+                  color: colorScheme.tertiary.withOpacity(0.7),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Text(
+                  'Pinch to zoom • Double tap to reset',
+                  style: TextStyle(
+                    color: colorScheme.onTertiary,
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
               ),
-              lineTouchData: buildTouchData(isDark),
-              minX: getMinX(),
-              maxX: getMaxX(),
-              minY: minY,
-              maxY: maxY,
             ),
           ),
-        ),
+        ],
       ),
     );
   }
@@ -245,18 +383,18 @@ abstract class BaseHydrographState<T extends BaseHydrograph> extends State<T> {
         getTooltipColor:
             (spot) =>
                 isDark
-                    ? colorScheme.surfaceContainerHighest.withValues(alpha: 0.8)
-                    : Colors.blueGrey.withValues(alpha: 0.8),
+                    ? colorScheme.surfaceContainerHighest.withOpacity(0.8)
+                    : Colors.blueGrey.withOpacity(0.8),
         tooltipRoundedRadius: 8,
         getTooltipItems: (List<LineBarSpot> lineBarsSpot) {
           return lineBarsSpot.map((spot) {
             return LineTooltipItem(
               '${flowFormatter.format(spot.y)} ft³/s',
-              TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+              const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
               children: [
                 TextSpan(
                   text: '\n${getTooltipDateText(spot)}',
-                  style: TextStyle(
+                  style: const TextStyle(
                     color: Colors.white70,
                     fontWeight: FontWeight.normal,
                     fontSize: 12,

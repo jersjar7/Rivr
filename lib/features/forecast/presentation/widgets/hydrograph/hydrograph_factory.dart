@@ -5,11 +5,11 @@ import 'package:flutter/material.dart';
 import 'package:rivr/features/forecast/domain/entities/forecast.dart';
 import 'package:rivr/features/forecast/domain/entities/forecast_types.dart';
 import 'package:rivr/features/forecast/domain/entities/return_period.dart';
-import 'package:rivr/features/forecast/presentation/widgets/chart_only/hydrograph_chart.dart';
+import 'package:rivr/features/forecast/presentation/widgets/hydrograph/chart_only/hydrograph_chart.dart';
 import 'package:rivr/features/forecast/presentation/widgets/expandable_hydrograph.dart';
-import 'package:rivr/features/forecast/presentation/widgets/long_range_hydrograph.dart';
-import 'package:rivr/features/forecast/presentation/widgets/medium_range_hydrograph.dart';
-import 'package:rivr/features/forecast/presentation/widgets/short_range_hydrograph.dart';
+import 'package:rivr/features/forecast/presentation/widgets/hydrograph/hydrograph_ranges/long_range_hydrograph.dart';
+import 'package:rivr/features/forecast/presentation/widgets/hydrograph/hydrograph_ranges/medium_range_hydrograph.dart';
+import 'package:rivr/features/forecast/presentation/widgets/hydrograph/hydrograph_ranges/short_range_hydrograph.dart';
 
 /// Factory class to create appropriate hydrograph widgets based on forecast type
 class HydrographFactory {

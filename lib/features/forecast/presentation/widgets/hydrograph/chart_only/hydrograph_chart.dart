@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 import 'package:rivr/features/forecast/domain/entities/forecast.dart';
 import 'package:rivr/features/forecast/domain/entities/forecast_types.dart';
 import 'package:rivr/features/forecast/domain/entities/return_period.dart';
+import 'package:rivr/features/forecast/utils/format_large_number.dart';
 
 class HydrographChart extends StatefulWidget {
   final ForecastType forecastType;
@@ -385,11 +386,8 @@ class _HydrographChartState extends State<HydrographChart> {
 
   // Build chart titles
   FlTitlesData _buildTitlesData(bool isDark) {
-    // Implementation depends on forecast type
-    // This would have custom implementations for each forecast type
-    // ...
+    final textColor = isDark ? Colors.white : Colors.black87;
 
-    // Simplified implementation for demonstration
     return FlTitlesData(
       topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
       rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
@@ -418,11 +416,17 @@ class _HydrographChartState extends State<HydrographChart> {
           showTitles: true,
           reservedSize: 50,
           getTitlesWidget: (value, meta) {
-            return Text(
-              value.toStringAsFixed(0),
-              style: TextStyle(
-                fontSize: 12,
-                color: isDark ? Colors.white : Colors.black87,
+            if (value == _maxY || value < 0) {
+              return Container();
+            }
+            return Padding(
+              padding: const EdgeInsets.only(right: 5),
+              child: Text(
+                formatLargeNumber(value),
+                style: TextStyle(fontSize: 12, color: textColor),
+                textAlign: TextAlign.right,
+                softWrap: false,
+                overflow: TextOverflow.ellipsis,
               ),
             );
           },

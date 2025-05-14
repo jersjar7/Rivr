@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 import 'package:rivr/features/forecast/domain/entities/forecast.dart';
 import 'package:rivr/features/forecast/domain/entities/forecast_types.dart';
 import 'package:rivr/features/forecast/domain/entities/return_period.dart';
+import 'package:rivr/features/forecast/utils/format_large_number.dart';
 
 /// A custom zoomable chart component specifically for the expandable overlay view
 class CustomZoomableChart extends StatefulWidget {
@@ -377,11 +378,60 @@ class _CustomZoomableChartState extends State<CustomZoomableChart> {
             return Padding(
               padding: const EdgeInsets.only(right: 5),
               child: Text(
-                value.toStringAsFixed(0),
+                formatLargeNumber(value),
                 style: TextStyle(fontSize: 12, color: textColor),
                 textAlign: TextAlign.right,
+                softWrap: false,
+                overflow: TextOverflow.ellipsis,
               ),
             );
+          },
+        ),
+      ),
+      bottomTitles: AxisTitles(
+        sideTitles: SideTitles(
+          showTitles: true,
+          reservedSize: 40,
+          getTitlesWidget: (value, meta) {
+            // Custom implementation based on forecast type
+            if (widget.forecastType == ForecastType.shortRange) {
+              if (value % 6 != 0) return const SizedBox.shrink();
+
+              // Convert to time
+              final sortedForecasts = List<Forecast>.from(widget.forecasts)
+                ..sort((a, b) => a.validDateTime.compareTo(b.validDateTime));
+              final baseTime = sortedForecasts.first.validDateTime;
+              final datetime = baseTime.add(Duration(hours: value.toInt()));
+
+              String timeText;
+              if (value == 0) {
+                timeText = 'Now';
+              } else if (datetime.hour == 0) {
+                // At midnight, show the date
+                timeText = DateFormat('MMM d').format(datetime);
+              } else {
+                // Otherwise show the hour
+                timeText = DateFormat('ha').format(datetime).toLowerCase();
+              }
+
+              return Padding(
+                padding: const EdgeInsets.only(top: 8.0),
+                child: Text(
+                  timeText,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: textColor,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              );
+            } else if (widget.forecastType == ForecastType.mediumRange) {
+              // Similar implementation for medium range...
+              return const SizedBox.shrink();
+            } else {
+              // Long range implementation
+              return const SizedBox.shrink();
+            }
           },
         ),
       ),

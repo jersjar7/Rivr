@@ -1,7 +1,10 @@
+// lib/features/forecast/presentation/widgets/hydrograph/base_hydrograph.dart
+
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:rivr/features/forecast/domain/entities/return_period.dart';
+import 'package:rivr/features/forecast/utils/format_large_number.dart';
 
 abstract class BaseHydrograph extends StatefulWidget {
   final String reachId;
@@ -447,9 +450,11 @@ abstract class BaseHydrographState<T extends BaseHydrograph> extends State<T> {
             return Padding(
               padding: const EdgeInsets.only(right: 5),
               child: Text(
-                value.toStringAsFixed(0),
+                formatLargeNumber(value),
                 style: TextStyle(fontSize: 12, color: textColor),
                 textAlign: TextAlign.right,
+                softWrap: false,
+                overflow: TextOverflow.ellipsis,
               ),
             );
           },

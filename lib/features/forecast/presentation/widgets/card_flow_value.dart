@@ -1,17 +1,7 @@
 // lib/features/forecast/presentation/widgets/card_flow_value.dart
 
 import 'package:flutter/material.dart';
-
-/// Helper function to format flow values compactly
-String formatFlowCompact(double flow) {
-  if (flow >= 1000000) {
-    return '${(flow / 1000000).toStringAsFixed(1)}M';
-  } else if (flow >= 10000) {
-    return '${(flow / 1000).toStringAsFixed(1)}K';
-  } else {
-    return flow.toInt().toString();
-  }
-}
+import 'package:rivr/features/forecast/utils/format_large_number.dart';
 
 /// Widget that displays flow value in a space-efficient manner
 class FlowValueDisplay extends StatelessWidget {
@@ -34,7 +24,7 @@ class FlowValueDisplay extends StatelessWidget {
     final textTheme = theme.textTheme;
 
     // Format the flow value compactly
-    final String formattedFlow = formatFlowCompact(flow);
+    final String formattedFlow = formatLargeNumber(flow);
 
     // Always maintain the circular container with dynamic colors
     return Container(

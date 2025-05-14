@@ -47,6 +47,9 @@ class _ExpandableHydrographState extends State<ExpandableHydrograph>
   // Store the tap position for expansion origin
   Offset? _tapPosition;
 
+  // Global overlay entry
+  OverlayEntry? _overlayEntry;
+
   @override
   void initState() {
     super.initState();
@@ -73,6 +76,7 @@ class _ExpandableHydrographState extends State<ExpandableHydrograph>
 
   @override
   void dispose() {
+    _removeOverlay();
     _animationController.dispose();
     super.dispose();
   }
@@ -80,20 +84,131 @@ class _ExpandableHydrographState extends State<ExpandableHydrograph>
   // Toggle between expanded and collapsed states
   void _toggleExpanded() {
     if (_isExpanded) {
-      // Collapse
+      // Collapse - start by reversing animation
       _animationController.reverse().then((_) {
+        _removeOverlay();
         setState(() {
           _isExpanded = false;
           _tapPosition = null;
         });
       });
     } else {
-      // Expand
+      // Expand - create and insert overlay
       setState(() {
         _isExpanded = true;
       });
+      _createAndInsertOverlay();
       _animationController.forward();
     }
+  }
+
+  // Create and insert the overlay entry
+  void _createAndInsertOverlay() {
+    final overlay = Overlay.of(context);
+
+    _overlayEntry = OverlayEntry(
+      builder: (context) {
+        // Get screen size for full-screen overlay
+        final screenSize = MediaQuery.of(context).size;
+
+        return AnimatedBuilder(
+          animation: _animationController,
+          builder: (context, child) {
+            return Stack(
+              children: [
+                // Semi-transparent background
+                Positioned.fill(
+                  child: GestureDetector(
+                    onTap: _toggleExpanded, // Close when tapping background
+                    child: Container(
+                      color: Colors.black.withValues(
+                        alpha: 0.5 * _opacityAnimation.value,
+                      ),
+                    ),
+                  ),
+                ),
+
+                // Centered expanded chart container
+                Positioned(
+                  left: screenSize.width * 0.05, // 5% margin
+                  top: screenSize.height * 0.1, // 10% from top
+                  width: screenSize.width * 0.9, // 90% of screen width
+                  height: screenSize.height * 0.8, // 80% of screen height
+                  child: ScaleTransition(
+                    scale: _scaleAnimation,
+                    child: FadeTransition(
+                      opacity: _opacityAnimation,
+                      child: Material(
+                        color: Theme.of(context).cardColor,
+                        elevation: 8,
+                        borderRadius: BorderRadius.circular(16),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(16),
+                          child: Column(
+                            children: [
+                              // Custom header instead of AppBar
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                  vertical: 12,
+                                ),
+                                decoration: BoxDecoration(
+                                  color:
+                                      Theme.of(
+                                        context,
+                                      ).colorScheme.surfaceContainerHighest,
+                                  border: Border(
+                                    bottom: BorderSide(
+                                      color: Theme.of(context).dividerColor,
+                                      width: 0.5,
+                                    ),
+                                  ),
+                                ),
+                                child: Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Text(
+                                      _getChartTitle(),
+                                      style: Theme.of(
+                                        context,
+                                      ).textTheme.titleMedium?.copyWith(
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                    IconButton(
+                                      icon: const Icon(Icons.close),
+                                      visualDensity: VisualDensity.compact,
+                                      padding: EdgeInsets.zero,
+                                      onPressed: _toggleExpanded,
+                                    ),
+                                  ],
+                                ),
+                              ),
+
+                              // Expanded hydrograph content
+                              Expanded(child: _buildFullHydrograph()),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    overlay.insert(_overlayEntry!);
+  }
+
+  // Remove the overlay
+  void _removeOverlay() {
+    _overlayEntry?.remove();
+    _overlayEntry = null;
   }
 
   // Track tap position for animation origin
@@ -105,25 +220,10 @@ class _ExpandableHydrographState extends State<ExpandableHydrograph>
 
   @override
   Widget build(BuildContext context) {
-    return Stack(
-      clipBehavior: Clip.none,
-      children: [
-        // Preview chart (always visible)
-        GestureDetector(
-          onTapDown: _handleTap,
-          onTap: _toggleExpanded,
-          child: _buildPreviewChart(context),
-        ),
-
-        // Expanded overlay (conditionally visible)
-        if (_isExpanded)
-          AnimatedBuilder(
-            animation: _animationController,
-            builder: (context, child) {
-              return _buildExpandedOverlay();
-            },
-          ),
-      ],
+    return GestureDetector(
+      onTapDown: _handleTap,
+      onTap: _toggleExpanded,
+      child: _buildPreviewChart(context),
     );
   }
 
@@ -139,7 +239,7 @@ class _ExpandableHydrographState extends State<ExpandableHydrograph>
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.1),
+            color: Colors.black.withValues(alpha: 0.1),
             blurRadius: 4,
             offset: const Offset(0, 2),
           ),
@@ -163,7 +263,7 @@ class _ExpandableHydrographState extends State<ExpandableHydrograph>
                 Icon(
                   Icons.open_in_full,
                   size: 18,
-                  color: colorScheme.primary.withOpacity(0.7),
+                  color: colorScheme.primary.withValues(alpha: 0.7),
                 ),
               ],
             ),
@@ -254,8 +354,8 @@ class _ExpandableHydrographState extends State<ExpandableHydrograph>
                     show: true,
                     gradient: LinearGradient(
                       colors: [
-                        colorScheme.primary.withOpacity(0.4),
-                        colorScheme.secondary.withOpacity(0.1),
+                        colorScheme.primary.withValues(alpha: 0.4),
+                        colorScheme.secondary.withValues(alpha: 0.1),
                       ],
                     ),
                   ),
@@ -275,7 +375,7 @@ class _ExpandableHydrographState extends State<ExpandableHydrograph>
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
             decoration: BoxDecoration(
-              color: colorScheme.primaryContainer.withOpacity(0.9),
+              color: colorScheme.primaryContainer.withValues(alpha: 0.9),
               borderRadius: const BorderRadius.only(
                 bottomLeft: Radius.circular(8),
                 topRight: Radius.circular(8),
@@ -295,7 +395,9 @@ class _ExpandableHydrographState extends State<ExpandableHydrograph>
                 Text(
                   'avg flow',
                   style: theme.textTheme.bodySmall?.copyWith(
-                    color: colorScheme.onPrimaryContainer.withOpacity(0.8),
+                    color: colorScheme.onPrimaryContainer.withValues(
+                      alpha: 0.8,
+                    ),
                   ),
                 ),
               ],
@@ -306,82 +408,20 @@ class _ExpandableHydrographState extends State<ExpandableHydrograph>
     );
   }
 
-  // Full expanded overlay
-  Widget _buildExpandedOverlay() {
-    final screenSize = MediaQuery.of(context).size;
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-
-    return AnimatedOpacity(
-      opacity: _opacityAnimation.value,
-      duration: const Duration(milliseconds: 200),
-      child: GestureDetector(
-        onTap: () {}, // Intercept taps to prevent closing when touching chart
-        child: Container(
-          width: screenSize.width,
-          height: screenSize.height,
-          color: Colors.black.withOpacity(0.5 * _opacityAnimation.value),
-          child: Center(
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 300),
-              curve: Curves.easeOutBack,
-              width: screenSize.width * 0.9,
-              height: screenSize.height * 0.7,
-              decoration: BoxDecoration(
-                color: theme.scaffoldBackgroundColor,
-                borderRadius: BorderRadius.circular(16),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.2),
-                    blurRadius: 20,
-                    spreadRadius: 5,
-                  ),
-                ],
-              ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(16),
-                child: Column(
-                  children: [
-                    // Header with close button
-                    Container(
-                      color: colorScheme.surface,
-                      padding: const EdgeInsets.fromLTRB(16, 12, 12, 12),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            _getChartTitle(),
-                            style: theme.textTheme.titleMedium?.copyWith(
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          IconButton(
-                            icon: const Icon(Icons.close),
-                            onPressed: _toggleExpanded,
-                            visualDensity: VisualDensity.compact,
-                            padding: EdgeInsets.zero,
-                            constraints: const BoxConstraints(),
-                          ),
-                        ],
-                      ),
-                    ),
-
-                    // Full interactive chart
-                    Expanded(
-                      child: HydrographFactory.createHydrograph(
-                        reachId: widget.reachId,
-                        forecastType: widget.forecastType,
-                        forecasts: widget.forecasts,
-                        returnPeriod: widget.returnPeriod,
-                        dailyStats: widget.dailyStats,
-                        longRangeFlows: widget.longRangeFlows,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
+  // Build the full hydrograph for the expanded view
+  Widget _buildFullHydrograph() {
+    // We no longer wrap this in a Scaffold, since we're using a custom header
+    return Container(
+      color: Theme.of(context).scaffoldBackgroundColor,
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: HydrographFactory.createHydrograph(
+          reachId: widget.reachId,
+          forecastType: widget.forecastType,
+          forecasts: widget.forecasts,
+          returnPeriod: widget.returnPeriod,
+          dailyStats: widget.dailyStats,
+          longRangeFlows: widget.longRangeFlows,
         ),
       ),
     );

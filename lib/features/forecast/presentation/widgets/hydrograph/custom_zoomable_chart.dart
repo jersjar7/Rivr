@@ -2,13 +2,11 @@
 
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:rivr/features/forecast/domain/entities/forecast.dart';
 import 'package:rivr/features/forecast/domain/entities/forecast_types.dart';
 import 'package:rivr/features/forecast/domain/entities/return_period.dart';
-import 'package:rivr/features/forecast/presentation/widgets/short_range_hydrograph.dart';
-import 'package:rivr/features/forecast/presentation/widgets/medium_range_hydrograph.dart';
-import 'package:rivr/features/forecast/presentation/widgets/long_range_hydrograph.dart';
-import 'package:rivr/features/forecast/presentation/widgets/hydrograph/base_hydrograph.dart';
+import 'package:rivr/features/forecast/utils/flow_thresholds.dart';
 
 /// A custom zoomable chart component specifically for the expandable overlay view
 class CustomZoomableChart extends StatefulWidget {
@@ -41,16 +39,18 @@ class _CustomZoomableChartState extends State<CustomZoomableChart> {
   final double _maxZoomLevel = 5.0; // Allow zooming in up to 5x
   double _xOffset = 0.0; // Horizontal pan offset
 
-  // Chart bounds (will be initialized when we create the state objects)
+  // Chart bounds
   double _baseMinX = 0.0;
   double _baseMaxX = 100.0;
   double _baseMinY = 0.0;
   double _baseMaxY = 100.0;
 
-  // Hydrograph state (will be initialized in initState)
-  late BaseHydrographState _hydrographState;
+  // Data for chart
   late List<FlSpot> _spots;
   late Color _backgroundColor;
+  late final DateFormat dateFormatter = DateFormat('MMM d');
+  late final DateFormat timeFormatter = DateFormat('h:mm a');
+  late final NumberFormat flowFormatter = NumberFormat('#,##0.0');
 
   // Transformations based on zoom/pan
   double get _transformedMinX => _baseMinX + _xOffset;
@@ -60,57 +60,20 @@ class _CustomZoomableChartState extends State<CustomZoomableChart> {
   @override
   void initState() {
     super.initState();
-    _initializeHydrographState();
+    _initializeChartData();
   }
 
-  void _initializeHydrographState() {
-    // Create the appropriate hydrograph state based on forecast type
-    switch (widget.forecastType) {
-      case ForecastType.shortRange:
-        final hydrographWidget = ShortRangeHydrograph(
-          reachId: widget.reachId,
-          forecasts: widget.forecasts,
-          returnPeriod: widget.returnPeriod,
-        );
-        _hydrographState = ShortRangeHydrographState();
-        (_hydrographState as dynamic).widget = hydrographWidget;
-        break;
+  void _initializeChartData() {
+    // Generate spots based on forecast type
+    _spots = _generateSpots();
 
-      case ForecastType.mediumRange:
-        final hydrographWidget = MediumRangeHydrograph(
-          reachId: widget.reachId,
-          forecasts: widget.forecasts,
-          dailyStats: widget.dailyStats,
-          returnPeriod: widget.returnPeriod,
-        );
-        _hydrographState = MediumRangeHydrographState();
-        (_hydrographState as dynamic).widget = hydrographWidget;
-        break;
+    // Calculate min/max values
+    _baseMinX = _getMinX();
+    _baseMaxX = _getMaxX();
+    _baseMinY = _getMinY();
+    _baseMaxY = _getMaxY();
 
-      case ForecastType.longRange:
-        final hydrographWidget = LongRangeHydrograph(
-          reachId: widget.reachId,
-          forecasts: widget.forecasts,
-          longRangeFlows: widget.longRangeFlows,
-          returnPeriod: widget.returnPeriod,
-        );
-        _hydrographState = LongRangeHydrographState();
-        (_hydrographState as dynamic).widget = hydrographWidget;
-        break;
-    }
-
-    // Set context and initialize state
-    (_hydrographState as dynamic).context = context;
-    _hydrographState.initState();
-
-    // Get initial data
-    _spots = _hydrographState.generateSpots();
-    _baseMinX = _hydrographState.getMinX();
-    _baseMaxX = _hydrographState.getMaxX();
-    _baseMinY = _hydrographState.getMinY();
-    _baseMaxY = _hydrographState.getMaxY();
-
-    // Background color
+    // Set background color based on theme
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final isDark = theme.brightness == Brightness.dark;
@@ -124,6 +87,473 @@ class _CustomZoomableChartState extends State<CustomZoomableChart> {
       _currentZoomLevel = 1.0;
       _xOffset = 0.0;
     });
+  }
+
+  // Generate spots based on forecast type
+  List<FlSpot> _generateSpots() {
+    final List<FlSpot> spots = [];
+
+    switch (widget.forecastType) {
+      case ForecastType.shortRange:
+        return _generateShortRangeSpots();
+      case ForecastType.mediumRange:
+        return _generateMediumRangeSpots();
+      case ForecastType.longRange:
+        return _generateLongRangeSpots();
+    }
+  }
+
+  // Short range spots (hourly)
+  List<FlSpot> _generateShortRangeSpots() {
+    if (widget.forecasts.isEmpty) return [];
+
+    // Sort forecasts by time
+    final sortedForecasts = List<Forecast>.from(widget.forecasts)
+      ..sort((a, b) => a.validDateTime.compareTo(b.validDateTime));
+
+    // Use the first valid time as the base time for x-axis normalization
+    final baseTime = sortedForecasts.first.validDateTime;
+
+    final List<FlSpot> spots = [];
+    for (var forecast in sortedForecasts) {
+      // Get normalized hours from base time
+      final hours =
+          forecast.validDateTime.difference(baseTime).inHours.toDouble();
+      spots.add(FlSpot(hours, forecast.flow));
+    }
+
+    return spots;
+  }
+
+  // Medium range spots (daily)
+  List<FlSpot> _generateMediumRangeSpots() {
+    if (widget.forecasts.isEmpty) return [];
+
+    // Sort forecasts by time
+    final sortedForecasts = List<Forecast>.from(widget.forecasts)
+      ..sort((a, b) => a.validDateTime.compareTo(b.validDateTime));
+
+    // Use the first valid time as the base time for x-axis normalization
+    final baseTime = sortedForecasts.first.validDateTime;
+
+    final List<FlSpot> spots = [];
+
+    // Add regular forecast spots
+    for (var forecast in sortedForecasts) {
+      // Get normalized days from base time (in hours / 24)
+      final days = forecast.validDateTime.difference(baseTime).inHours / 24;
+      spots.add(FlSpot(days, forecast.flow));
+    }
+
+    // Add spots from dailyStats if available
+    if (widget.dailyStats != null && widget.dailyStats!.isNotEmpty) {
+      for (var entry in widget.dailyStats!.entries) {
+        final date = entry.key;
+        final stats = entry.value;
+
+        // Use 'mean' or 'avg' flow value if available
+        final flow = stats['mean'] ?? stats['avg'] ?? stats['flow'];
+
+        if (flow != null) {
+          final days = date.difference(baseTime).inHours / 24;
+          spots.add(FlSpot(days, flow));
+        }
+      }
+    }
+
+    // Sort spots by x-value
+    spots.sort((a, b) => a.x.compareTo(b.x));
+
+    return spots;
+  }
+
+  // Long range spots (weekly)
+  List<FlSpot> _generateLongRangeSpots() {
+    if (widget.forecasts.isEmpty) return [];
+
+    // Sort forecasts by time
+    final sortedForecasts = List<Forecast>.from(widget.forecasts)
+      ..sort((a, b) => a.validDateTime.compareTo(b.validDateTime));
+
+    // Use the first valid time as the base time for x-axis normalization
+    final baseTime = sortedForecasts.first.validDateTime;
+
+    final List<FlSpot> spots = [];
+
+    // Add regular forecast spots
+    for (var forecast in sortedForecasts) {
+      // Get normalized weeks from base time (in days / 7)
+      final weeks = forecast.validDateTime.difference(baseTime).inDays / 7;
+      spots.add(FlSpot(weeks, forecast.flow));
+    }
+
+    // Add spots from longRangeFlows if available
+    if (widget.longRangeFlows != null && widget.longRangeFlows!.isNotEmpty) {
+      for (var entry in widget.longRangeFlows!.entries) {
+        try {
+          final dateStr = entry.key;
+          final flowData = entry.value;
+
+          // Parse the date string
+          final parts = dateStr.split('-');
+          if (parts.length >= 3) {
+            final date = DateTime(
+              int.parse(parts[0]),
+              int.parse(parts[1]),
+              int.parse(parts[2]),
+            );
+
+            // Use 'mean' or 'avg' flow value if available
+            final flow =
+                flowData['mean'] ?? flowData['avg'] ?? flowData['flow'];
+
+            if (flow != null) {
+              final weeks = date.difference(baseTime).inDays / 7;
+              spots.add(FlSpot(weeks, flow));
+            }
+          }
+        } catch (e) {
+          // Skip entries that can't be parsed
+          continue;
+        }
+      }
+    }
+
+    // Sort spots by x-value
+    spots.sort((a, b) => a.x.compareTo(b.x));
+
+    return spots;
+  }
+
+  double _getMinY() {
+    // Start from zero for a clearer representation
+    return 0.0;
+  }
+
+  double _getMaxY() {
+    if (widget.forecasts.isEmpty) return 100.0;
+
+    // Find max flow and add 20% for padding
+    double maxFlow = widget.forecasts
+        .map((f) => f.flow)
+        .reduce((a, b) => a > b ? a : b);
+
+    // Also consider return period thresholds if available
+    if (widget.returnPeriod != null) {
+      for (final year in [2, 5, 10, 25, 50, 100]) {
+        final threshold = widget.returnPeriod!.getFlowForYear(year);
+        if (threshold != null && threshold > maxFlow) {
+          maxFlow = threshold;
+        }
+      }
+    }
+
+    return maxFlow * 1.2;
+  }
+
+  double _getMinX() {
+    return 0.0;
+  }
+
+  double _getMaxX() {
+    switch (widget.forecastType) {
+      case ForecastType.shortRange:
+        return widget.forecasts.isEmpty
+            ? 72.0
+            : _spots.map((s) => s.x).reduce((a, b) => a > b ? a : b);
+      case ForecastType.mediumRange:
+        return widget.forecasts.isEmpty
+            ? 10.0
+            : _spots.map((s) => s.x).reduce((a, b) => a > b ? a : b);
+      case ForecastType.longRange:
+        return widget.forecasts.isEmpty
+            ? 8.0
+            : _spots.map((s) => s.x).reduce((a, b) => a > b ? a : b);
+    }
+  }
+
+  // Get horizontal lines for return periods
+  List<HorizontalLine> _getReturnPeriodLines() {
+    if (widget.returnPeriod == null) {
+      return [];
+    }
+
+    final List<HorizontalLine> lines = [];
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    for (final year in [2, 5, 10, 25, 50, 100]) {
+      final threshold = widget.returnPeriod!.getFlowForYear(year);
+
+      if (threshold != null) {
+        lines.add(
+          HorizontalLine(
+            y: threshold,
+            color: _getReturnPeriodColor(year),
+            strokeWidth: 2,
+            dashArray: [5, 5], // Create dashed line
+            label: HorizontalLineLabel(
+              show: true,
+              alignment: Alignment.topRight,
+              padding: const EdgeInsets.only(right: 5, bottom: 5),
+              style: TextStyle(
+                color: isDark ? Colors.white : Colors.black,
+                fontWeight: FontWeight.bold,
+                fontSize: 10,
+              ),
+              labelResolver: (line) => '$year-yr',
+            ),
+          ),
+        );
+      }
+    }
+
+    return lines;
+  }
+
+  // Helper method to get color for return period
+  Color _getReturnPeriodColor(int year) {
+    // These colors should be distinguishable in both light and dark modes
+    switch (year) {
+      case 2:
+        return Colors.yellow;
+      case 5:
+        return Colors.orange;
+      case 10:
+        return Colors.deepOrange;
+      case 25:
+        return Colors.redAccent;
+      case 50:
+        return const Color.fromARGB(255, 187, 42, 212);
+      case 100:
+        return const Color.fromARGB(255, 130, 85, 255);
+      default:
+        return Colors.grey;
+    }
+  }
+
+  // Get tooltip text based on forecast type
+  String _getTooltipDateText(LineBarSpot spot) {
+    switch (widget.forecastType) {
+      case ForecastType.shortRange:
+        // For hourly forecasts, show date and time
+        final sortedForecasts = List<Forecast>.from(widget.forecasts)
+          ..sort((a, b) => a.validDateTime.compareTo(b.validDateTime));
+        final baseTime = sortedForecasts.first.validDateTime;
+        final time = baseTime.add(Duration(hours: spot.x.toInt()));
+        return DateFormat('MMM d, h:mm a').format(time);
+
+      case ForecastType.mediumRange:
+        // For daily forecasts, show day of week and date
+        final sortedForecasts = List<Forecast>.from(widget.forecasts)
+          ..sort((a, b) => a.validDateTime.compareTo(b.validDateTime));
+        final baseTime = sortedForecasts.first.validDateTime;
+        final time = baseTime.add(Duration(hours: (spot.x * 24).toInt()));
+        return DateFormat('EEE, MMM d').format(time);
+
+      case ForecastType.longRange:
+        // For weekly forecasts, show date range
+        final sortedForecasts = List<Forecast>.from(widget.forecasts)
+          ..sort((a, b) => a.validDateTime.compareTo(b.validDateTime));
+        final baseTime = sortedForecasts.first.validDateTime;
+        final time = baseTime.add(Duration(days: (spot.x * 7).toInt()));
+        final weekEnd = time.add(const Duration(days: 6));
+        return '${DateFormat('MMM d').format(time)} - ${DateFormat('MMM d').format(weekEnd)}';
+    }
+  }
+
+  // Build bottom axis titles based on forecast type
+  AxisTitles _buildBottomTitles(bool isDark) {
+    final textColor = isDark ? Colors.white : Colors.black87;
+
+    switch (widget.forecastType) {
+      case ForecastType.shortRange:
+        // Hourly labels
+        return AxisTitles(
+          sideTitles: SideTitles(
+            showTitles: true,
+            reservedSize: 40,
+            interval: 6, // Show every 6 hours
+            getTitlesWidget: (value, meta) {
+              if (value % 6 != 0) return const SizedBox.shrink();
+
+              final sortedForecasts = List<Forecast>.from(widget.forecasts)
+                ..sort((a, b) => a.validDateTime.compareTo(b.validDateTime));
+              final baseTime = sortedForecasts.first.validDateTime;
+
+              // Convert back to datetime
+              final datetime = baseTime.add(Duration(hours: value.toInt()));
+
+              // Format based on hour
+              String timeText;
+              if (value == 0) {
+                timeText = 'Now';
+              } else if (datetime.hour == 0) {
+                // At midnight, show the date
+                timeText = DateFormat('MMM d').format(datetime);
+              } else {
+                // Otherwise show the hour
+                timeText = DateFormat('ha').format(datetime).toLowerCase();
+              }
+
+              return Padding(
+                padding: const EdgeInsets.only(top: 8.0),
+                child: Text(
+                  timeText,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: textColor,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              );
+            },
+          ),
+        );
+
+      case ForecastType.mediumRange:
+        // Daily labels
+        return AxisTitles(
+          sideTitles: SideTitles(
+            showTitles: true,
+            reservedSize: 40,
+            interval: 1, // Show every day
+            getTitlesWidget: (value, meta) {
+              final sortedForecasts = List<Forecast>.from(widget.forecasts)
+                ..sort((a, b) => a.validDateTime.compareTo(b.validDateTime));
+              final baseTime = sortedForecasts.first.validDateTime;
+
+              // Convert back to datetime
+              final datetime = baseTime.add(
+                Duration(hours: (value * 24).toInt()),
+              );
+
+              // Format based on day
+              String dayText;
+              if (value == 0) {
+                dayText = 'Today';
+              } else if (value == 1) {
+                dayText = 'Tmrw';
+              } else {
+                // Show day of week and date
+                dayText = DateFormat('E\nM/d').format(datetime);
+              }
+
+              return Padding(
+                padding: const EdgeInsets.only(top: 8.0),
+                child: Text(
+                  dayText,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: textColor,
+                    fontWeight: FontWeight.bold,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              );
+            },
+          ),
+        );
+
+      case ForecastType.longRange:
+        // Weekly labels
+        return AxisTitles(
+          sideTitles: SideTitles(
+            showTitles: true,
+            reservedSize: 40,
+            interval: 1, // Show every week
+            getTitlesWidget: (value, meta) {
+              final sortedForecasts = List<Forecast>.from(widget.forecasts)
+                ..sort((a, b) => a.validDateTime.compareTo(b.validDateTime));
+              final baseTime = sortedForecasts.first.validDateTime;
+
+              // Convert back to datetime
+              final datetime = baseTime.add(
+                Duration(days: (value * 7).toInt()),
+              );
+
+              // Format based on week
+              String weekText;
+              if (value == 0) {
+                weekText = 'This\nWeek';
+              } else if (value == 1) {
+                weekText = 'Next\nWeek';
+              } else {
+                // Show month and week of month
+                final weekOfMonth = (datetime.day / 7).ceil();
+                weekText =
+                    '${DateFormat('MMM').format(datetime)}\nWk $weekOfMonth';
+              }
+
+              return Padding(
+                padding: const EdgeInsets.only(top: 8.0),
+                child: Text(
+                  weekText,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: textColor,
+                    fontWeight: FontWeight.bold,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              );
+            },
+          ),
+        );
+    }
+  }
+
+  // Build touch tooltip data
+  LineTouchData _buildTouchData(bool isDark) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return LineTouchData(
+      enabled: true,
+      touchTooltipData: LineTouchTooltipData(
+        getTooltipColor:
+            (spot) =>
+                isDark
+                    ? colorScheme.surfaceContainerHighest.withOpacity(0.8)
+                    : Colors.blueGrey.withOpacity(0.8),
+        tooltipRoundedRadius: 8,
+        getTooltipItems: (List<LineBarSpot> lineBarsSpot) {
+          return lineBarsSpot.map((spot) {
+            return LineTooltipItem(
+              '${flowFormatter.format(spot.y)} ft³/s',
+              const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+              children: [
+                TextSpan(
+                  text: '\n${_getTooltipDateText(spot)}',
+                  style: const TextStyle(
+                    color: Colors.white70,
+                    fontWeight: FontWeight.normal,
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+            );
+          }).toList();
+        },
+      ),
+      getTouchedSpotIndicator: (barData, spotIndexes) {
+        return spotIndexes.map((spotIndex) {
+          return TouchedSpotIndicatorData(
+            FlLine(color: Colors.white, strokeWidth: 2, dashArray: [3, 3]),
+            FlDotData(
+              show: true,
+              getDotPainter: (spot, percent, barData, index) {
+                return FlDotCirclePainter(
+                  radius: 6,
+                  color: colorScheme.primary,
+                  strokeWidth: 2,
+                  strokeColor: Colors.white,
+                );
+              },
+            ),
+          );
+        }).toList();
+      },
+    );
   }
 
   @override
@@ -141,11 +571,21 @@ class _CustomZoomableChartState extends State<CustomZoomableChart> {
       );
     }
 
-    // Get chart elements from the hydrograph state
-    final horizontalLines = _hydrographState.getReturnPeriodLines();
-    final titlesData = _hydrographState.buildTitlesData(isDark);
-    final touchData = _hydrographState.buildTouchData(isDark);
-    final gradientColors = _hydrographState.gradientColors;
+    // Get chart elements
+    final horizontalLines = _getReturnPeriodLines();
+    final titlesData = _buildBottomTitles(isDark);
+    final touchData = _buildTouchData(isDark);
+
+    // Gradient colors
+    final gradientColors = [colorScheme.primary, colorScheme.secondary];
+
+    // Chart padding
+    final EdgeInsets chartPadding = const EdgeInsets.only(
+      top: 16,
+      right: 30,
+      bottom: 80,
+      left: 10,
+    );
 
     // Create the chart with gesture detection for zoom/pan
     return Stack(
@@ -180,7 +620,7 @@ class _CustomZoomableChartState extends State<CustomZoomableChart> {
           onDoubleTap: _resetZoom, // Reset zoom on double tap
           child: Container(
             color: _backgroundColor,
-            padding: _hydrographState.chartPadding,
+            padding: chartPadding,
             child: LineChart(
               LineChartData(
                 lineBarsData: [
@@ -196,7 +636,7 @@ class _CustomZoomableChartState extends State<CustomZoomableChart> {
                       gradient: LinearGradient(
                         colors:
                             gradientColors
-                                .map((color) => color.withValues(alpha: 0.3))
+                                .map((color) => color.withOpacity(0.3))
                                 .toList(),
                       ),
                     ),
@@ -213,8 +653,8 @@ class _CustomZoomableChartState extends State<CustomZoomableChart> {
                     return FlLine(
                       color:
                           isDark
-                              ? colorScheme.primary.withValues(alpha: 0.15)
-                              : colorScheme.primary.withValues(alpha: 0.2),
+                              ? colorScheme.primary.withOpacity(0.15)
+                              : colorScheme.primary.withOpacity(0.2),
                       strokeWidth: 1,
                     );
                   },
@@ -222,13 +662,13 @@ class _CustomZoomableChartState extends State<CustomZoomableChart> {
                     return FlLine(
                       color:
                           isDark
-                              ? colorScheme.primary.withValues(alpha: 0.25)
-                              : colorScheme.primary.withValues(alpha: 0.4),
+                              ? colorScheme.primary.withOpacity(0.25)
+                              : colorScheme.primary.withOpacity(0.4),
                       strokeWidth: 1,
                     );
                   },
                 ),
-                titlesData: titlesData,
+                // titlesData: titlesData,
                 borderData: FlBorderData(
                   show: true,
                   border: Border.all(color: colorScheme.outline),
@@ -252,7 +692,7 @@ class _CustomZoomableChartState extends State<CustomZoomableChart> {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               decoration: BoxDecoration(
-                color: colorScheme.primaryContainer.withValues(alpha: 0.8),
+                color: colorScheme.primaryContainer.withOpacity(0.8),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Text(
@@ -275,7 +715,7 @@ class _CustomZoomableChartState extends State<CustomZoomableChart> {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               decoration: BoxDecoration(
-                color: colorScheme.tertiary.withValues(alpha: 0.7),
+                color: colorScheme.tertiary.withOpacity(0.7),
                 borderRadius: BorderRadius.circular(16),
               ),
               child: Text(

@@ -5,8 +5,8 @@ import 'package:flutter/material.dart';
 import 'package:rivr/features/forecast/domain/entities/forecast.dart';
 import 'package:rivr/features/forecast/domain/entities/forecast_types.dart';
 import 'package:rivr/features/forecast/domain/entities/return_period.dart';
+import 'package:rivr/features/forecast/presentation/widgets/chart_only/hydrograph_chart.dart';
 import 'package:rivr/features/forecast/presentation/widgets/expandable_hydrograph.dart';
-import 'package:rivr/features/forecast/presentation/widgets/hydrograph/base_hydrograph.dart';
 import 'package:rivr/features/forecast/presentation/widgets/long_range_hydrograph.dart';
 import 'package:rivr/features/forecast/presentation/widgets/medium_range_hydrograph.dart';
 import 'package:rivr/features/forecast/presentation/widgets/short_range_hydrograph.dart';
@@ -14,7 +14,6 @@ import 'package:rivr/features/forecast/presentation/widgets/short_range_hydrogra
 /// Factory class to create appropriate hydrograph widgets based on forecast type
 class HydrographFactory {
   /// Creates a hydrograph widget for the specified forecast type
-  /// Set includeScaffold to false to get just the chart without Scaffold/AppBar
   static Widget createHydrograph({
     required String reachId,
     required ForecastType forecastType,
@@ -25,9 +24,8 @@ class HydrographFactory {
     bool includeScaffold = true,
   }) {
     if (!includeScaffold) {
-      // For content-only hydrographs (no Scaffold/AppBar)
-      return _createHydrographContent(
-        reachId: reachId,
+      // For content-only hydrographs (no Scaffold/AppBar), use the chart directly
+      return HydrographChart(
         forecastType: forecastType,
         forecasts: forecasts,
         returnPeriod: returnPeriod,
@@ -61,155 +59,6 @@ class HydrographFactory {
           returnPeriod: returnPeriod,
         );
     }
-  }
-
-  /// Creates just the hydrograph content without the Scaffold/AppBar
-  static Widget _createHydrographContent({
-    required String reachId,
-    required ForecastType forecastType,
-    required List<Forecast> forecasts,
-    ReturnPeriod? returnPeriod,
-    Map<DateTime, Map<String, double>>? dailyStats,
-    Map<String, Map<String, double>>? longRangeFlows,
-  }) {
-    // This builder creates the chart without the surrounding Scaffold
-    Widget chartBuilder(BuildContext context) {
-      final theme = Theme.of(context);
-      final colorScheme = theme.colorScheme;
-      final isDark = theme.brightness == Brightness.dark;
-
-      final backgroundColor =
-          isDark ? colorScheme.surface : colorScheme.surfaceContainerHighest;
-
-      // Determine which hydrograph state to instantiate
-      BaseHydrographState hydrographState;
-      switch (forecastType) {
-        case ForecastType.shortRange:
-          final widget = ShortRangeHydrograph(
-            reachId: reachId,
-            forecasts: forecasts,
-            returnPeriod: returnPeriod,
-          );
-          hydrographState = ShortRangeHydrographState();
-          hydrographState.widget = widget;
-          break;
-
-        case ForecastType.mediumRange:
-          final widget = MediumRangeHydrograph(
-            reachId: reachId,
-            forecasts: forecasts,
-            dailyStats: dailyStats,
-            returnPeriod: returnPeriod,
-          );
-          hydrographState = MediumRangeHydrographState();
-          hydrographState.widget = widget;
-          break;
-
-        case ForecastType.longRange:
-          final widget = LongRangeHydrograph(
-            reachId: reachId,
-            forecasts: forecasts,
-            longRangeFlows: longRangeFlows,
-            returnPeriod: returnPeriod,
-          );
-          hydrographState = LongRangeHydrographState();
-          hydrographState.widget = widget;
-          break;
-      }
-
-      // Initialize the state (normally done by StatefulWidget)
-      hydrographState.context = context;
-      hydrographState.initState();
-
-      // Get the data needed for the chart
-      final spots = hydrographState.generateSpots();
-      if (spots.isEmpty) {
-        return Center(
-          child: Text(
-            'No data available to display',
-            style: theme.textTheme.titleMedium,
-          ),
-        );
-      }
-
-      // Calculate chart bounds
-      final minY = hydrographState.getMinY();
-      final maxY = hydrographState.getMaxY();
-      final minX = hydrographState.getMinX();
-      final maxX = hydrographState.getMaxX();
-
-      // Get return period lines and other chart elements
-      final horizontalLines = hydrographState.getReturnPeriodLines();
-      final titlesData = hydrographState.buildTitlesData(isDark);
-      final touchData = hydrographState.buildTouchData(isDark);
-      final gradientColors = hydrographState.gradientColors;
-
-      // Build the chart without the scaffold
-      return Container(
-        color: backgroundColor,
-        padding: hydrographState.chartPadding,
-        child: LineChart(
-          LineChartData(
-            lineBarsData: [
-              LineChartBarData(
-                spots: spots,
-                isCurved: true,
-                barWidth: 3,
-                isStrokeCapRound: true,
-                gradient: LinearGradient(colors: gradientColors),
-                dotData: const FlDotData(show: false),
-                belowBarData: BarAreaData(
-                  show: true,
-                  gradient: LinearGradient(
-                    colors:
-                        gradientColors
-                            .map((color) => color.withOpacity(0.3))
-                            .toList(),
-                  ),
-                ),
-              ),
-            ],
-            extraLinesData: ExtraLinesData(horizontalLines: horizontalLines),
-            gridData: FlGridData(
-              show: true,
-              drawHorizontalLine: true,
-              drawVerticalLine: true,
-              getDrawingHorizontalLine: (value) {
-                return FlLine(
-                  color:
-                      isDark
-                          ? colorScheme.primary.withOpacity(0.15)
-                          : colorScheme.primary.withOpacity(0.2),
-                  strokeWidth: 1,
-                );
-              },
-              getDrawingVerticalLine: (value) {
-                return FlLine(
-                  color:
-                      isDark
-                          ? colorScheme.primary.withOpacity(0.25)
-                          : colorScheme.primary.withOpacity(0.4),
-                  strokeWidth: 1,
-                );
-              },
-            ),
-            titlesData: titlesData,
-            borderData: FlBorderData(
-              show: true,
-              border: Border.all(color: colorScheme.outline),
-            ),
-            lineTouchData: touchData,
-            minX: minX,
-            maxX: maxX,
-            minY: minY,
-            maxY: maxY,
-          ),
-        ),
-      );
-    }
-
-    // Use Builder to ensure we have a proper BuildContext
-    return Builder(builder: chartBuilder);
   }
 
   /// Creates an expandable hydrograph widget that shows a preview and expands to full view

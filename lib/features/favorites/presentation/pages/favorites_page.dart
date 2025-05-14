@@ -491,7 +491,10 @@ class _FavoritesPageState extends State<FavoritesPage>
       appBar: AppBar(
         title: Text(
           'My Rivers',
-          style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+          style: textTheme.titleMedium?.copyWith(
+            fontWeight: FontWeight.bold,
+            color: colors.onPrimary, // Explicitly set the text color to white
+          ),
         ),
         elevation: 0,
         backgroundColor: colors.primary,

@@ -6,7 +6,7 @@ import 'package:rivr/features/forecast/presentation/widgets/FlowIndicatorBar.dar
 import 'package:rivr/features/forecast/utils/flow_thresholds.dart';
 import 'package:intl/intl.dart';
 
-class FlowStatusCard extends StatelessWidget {
+class FlowStatusCard extends StatefulWidget {
   final Forecast? currentFlow;
   final ReturnPeriod? returnPeriod;
   final double? historicalAverage; // Optional historical average flow
@@ -23,33 +23,42 @@ class FlowStatusCard extends StatelessWidget {
   });
 
   @override
+  State<FlowStatusCard> createState() => _FlowStatusCardState();
+}
+
+class _FlowStatusCardState extends State<FlowStatusCard> {
+  bool _returnPeriodExpanded = false;
+
+  @override
   Widget build(BuildContext context) {
     // If we don't have flow data yet, show loading
-    if (currentFlow == null) {
+    if (widget.currentFlow == null) {
       return _buildLoadingCard(context);
     }
 
-    final flow = currentFlow!.flow;
-    final String category = returnPeriod?.getFlowCategory(flow) ?? 'Unknown';
+    final flow = widget.currentFlow!.flow;
+    final String category =
+        widget.returnPeriod?.getFlowCategory(flow) ?? 'Unknown';
     final Color statusColor = FlowThresholds.getColorForCategory(category);
     final String statusDescription =
-        returnPeriod != null
-            ? FlowThresholds.getFlowSummary(flow, returnPeriod!)
+        widget.returnPeriod != null
+            ? FlowThresholds.getFlowSummary(flow, widget.returnPeriod!)
             : 'Flow information unavailable';
 
     // Format flow values with NumberFormat
     final NumberFormat flowFormat = NumberFormat('#,##0.0');
     final String formattedFlow = flowFormat.format(flow);
     final String formattedHistorical =
-        historicalAverage != null
-            ? flowFormat.format(historicalAverage!)
+        widget.historicalAverage != null
+            ? flowFormat.format(widget.historicalAverage!)
             : 'N/A';
 
     // Calculate percentage comparison with historical average
     String comparisonText = '';
-    if (historicalAverage != null && historicalAverage! > 0) {
+    if (widget.historicalAverage != null && widget.historicalAverage! > 0) {
       final percentDiff =
-          ((flow - historicalAverage!) / historicalAverage! * 100).round();
+          ((flow - widget.historicalAverage!) / widget.historicalAverage! * 100)
+              .round();
       if (percentDiff > 0) {
         comparisonText = '$percentDiff% above normal';
       } else if (percentDiff < 0) {
@@ -62,11 +71,15 @@ class FlowStatusCard extends StatelessWidget {
     // Format timestamp
     final String formattedTime = DateFormat(
       'MMM d, h:mm a',
-    ).format(currentFlow!.validDateTime);
+    ).format(widget.currentFlow!.validDateTime);
+
+    final theme = Theme.of(context);
+    final surfaceColor = theme.colorScheme.primary;
 
     return GestureDetector(
-      onTap: onTap,
+      onTap: widget.onTap,
       child: Card(
+        color: surfaceColor,
         elevation: 4,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         child: Container(
@@ -75,7 +88,7 @@ class FlowStatusCard extends StatelessWidget {
             gradient: LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
-              colors: [Colors.blueGrey.shade800, Colors.blueGrey.shade900],
+              colors: [Colors.teal.shade700, Colors.teal.shade900],
             ),
           ),
           child: Padding(
@@ -87,9 +100,11 @@ class FlowStatusCard extends StatelessWidget {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text(
+                    Text(
                       'Current Flow',
-                      style: TextStyle(color: Colors.white70, fontSize: 16),
+                      style: theme.textTheme.bodyMedium!.copyWith(
+                        color: theme.colorScheme.surface,
+                      ),
                     ),
                     Container(
                       padding: const EdgeInsets.symmetric(
@@ -119,18 +134,18 @@ class FlowStatusCard extends StatelessWidget {
                   children: [
                     Text(
                       formattedFlow,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 34,
+                      style: theme.textTheme.titleLarge!.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
                       ),
                     ),
                     const SizedBox(width: 8),
-                    const Padding(
-                      padding: EdgeInsets.only(bottom: 6),
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 6.0),
                       child: Text(
                         'ft³/s',
-                        style: TextStyle(color: Colors.white70, fontSize: 16),
+                        style: theme.textTheme.bodyMedium!.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
                       ),
                     ),
                     if (comparisonText.isNotEmpty) const Spacer(),
@@ -141,14 +156,16 @@ class FlowStatusCard extends StatelessWidget {
                           vertical: 2,
                         ),
                         decoration: BoxDecoration(
-                          color: Colors.black26,
+                          color: theme.colorScheme.onSurface.withValues(
+                            alpha: 0.1,
+                          ),
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Text(
                           comparisonText,
-                          style: TextStyle(
+                          style: theme.textTheme.bodyMedium!.copyWith(
                             color:
-                                flow > historicalAverage!
+                                flow > widget.historicalAverage!
                                     ? Colors.orange
                                     : Colors.green,
                             fontWeight: FontWeight.bold,
@@ -161,19 +178,19 @@ class FlowStatusCard extends StatelessWidget {
                 const SizedBox(height: 16),
 
                 // Flow indicator bar
-                if (returnPeriod != null)
+                if (widget.returnPeriod != null)
                   Center(
                     child: FlowIndicatorBar(
                       currentFlow: flow,
-                      returnPeriod: returnPeriod,
-                      width: MediaQuery.of(context).size.width * 0.8,
+                      returnPeriod: widget.returnPeriod,
+                      width: MediaQuery.of(context).size.width * 0.75,
                     ),
                   ),
 
-                const SizedBox(height: 16),
+                // const SizedBox(height: 16),
 
                 // Historical comparison
-                if (historicalAverage != null)
+                if (widget.historicalAverage != null)
                   Row(
                     children: [
                       const Icon(
@@ -184,7 +201,9 @@ class FlowStatusCard extends StatelessWidget {
                       const SizedBox(width: 8),
                       Text(
                         'Historical Average: $formattedHistorical ft³/s',
-                        style: const TextStyle(color: Colors.white70),
+                        style: theme.textTheme.bodyMedium!.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
                       ),
                     ],
                   ),
@@ -192,44 +211,93 @@ class FlowStatusCard extends StatelessWidget {
                 const SizedBox(height: 8),
 
                 // Timestamp information
-                Row(
-                  children: [
-                    const Icon(
-                      Icons.access_time_rounded,
-                      color: Colors.white70,
-                      size: 18,
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      'As of $formattedTime',
-                      style: const TextStyle(color: Colors.white70),
-                    ),
-                  ],
-                ),
+                // Row(
+                //   children: [
+                //     const Icon(
+                //       Icons.access_time_rounded,
+                //       color: Colors.white70,
+                //       size: 18,
+                //     ),
+                //     const SizedBox(width: 8),
+                //     Text(
+                //       'As of $formattedTime',
+                //       style: const TextStyle(color: Colors.white70),
+                //     ),
+                //   ],
+                // ),
 
                 // Additional information in expanded mode
-                if (expanded) ...[
-                  const SizedBox(height: 16),
+                if (widget.expanded) ...[
+                  const SizedBox(height: 8),
                   const Divider(color: Colors.white24),
                   const SizedBox(height: 8),
                   Text(
                     statusDescription,
-                    style: const TextStyle(color: Colors.white, fontSize: 14),
+                    style: theme.textTheme.bodyMedium!.copyWith(
+                      color: theme.colorScheme.surface,
+                    ),
                   ),
                   const SizedBox(height: 16),
 
-                  // Return period information if available
-                  if (returnPeriod != null) ...[
-                    const Text(
-                      'Return Period Information',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 14,
+                  // Return period information if available - now collapsible
+                  if (widget.returnPeriod != null) ...[
+                    // Clickable header row with arrow indicator and button styling
+                    Material(
+                      color: Colors.black26,
+                      borderRadius: BorderRadius.circular(8),
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(8),
+                        onTap: () {
+                          setState(() {
+                            _returnPeriodExpanded = !_returnPeriodExpanded;
+                          });
+                        },
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                            vertical: 10.0,
+                            horizontal: 12.0,
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                'Return Period Information',
+                                style: theme.textTheme.bodyMedium!.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              Container(
+                                decoration: BoxDecoration(
+                                  color: Colors.white24,
+                                  shape: BoxShape.circle,
+                                ),
+                                padding: const EdgeInsets.all(4),
+                                child: Icon(
+                                  _returnPeriodExpanded
+                                      ? Icons.keyboard_arrow_up
+                                      : Icons.keyboard_arrow_down,
+                                  color: theme.colorScheme.onSurfaceVariant,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
                     ),
-                    const SizedBox(height: 8),
-                    _buildReturnPeriodTable(returnPeriod!),
+
+                    // Animation for smooth transition
+                    AnimatedSize(
+                      duration: const Duration(milliseconds: 300),
+                      child:
+                          _returnPeriodExpanded
+                              ? Padding(
+                                padding: const EdgeInsets.only(top: 12.0),
+                                child: _buildReturnPeriodTable(
+                                  widget.returnPeriod!,
+                                ),
+                              )
+                              : const SizedBox.shrink(),
+                    ),
                   ],
                 ] else ...[
                   // Expand button
@@ -238,7 +306,9 @@ class FlowStatusCard extends StatelessWidget {
                       padding: const EdgeInsets.only(top: 8.0),
                       child: Icon(
                         Icons.keyboard_arrow_down,
-                        color: Colors.white.withValues(alpha: 0.5),
+                        color: theme.colorScheme.onSurfaceVariant.withValues(
+                          alpha: 0.6,
+                        ),
                       ),
                     ),
                   ),
@@ -253,21 +323,21 @@ class FlowStatusCard extends StatelessWidget {
 
   // Build a table showing return period flows
   Widget _buildReturnPeriodTable(ReturnPeriod returnPeriod) {
+    final theme = Theme.of(context);
     final rows = <TableRow>[];
 
     // Header row
     rows.add(
-      const TableRow(
+      TableRow(
         decoration: BoxDecoration(
-          border: Border(bottom: BorderSide(color: Colors.white24)),
+          border: Border(bottom: BorderSide(color: theme.dividerColor)),
         ),
         children: [
           Padding(
             padding: EdgeInsets.symmetric(vertical: 4.0),
             child: Text(
               'Return Period',
-              style: TextStyle(
-                color: Colors.white70,
+              style: theme.textTheme.bodyMedium!.copyWith(
                 fontWeight: FontWeight.bold,
               ),
             ),
@@ -276,8 +346,7 @@ class FlowStatusCard extends StatelessWidget {
             padding: EdgeInsets.symmetric(vertical: 4.0),
             child: Text(
               'Flow (ft³/s)',
-              style: TextStyle(
-                color: Colors.white70,
+              style: theme.textTheme.bodyMedium!.copyWith(
                 fontWeight: FontWeight.bold,
               ),
               textAlign: TextAlign.right,
@@ -296,16 +365,13 @@ class FlowStatusCard extends StatelessWidget {
             children: [
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 4.0),
-                child: Text(
-                  '$year-year',
-                  style: const TextStyle(color: Colors.white70),
-                ),
+                child: Text('$year-year', style: theme.textTheme.bodyMedium),
               ),
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 4.0),
                 child: Text(
                   NumberFormat('#,##0.0').format(flow),
-                  style: const TextStyle(color: Colors.white70),
+                  style: theme.textTheme.bodyMedium,
                   textAlign: TextAlign.right,
                 ),
               ),
@@ -323,7 +389,9 @@ class FlowStatusCard extends StatelessWidget {
 
   // Loading state card
   Widget _buildLoadingCard(BuildContext context) {
+    final theme = Theme.of(context);
     return Card(
+      color: theme.colorScheme.surfaceContainerHighest,
       elevation: 4,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Container(
@@ -336,17 +404,19 @@ class FlowStatusCard extends StatelessWidget {
           ),
         ),
         height: 180,
-        child: const Center(
+        child: Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               CircularProgressIndicator(
-                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                valueColor: AlwaysStoppedAnimation(theme.colorScheme.primary),
               ),
               SizedBox(height: 16),
               Text(
                 'Loading flow data...',
-                style: TextStyle(color: Colors.white70),
+                style: theme.textTheme.bodyMedium!.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
               ),
             ],
           ),

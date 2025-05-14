@@ -7,13 +7,13 @@ import 'package:rivr/features/forecast/domain/entities/return_period.dart';
 class FlowThresholds {
   /// Flow categories based on return periods
   static const Map<String, String> categories = {
-    'Low': 'Flow is below normal levels',
-    'Normal': 'Flow is at normal levels',
-    'Moderate': 'Flow is above normal but not concerning',
-    'Elevated': 'Flow is high, use caution when approaching',
-    'High': 'Flow is very high, consider postponing activities',
-    'Very High': 'Flow is at dangerous levels, avoid river',
-    'Extreme': 'Flow is at life-threatening levels, stay away',
+    'Low': 'Flow is below normal levels.',
+    'Normal': 'Flow is at normal levels.',
+    'Moderate': 'Flow is above normal but not concerning.',
+    'Elevated': 'Flow is high, use caution when approaching.',
+    'High': 'Flow is very high, consider postponing activities.',
+    'Very High': 'Flow is at dangerous levels, avoid river.',
+    'Extreme': 'Flow is at life-threatening levels, stay away.',
   };
 
   /// Get color for flow category

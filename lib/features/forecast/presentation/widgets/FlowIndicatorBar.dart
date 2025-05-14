@@ -219,17 +219,32 @@ class _FlowIndicatorBarState extends State<FlowIndicatorBar>
         // Return period labels
         if (widget.showLabels && widget.returnPeriod != null)
           Padding(
-            padding: const EdgeInsets.only(top: 8.0),
+            padding: const EdgeInsets.only(top: 8.0), // Add right padding
             child: SizedBox(
               width: widget.width,
               height: 14,
               child: Stack(
                 children:
                     returnPeriodPositions.entries.map((entry) {
+                      final labelText = '${entry.key}y';
+                      // Estimate the width of the text (adjust multiplier as needed)
+                      final textWidth =
+                          labelText.length *
+                          7.0; // Example: assuming ~7 pixels per character
+
+                      // Ensure the label doesn't overflow
+                      double calculatedLeft = entry.value;
+                      if (calculatedLeft + textWidth > widget.width) {
+                        calculatedLeft = widget.width - textWidth + 2;
+                      } // Adjust by a small margin
+                      if (calculatedLeft < 0) {
+                        calculatedLeft = 0; // Ensure it's not negative
+                      }
+
                       return Positioned(
-                        left: entry.value - 12,
+                        left: calculatedLeft,
                         child: Text(
-                          '${entry.key}y',
+                          labelText,
                           style: const TextStyle(
                             fontSize: 10,
                             color: Colors.white,

@@ -2,7 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:rivr/features/forecast/domain/entities/forecast.dart';
 import 'package:rivr/features/forecast/domain/entities/return_period.dart';
-import 'package:rivr/features/forecast/presentation/widgets/FlowIndicatorBar.dart';
+import 'package:rivr/features/forecast/presentation/widgets/flow_indicator_bar.dart';
 import 'package:rivr/features/forecast/utils/flow_thresholds.dart';
 import 'package:intl/intl.dart';
 
@@ -109,7 +109,7 @@ class _FlowStatusCardState extends State<FlowStatusCard> {
                   children: [
                     Text(
                       'Current Flow',
-                      style: theme.textTheme.bodyMedium!.copyWith(
+                      style: theme.textTheme.bodyLarge!.copyWith(
                         color: textColor,
                       ),
                     ),
@@ -192,7 +192,7 @@ class _FlowStatusCardState extends State<FlowStatusCard> {
                     child: FlowIndicatorBar(
                       currentFlow: flow,
                       returnPeriod: widget.returnPeriod,
-                      width: MediaQuery.of(context).size.width * 0.75,
+                      width: MediaQuery.of(context).size.width * 0.8,
                     ),
                   ),
 

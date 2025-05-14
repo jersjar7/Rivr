@@ -22,12 +22,6 @@ abstract class BaseHydrograph extends StatefulWidget {
 }
 
 abstract class BaseHydrographState<T extends BaseHydrograph> extends State<T> {
-  // Shared chart configuration
-  final List<Color> gradientColors = [
-    const Color(0xFF23B6E6), // Cyan-like color
-    const Color.fromARGB(255, 0, 163, 120), // Green-like color
-  ];
-
   // Formatters
   final DateFormat dateFormatter = DateFormat('MMM d');
   final DateFormat timeFormatter = DateFormat('h:mm a');
@@ -55,6 +49,7 @@ abstract class BaseHydrographState<T extends BaseHydrograph> extends State<T> {
     }
 
     final List<HorizontalLine> lines = [];
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     for (final year in [2, 5, 10, 25, 50, 100]) {
       final threshold = widget.returnPeriod!.getFlowForYear(year);
@@ -70,8 +65,8 @@ abstract class BaseHydrographState<T extends BaseHydrograph> extends State<T> {
               show: true,
               alignment: Alignment.topRight,
               padding: const EdgeInsets.only(right: 5, bottom: 5),
-              style: const TextStyle(
-                color: Colors.black,
+              style: TextStyle(
+                color: isDark ? Colors.white : Colors.black,
                 fontWeight: FontWeight.bold,
                 fontSize: 10,
               ),
@@ -87,6 +82,7 @@ abstract class BaseHydrographState<T extends BaseHydrograph> extends State<T> {
 
   // Helper method to get color for return period
   Color _getReturnPeriodColor(int year) {
+    // These colors should be distinguishable in both light and dark modes
     switch (year) {
       case 2:
         return Colors.yellow;
@@ -134,6 +130,15 @@ abstract class BaseHydrographState<T extends BaseHydrograph> extends State<T> {
   @override
   Widget build(BuildContext context) {
     final spots = generateSpots();
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+
+    // Define gradient colors based on theme
+    final List<Color> gradientColors = [
+      colorScheme.primary,
+      colorScheme.secondary,
+    ];
 
     if (spots.isEmpty) {
       return buildNoDataView();
@@ -149,18 +154,13 @@ abstract class BaseHydrographState<T extends BaseHydrograph> extends State<T> {
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.title),
-        backgroundColor: const Color(0xFFBFBFBF),
+        backgroundColor:
+            isDark ? colorScheme.surface : colorScheme.surfaceContainerHighest,
         elevation: 0,
       ),
       body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [Color(0xFFBFBFBF), Color(0xFFBFBFBF), Color(0xFFBFBFBF)],
-            stops: [0.0, 0.8, 1.0],
-          ),
-        ),
+        color:
+            isDark ? colorScheme.surface : colorScheme.surfaceContainerHighest,
         child: Padding(
           padding: chartPadding,
           child: LineChart(
@@ -191,23 +191,31 @@ abstract class BaseHydrographState<T extends BaseHydrograph> extends State<T> {
                 drawVerticalLine: true,
                 getDrawingHorizontalLine: (value) {
                   return FlLine(
-                    color: gradientColors[0].withOpacity(0.2),
+                    color:
+                        isDark
+                            ? colorScheme.primary.withOpacity(0.15)
+                            : colorScheme.primary.withOpacity(0.2),
                     strokeWidth: 1,
                   );
                 },
                 getDrawingVerticalLine: (value) {
                   return FlLine(
-                    color: gradientColors[0].withOpacity(0.45),
+                    color:
+                        isDark
+                            ? colorScheme.primary.withOpacity(0.25)
+                            : colorScheme.primary.withOpacity(0.4),
                     strokeWidth: 1,
                   );
                 },
               ),
-              titlesData: buildTitlesData(),
+              titlesData: buildTitlesData(isDark),
               borderData: FlBorderData(
                 show: true,
-                border: Border.all(color: const Color(0xff37434d)),
+                border: Border.all(
+                  color: isDark ? colorScheme.outline : colorScheme.outline,
+                ),
               ),
-              lineTouchData: buildTouchData(),
+              lineTouchData: buildTouchData(isDark),
               minX: getMinX(),
               maxX: getMaxX(),
               minY: minY,
@@ -220,21 +228,28 @@ abstract class BaseHydrographState<T extends BaseHydrograph> extends State<T> {
   }
 
   // Implement default touch data behavior - can be overridden
-  LineTouchData buildTouchData() {
+  LineTouchData buildTouchData([bool isDark = false]) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
     return LineTouchData(
       enabled: true,
       touchTooltipData: LineTouchTooltipData(
-        getTooltipColor: (spot) => Colors.blueGrey.withValues(alpha: 0.8),
+        getTooltipColor:
+            (spot) =>
+                isDark
+                    ? colorScheme.surfaceContainerHighest.withOpacity(0.8)
+                    : Colors.blueGrey.withOpacity(0.8),
         tooltipRoundedRadius: 8,
         getTooltipItems: (List<LineBarSpot> lineBarsSpot) {
           return lineBarsSpot.map((spot) {
             return LineTooltipItem(
               '${flowFormatter.format(spot.y)} ft³/s',
-              const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+              TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
               children: [
                 TextSpan(
                   text: '\n${getTooltipDateText(spot)}',
-                  style: const TextStyle(
+                  style: TextStyle(
                     color: Colors.white70,
                     fontWeight: FontWeight.normal,
                     fontSize: 12,
@@ -254,7 +269,7 @@ abstract class BaseHydrographState<T extends BaseHydrograph> extends State<T> {
               getDotPainter: (spot, percent, barData, index) {
                 return FlDotCirclePainter(
                   radius: 6,
-                  color: gradientColors[0],
+                  color: colorScheme.primary,
                   strokeWidth: 2,
                   strokeColor: Colors.white,
                 );
@@ -267,14 +282,20 @@ abstract class BaseHydrographState<T extends BaseHydrograph> extends State<T> {
   }
 
   // Implement default titles data - can be overridden
-  FlTitlesData buildTitlesData() {
+  FlTitlesData buildTitlesData([bool isDark = false]) {
+    final textColor = isDark ? Colors.white : Colors.black;
+
     return FlTitlesData(
       topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
       bottomTitles: buildBottomTitles(),
       leftTitles: AxisTitles(
-        axisNameWidget: const Text(
+        axisNameWidget: Text(
           'ft³/s',
-          style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+          style: TextStyle(
+            fontSize: 15,
+            fontWeight: FontWeight.bold,
+            color: textColor,
+          ),
         ),
         axisNameSize: 30,
         sideTitles: SideTitles(
@@ -288,7 +309,7 @@ abstract class BaseHydrographState<T extends BaseHydrograph> extends State<T> {
               padding: const EdgeInsets.only(right: 5),
               child: Text(
                 value.toStringAsFixed(0),
-                style: const TextStyle(fontSize: 12, color: Colors.black),
+                style: TextStyle(fontSize: 12, color: textColor),
                 textAlign: TextAlign.right,
               ),
             );
@@ -311,26 +332,35 @@ abstract class BaseHydrographState<T extends BaseHydrograph> extends State<T> {
 
   // No data view
   Widget buildNoDataView() {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final textTheme = theme.textTheme;
+
     return Scaffold(
       appBar: AppBar(title: Text(widget.title)),
-      body: const Center(
+      body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.show_chart, size: 48, color: Colors.grey),
-            SizedBox(height: 16),
+            Icon(
+              Icons.show_chart,
+              size: 48,
+              color: colorScheme.onSurfaceVariant,
+            ),
+            const SizedBox(height: 16),
             Text(
               'No data available to display',
-              style: TextStyle(
-                fontSize: 18,
+              style: textTheme.titleMedium?.copyWith(
                 fontWeight: FontWeight.bold,
-                color: Colors.grey,
+                color: colorScheme.onSurfaceVariant,
               ),
             ),
-            SizedBox(height: 8),
+            const SizedBox(height: 8),
             Text(
               'Try again later or select a different time range',
-              style: TextStyle(color: Colors.grey),
+              style: textTheme.bodyMedium?.copyWith(
+                color: colorScheme.onSurfaceVariant,
+              ),
             ),
           ],
         ),

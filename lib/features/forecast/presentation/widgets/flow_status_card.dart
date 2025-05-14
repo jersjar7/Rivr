@@ -222,29 +222,9 @@ class _FlowStatusCardState extends State<FlowStatusCard> {
                     ],
                   ),
 
-                const SizedBox(height: 8),
-
-                // Timestamp information
-                Row(
-                  children: [
-                    Icon(
-                      Icons.access_time_rounded,
-                      color: textColor.withValues(alpha: 0.7),
-                      size: 18,
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      'As of $formattedTime',
-                      style: theme.textTheme.bodySmall!.copyWith(
-                        color: textColor.withValues(alpha: 0.9),
-                      ),
-                    ),
-                  ],
-                ),
-
                 // Additional information in expanded mode
                 if (widget.expanded) ...[
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 8),
                   Divider(color: textColor.withValues(alpha: 0.2)),
                   const SizedBox(height: 8),
                   Text(

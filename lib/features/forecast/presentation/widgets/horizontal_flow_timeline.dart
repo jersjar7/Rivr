@@ -157,17 +157,26 @@ class _HorizontalFlowTimelineState extends State<HorizontalFlowTimeline> {
   }
 
   Color _getTrendColor(int index) {
-    if (index <= 0 || index >= _sortedForecasts.length) return Colors.grey;
+    if (index <= 0 || index >= _sortedForecasts.length) {
+      return Theme.of(
+        context,
+      ).colorScheme.onSurfaceVariant; // Use theme-appropriate grey
+    }
 
     final currentFlow = _sortedForecasts[index].flow;
     final prevFlow = _sortedForecasts[index - 1].flow;
 
     if (currentFlow > prevFlow) {
-      return Colors.red;
+      return Theme.of(
+        context,
+      ).colorScheme.error; // Use theme's error color for increase
     } else if (currentFlow < prevFlow) {
-      return Colors.green;
+      return Colors
+          .green; // Keep green for decrease as it's a universal indicator
     } else {
-      return Colors.grey;
+      return Theme.of(
+        context,
+      ).colorScheme.onSurfaceVariant; // Use theme-appropriate grey
     }
   }
 
@@ -183,8 +192,16 @@ class _HorizontalFlowTimelineState extends State<HorizontalFlowTimeline> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final textTheme = theme.textTheme;
+
     if (_sortedForecasts.isEmpty) {
-      return const Center(child: Text('No hourly forecast data available'));
+      return Center(
+        child: Text(
+          'No hourly forecast data available',
+          style: textTheme.bodyMedium,
+        ),
+      );
     }
 
     return Column(
@@ -196,10 +213,7 @@ class _HorizontalFlowTimelineState extends State<HorizontalFlowTimeline> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                'Hourly Flow Forecast',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-              ),
+              Text('Hourly Flow Forecast', style: textTheme.titleMedium),
               // Toggle button
               TextButton.icon(
                 onPressed: _toggleViewType,
@@ -228,6 +242,9 @@ class _HorizontalFlowTimelineState extends State<HorizontalFlowTimeline> {
   }
 
   Widget _buildHourCardsView() {
+    final theme = Theme.of(context);
+    final textTheme = theme.textTheme;
+
     return SizedBox(
       height: 180,
       child: ListView.builder(
@@ -246,9 +263,6 @@ class _HorizontalFlowTimelineState extends State<HorizontalFlowTimeline> {
               index == 0
                   ? 'Now'
                   : DateFormat('h a').format(forecast.validDateTime);
-          final dateStr = DateFormat(
-            'EEE, MMM d',
-          ).format(forecast.validDateTime);
 
           // Get trend data
           final trendIcon = _getTrendIcon(index);
@@ -260,7 +274,7 @@ class _HorizontalFlowTimelineState extends State<HorizontalFlowTimeline> {
             margin: const EdgeInsets.only(right: 8.0, bottom: 8.0),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),
-              side: BorderSide(color: color.withOpacity(0.5), width: 2),
+              side: BorderSide(color: color.withValues(alpha: 0.5), width: 2),
             ),
             child: Container(
               width: 100,
@@ -271,11 +285,9 @@ class _HorizontalFlowTimelineState extends State<HorizontalFlowTimeline> {
                   // Time
                   Text(
                     timeFormat,
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                  ),
-                  Text(
-                    dateStr,
-                    style: TextStyle(fontSize: 10, color: Colors.grey[600]),
+                    style: textTheme.bodyLarge?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                   const SizedBox(height: 12),
 
@@ -285,7 +297,7 @@ class _HorizontalFlowTimelineState extends State<HorizontalFlowTimeline> {
                     height: 60,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: color.withOpacity(0.2),
+                      color: color.withValues(alpha: 0.2),
                       border: Border.all(color: color, width: 2),
                     ),
                     child: Center(
@@ -294,12 +306,11 @@ class _HorizontalFlowTimelineState extends State<HorizontalFlowTimeline> {
                         children: [
                           Text(
                             flow.toInt().toString(),
-                            style: TextStyle(
+                            style: textTheme.bodyLarge?.copyWith(
                               fontWeight: FontWeight.bold,
-                              fontSize: 16,
                             ),
                           ),
-                          Text('ft³/s', style: TextStyle(fontSize: 10)),
+                          Text('ft³/s', style: textTheme.bodySmall),
                         ],
                       ),
                     ),
@@ -310,10 +321,9 @@ class _HorizontalFlowTimelineState extends State<HorizontalFlowTimeline> {
                   // Category
                   Text(
                     category,
-                    style: TextStyle(
+                    style: textTheme.bodySmall?.copyWith(
                       color: color,
                       fontWeight: FontWeight.bold,
-                      fontSize: 12,
                     ),
                   ),
 
@@ -327,7 +337,9 @@ class _HorizontalFlowTimelineState extends State<HorizontalFlowTimeline> {
                         const SizedBox(width: 2),
                         Text(
                           '${trendPercentage.abs().toStringAsFixed(1)}%',
-                          style: TextStyle(fontSize: 10, color: trendColor),
+                          style: textTheme.bodySmall?.copyWith(
+                            color: trendColor,
+                          ),
                         ),
                       ],
                     ),
@@ -341,6 +353,15 @@ class _HorizontalFlowTimelineState extends State<HorizontalFlowTimeline> {
   }
 
   Widget _buildFlowWaveView() {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+
+    // Theme-aware colors for markers
+    final markerLineColor =
+        isDark ? colorScheme.surfaceContainerHighest : Colors.grey[400];
+    final markerTextColor = isDark ? colorScheme.onSurface : Colors.grey[700];
+
     return SizedBox(
       height: 220,
       child: SingleChildScrollView(
@@ -363,16 +384,17 @@ class _HorizontalFlowTimelineState extends State<HorizontalFlowTimeline> {
                     painter: FlowWavePainter(
                       forecasts: _sortedForecasts,
                       returnPeriod: widget.returnPeriod,
+                      isDarkMode: isDark,
                     ),
                   ),
                 ),
               ),
 
               // Time markers
-              ..._buildTimeMarkers(),
+              ..._buildTimeMarkers(markerLineColor, markerTextColor),
 
               // Flow values
-              ..._buildFlowMarkers(),
+              ..._buildFlowMarkers(isDark, colorScheme),
             ],
           ),
         ),
@@ -380,7 +402,14 @@ class _HorizontalFlowTimelineState extends State<HorizontalFlowTimeline> {
     );
   }
 
-  List<Widget> _buildTimeMarkers() {
+  List<Widget> _buildTimeMarkers([Color? lineColor, Color? textColor]) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
+    // Default colors if not provided
+    lineColor ??= isDark ? Colors.grey[600] : Colors.grey[400];
+    textColor ??= isDark ? Colors.grey[300] : Colors.grey[700];
+
     final markers = <Widget>[];
     final double hourWidth = 70.0;
 
@@ -398,11 +427,11 @@ class _HorizontalFlowTimelineState extends State<HorizontalFlowTimeline> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Container(height: 12, width: 1, color: Colors.grey[400]),
+                Container(height: 12, width: 1, color: lineColor),
                 const SizedBox(height: 4),
                 Text(
                   timeStr,
-                  style: TextStyle(fontSize: 12, color: Colors.grey[700]),
+                  style: theme.textTheme.bodySmall?.copyWith(color: textColor),
                   textAlign: TextAlign.center,
                 ),
               ],
@@ -415,7 +444,8 @@ class _HorizontalFlowTimelineState extends State<HorizontalFlowTimeline> {
     return markers;
   }
 
-  List<Widget> _buildFlowMarkers() {
+  List<Widget> _buildFlowMarkers(bool isDark, ColorScheme colorScheme) {
+    final theme = Theme.of(context);
     final markers = <Widget>[];
     final double hourWidth = 70.0;
     final double maxHeight = 160.0; // Max height for the wave
@@ -437,21 +467,27 @@ class _HorizontalFlowTimelineState extends State<HorizontalFlowTimeline> {
           left: i * hourWidth + (hourWidth / 2) - 15,
           top: y - 10,
           child: Container(
-            padding: EdgeInsets.all(4),
+            padding: const EdgeInsets.all(4),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color:
+                  isDark ? colorScheme.surfaceContainerHighest : Colors.white,
               borderRadius: BorderRadius.circular(4),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.1),
+                  color:
+                      isDark
+                          ? Colors.black.withOpacity(0.3)
+                          : Colors.black.withOpacity(0.1),
                   blurRadius: 2,
-                  offset: Offset(0, 1),
+                  offset: const Offset(0, 1),
                 ),
               ],
             ),
             child: Text(
               flow.toInt().toString(),
-              style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
+              style: theme.textTheme.bodySmall?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
             ),
           ),
         ),
@@ -517,8 +553,13 @@ class FlowWaveClipper extends CustomClipper<Path> {
 class FlowWavePainter extends CustomPainter {
   final List<Forecast> forecasts;
   final ReturnPeriod? returnPeriod;
+  final bool isDarkMode;
 
-  FlowWavePainter({required this.forecasts, this.returnPeriod});
+  FlowWavePainter({
+    required this.forecasts,
+    this.returnPeriod,
+    this.isDarkMode = false,
+  });
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -616,10 +657,15 @@ class FlowWavePainter extends CustomPainter {
     // Draw the wave fill
     canvas.drawPath(path, paint);
 
-    // Draw the wave line on top
+    // Draw the wave line on top - adapt to dark mode
+    final lineColor =
+        isDarkMode
+            ? Colors.white.withOpacity(0.5)
+            : Colors.white.withOpacity(0.7);
+
     final linePaint =
         Paint()
-          ..color = Colors.white.withOpacity(0.7)
+          ..color = lineColor
           ..style = PaintingStyle.stroke
           ..strokeWidth = 2.0;
 
@@ -679,9 +725,15 @@ class FlowWavePainter extends CustomPainter {
                 : 0.0;
         final y = maxHeight - normalizedHeight;
 
+        // Theme-aware colors
+        final lineColor =
+            isDarkMode
+                ? Colors.white.withOpacity(0.4)
+                : Colors.white.withOpacity(0.6);
+
         final paint =
             Paint()
-              ..color = Colors.white.withOpacity(0.6)
+              ..color = lineColor
               ..style = PaintingStyle.stroke
               ..strokeWidth = 1.0
               ..strokeCap = StrokeCap.round;
@@ -700,13 +752,16 @@ class FlowWavePainter extends CustomPainter {
           startX += dashWidth + dashSpace;
         }
 
-        // Draw label
+        // Draw label with theme-aware colors
+        final bgColor = isDarkMode ? Colors.black38 : Colors.black54;
+        final textColor = Colors.white;
+
         final textSpan = TextSpan(
           text: '$year-yr',
           style: TextStyle(
-            color: Colors.white,
+            color: textColor,
             fontSize: 10,
-            backgroundColor: Colors.black54,
+            backgroundColor: bgColor,
           ),
         );
 

@@ -62,7 +62,7 @@ class FlowRangeBar extends StatelessWidget {
               Container(
                 width: totalWidth,
                 height: height,
-                color: Colors.grey.withValues(alpha: 0.3),
+                color: Colors.grey.withValues(alpha: 0.2),
               ),
 
               // Range bar with gradient
@@ -101,6 +101,7 @@ class FlowRangeBar extends StatelessWidget {
     return Container(
       height: height,
       decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(3),
         gradient: LinearGradient(
           colors: [minColor, maxColor],
           begin: Alignment.centerLeft,

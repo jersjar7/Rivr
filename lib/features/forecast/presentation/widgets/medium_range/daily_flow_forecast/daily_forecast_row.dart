@@ -42,7 +42,7 @@ class DailyForecastRow extends StatelessWidget {
     return InkWell(
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
         decoration: BoxDecoration(
           color:
               isSelected
@@ -59,7 +59,7 @@ class DailyForecastRow extends StatelessWidget {
           children: [
             // Day label (left-aligned)
             SizedBox(
-              width: 85,
+              width: 90,
               child: Text(
                 dayLabel,
                 style: textTheme.titleMedium?.copyWith(
@@ -76,18 +76,10 @@ class DailyForecastRow extends StatelessWidget {
                   size: 24,
                   withBackground: true,
                 ),
-                Positioned(
-                  right: 0,
-                  bottom: 0,
-                  child: DataSourceBadge(
-                    dataSource: forecast.dataSource,
-                    size: 14,
-                  ),
-                ),
               ],
             ),
 
-            const SizedBox(width: 16),
+            const SizedBox(width: 40),
 
             // Flow values and range bar
             Expanded(
@@ -113,7 +105,7 @@ class DailyForecastRow extends StatelessWidget {
                       forecast: forecast,
                       minFlowBound: minFlowBound,
                       maxFlowBound: maxFlowBound,
-                      height: 8.0,
+                      height: 7.0,
                       returnPeriod: returnPeriod,
                     ),
                   ),

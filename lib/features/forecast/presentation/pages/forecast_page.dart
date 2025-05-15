@@ -322,7 +322,7 @@ class _ForecastPageState extends State<ForecastPage>
             onTap: () {},
           ),
 
-          const SizedBox(height: 24),
+          const SizedBox(height: 12),
 
           // Daily Flow Forecast widget (using our new weather-app style widget)
           DailyFlowForecastWidget(

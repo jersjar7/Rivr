@@ -45,7 +45,8 @@ class ForecastDataProcessor {
     String dataSource = "unknown";
     if (forecastCollection.forecasts.isNotEmpty) {
       final firstForecast = forecastCollection.forecasts.first;
-      dataSource = firstForecast.member ?? "mean";
+      // Don't default to "mean" - use the actual source information
+      dataSource = firstForecast.member ?? "unknown";
     }
 
     // Group forecasts by day
@@ -147,15 +148,6 @@ class ForecastDataProcessor {
   /// Get a user-friendly representation of the day
   static String getDayLabel(DateTime date, bool isToday) {
     if (isToday) return 'Today';
-
-    final now = DateTime.now();
-    final tomorrow = DateTime(now.year, now.month, now.day + 1);
-
-    if (date.year == tomorrow.year &&
-        date.month == tomorrow.month &&
-        date.day == tomorrow.day) {
-      return 'Tomorrow';
-    }
 
     // Format weekday name
     final weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];

@@ -102,6 +102,7 @@ class _DailyFlowForecastWidgetState extends State<DailyFlowForecastWidget> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final textTheme = theme.textTheme;
 
     // If processing, show loading indicator
     if (_isProcessing) {
@@ -168,17 +169,14 @@ class _DailyFlowForecastWidgetState extends State<DailyFlowForecastWidget> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header with 10-DAY FORECAST title
+          // Header with 10-Day Flow Forecast title
           Container(
             width: double.infinity,
             padding: const EdgeInsets.all(16),
-            color: colorScheme.primary,
+            // color: colorScheme.primary,
             child: Text(
-              '${_dailyForecasts.length}-DAY FORECAST',
-              style: theme.textTheme.titleMedium?.copyWith(
-                color: colorScheme.onPrimary,
-                fontWeight: FontWeight.bold,
-              ),
+              '${_dailyForecasts.length}-Day Flow Forecast',
+              style: textTheme.titleMedium,
             ),
           ),
 

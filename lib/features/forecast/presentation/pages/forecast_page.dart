@@ -480,7 +480,7 @@ class _ForecastPageState extends State<ForecastPage>
           FlowStatusCard(
             currentFlow: latestFlow,
             returnPeriod: returnPeriod,
-            expanded: false,
+            expanded: true,
             onTap: () {},
           ),
 

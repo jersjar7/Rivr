@@ -10,7 +10,7 @@ import 'package:rivr/features/forecast/domain/entities/forecast_types.dart';
 import 'package:rivr/features/forecast/presentation/providers/forecast_provider.dart';
 import 'package:rivr/features/forecast/presentation/providers/return_period_provider.dart';
 import 'package:rivr/features/forecast/presentation/widgets/flow_status_card.dart';
-import 'package:rivr/features/forecast/presentation/widgets/medium_range/daily_flow_forecast/daily_flow_forecast_widget.dart';
+import 'package:rivr/features/forecast/presentation/widgets/medium_range/daily_flow_forecast/daily_flow_forecast_widget_with_hourly.dart';
 import 'package:rivr/features/forecast/presentation/widgets/short_range/horizontal_flow_timeline.dart';
 import 'package:rivr/features/forecast/presentation/widgets/hydrograph/hydrograph_factory.dart';
 import 'package:rivr/features/forecast/presentation/widgets/long_range_calendar.dart';
@@ -325,7 +325,7 @@ class _ForecastPageState extends State<ForecastPage>
           const SizedBox(height: 12),
 
           // Daily Flow Forecast widget (using our new weather-app style widget)
-          DailyFlowForecastWidget(
+          DailyFlowForecastWidgetWithHourly(
             forecastCollection: mediumRangeForecasts,
             returnPeriod: returnPeriod,
             onRefresh: _handleRefresh,

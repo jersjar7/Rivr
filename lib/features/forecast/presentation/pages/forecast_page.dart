@@ -9,7 +9,7 @@ import 'package:rivr/features/forecast/domain/entities/forecast_types.dart';
 import 'package:rivr/features/forecast/presentation/providers/forecast_provider.dart';
 import 'package:rivr/features/forecast/presentation/providers/return_period_provider.dart';
 import 'package:rivr/features/forecast/presentation/widgets/flow_status_card.dart';
-import 'package:rivr/features/forecast/presentation/widgets/horizontal_flow_timeline.dart';
+import 'package:rivr/features/forecast/presentation/widgets/short_range/horizontal_flow_timeline.dart';
 import 'package:rivr/features/forecast/presentation/widgets/hydrograph/hydrograph_factory.dart';
 import 'package:rivr/features/forecast/presentation/widgets/long_range_calendar.dart';
 

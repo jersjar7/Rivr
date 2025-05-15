@@ -386,6 +386,8 @@ class _ForecastPageState extends State<ForecastPage>
       );
     }
 
+    final forecasts = mediumRangeForecasts.forecasts;
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16.0),
       child: Column(
@@ -407,6 +409,17 @@ class _ForecastPageState extends State<ForecastPage>
             returnPeriod: returnPeriod,
             onRefresh: _handleRefresh,
             flowFormatter: NumberFormat('#,##0'),
+          ),
+
+          const SizedBox(height: 12),
+
+          // Add expandable hydrograph for daily forecasts
+          HydrographFactory.createExpandableHydrograph(
+            reachId: widget.reachId,
+            forecastType: ForecastType.mediumRange,
+            forecasts: forecasts,
+            returnPeriod: returnPeriod,
+            dailyStats: forecastProvider.getDailyDataFor(widget.reachId),
           ),
 
           const SizedBox(height: 24),

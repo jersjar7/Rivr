@@ -3,10 +3,10 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:rivr/features/forecast/domain/entities/return_period.dart';
-import 'package:rivr/features/forecast/presentation/widgets/medium_range/daily_flow_forecast/forecast_data_processor.dart';
-import 'package:rivr/features/forecast/presentation/widgets/medium_range/daily_flow_forecast/hourly_daily_flows_widget/flow_value_indicator.dart';
-import 'package:rivr/features/forecast/presentation/widgets/medium_range/daily_flow_forecast/hourly_daily_flows_widget/micro_bar_chart.dart';
-import 'package:rivr/features/forecast/presentation/widgets/medium_range/daily_flow_forecast/hourly_daily_flows_widget/time_slider.dart';
+import 'package:rivr/features/forecast/presentation/widgets/medium_range/9_day_flow_forecast_widget/forecast_data_processor.dart';
+import 'package:rivr/features/forecast/presentation/widgets/medium_range/9_day_flow_forecast_widget/hourly_slider_widget/flow_value_indicator.dart';
+import 'package:rivr/features/forecast/presentation/widgets/medium_range/9_day_flow_forecast_widget/hourly_slider_widget/micro_bar_chart.dart';
+import 'package:rivr/features/forecast/presentation/widgets/medium_range/9_day_flow_forecast_widget/hourly_slider_widget/time_slider.dart';
 
 /// A widget that displays hourly flow data for a selected day
 class HourlyFlowDisplay extends StatefulWidget {

@@ -2,7 +2,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:rivr/features/forecast/domain/entities/return_period.dart';
-import 'package:rivr/features/forecast/presentation/widgets/medium_range/daily_flow_forecast/forecast_data_processor.dart';
+import 'package:rivr/features/forecast/presentation/widgets/medium_range/9_day_flow_forecast_widget/forecast_data_processor.dart';
 import 'package:rivr/features/forecast/utils/flow_thresholds.dart';
 
 /// A horizontal bar that represents the flow range for a day

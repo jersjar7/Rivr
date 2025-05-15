@@ -3,10 +3,10 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:rivr/features/forecast/domain/entities/return_period.dart';
-import 'package:rivr/features/forecast/presentation/widgets/medium_range/daily_flow_forecast/flow_condition_icon.dart';
-import 'package:rivr/features/forecast/presentation/widgets/medium_range/daily_flow_forecast/flow_range_bar.dart';
-import 'package:rivr/features/forecast/presentation/widgets/medium_range/daily_flow_forecast/forecast_data_processor.dart';
-import 'package:rivr/features/forecast/presentation/widgets/medium_range/daily_flow_forecast/hourly_daily_flows_widget/hourly_flow_display.dart';
+import 'package:rivr/features/forecast/presentation/widgets/medium_range/9_day_flow_forecast_widget/flow_condition_icon.dart';
+import 'package:rivr/features/forecast/presentation/widgets/medium_range/9_day_flow_forecast_widget/flow_range_bar.dart';
+import 'package:rivr/features/forecast/presentation/widgets/medium_range/9_day_flow_forecast_widget/forecast_data_processor.dart';
+import 'package:rivr/features/forecast/presentation/widgets/medium_range/9_day_flow_forecast_widget/hourly_slider_widget/hourly_flow_display.dart';
 
 /// An enhanced version of the expandable daily forecast row that includes hourly data
 class ExpandableDailyForecastRowWithHourly extends StatefulWidget {
@@ -106,11 +106,11 @@ class _ExpandableDailyForecastRowWithHourlyState
       decoration: BoxDecoration(
         color:
             _isExpanded
-                ? colorScheme.surfaceContainerHighest.withOpacity(0.5)
+                ? colorScheme.surfaceContainerHighest.withValues(alpha: 0.5)
                 : null,
         border: Border(
           bottom: BorderSide(
-            color: colorScheme.outline.withOpacity(0.2),
+            color: colorScheme.outline.withValues(alpha: 0.2),
             width: 0.5,
           ),
         ),
@@ -154,7 +154,7 @@ class _ExpandableDailyForecastRowWithHourlyState
                     color:
                         widget.isToday
                             ? colorScheme.primary
-                            : colorScheme.onSurface.withOpacity(0.8),
+                            : colorScheme.onSurface.withValues(alpha: 0.8),
                   ),
                 ),
 
@@ -181,7 +181,7 @@ class _ExpandableDailyForecastRowWithHourlyState
                     color:
                         widget.isToday
                             ? colorScheme.primary
-                            : colorScheme.onSurface.withOpacity(0.8),
+                            : colorScheme.onSurface.withValues(alpha: 0.8),
                   ),
                 ),
               ],
@@ -204,7 +204,7 @@ class _ExpandableDailyForecastRowWithHourlyState
 
     return Container(
       width: double.infinity,
-      color: colorScheme.surfaceContainerHighest.withOpacity(0.3),
+      color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

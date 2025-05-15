@@ -1,20 +1,20 @@
-// lib/features/forecast/presentation/widgets/medium_range/daily_flow_forecast/daily_flow_forecast_widget.dart
+// lib/features/forecast/presentation/widgets/medium_range/daily_flow_forecast/daily_flow_forecast_widget_with_hourly.dart
 
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:rivr/features/forecast/domain/entities/forecast.dart';
 import 'package:rivr/features/forecast/domain/entities/return_period.dart';
-import 'package:rivr/features/forecast/presentation/widgets/medium_range/daily_flow_forecast/daily_forecast_row.dart';
-import 'package:rivr/features/forecast/presentation/widgets/medium_range/daily_flow_forecast/forecast_data_processor.dart';
+import 'package:rivr/features/forecast/presentation/widgets/medium_range/9_day_flow_forecast_widget/daily_forecast_row.dart';
+import 'package:rivr/features/forecast/presentation/widgets/medium_range/9_day_flow_forecast_widget/forecast_data_processor.dart';
 
-/// Main widget for displaying the daily flow forecast similar to the weather app
-class DailyFlowForecastWidget extends StatefulWidget {
+/// Enhanced version of the daily flow forecast widget that includes hourly data visualization
+class DailyFlowForecastWidgetWithHourly extends StatefulWidget {
   final ForecastCollection? forecastCollection;
   final ReturnPeriod? returnPeriod;
   final VoidCallback? onRefresh;
   final NumberFormat? flowFormatter;
 
-  const DailyFlowForecastWidget({
+  const DailyFlowForecastWidgetWithHourly({
     super.key,
     required this.forecastCollection,
     this.returnPeriod,
@@ -23,11 +23,12 @@ class DailyFlowForecastWidget extends StatefulWidget {
   });
 
   @override
-  State<DailyFlowForecastWidget> createState() =>
-      _DailyFlowForecastWidgetState();
+  State<DailyFlowForecastWidgetWithHourly> createState() =>
+      _DailyFlowForecastWidgetWithHourlyState();
 }
 
-class _DailyFlowForecastWidgetState extends State<DailyFlowForecastWidget> {
+class _DailyFlowForecastWidgetWithHourlyState
+    extends State<DailyFlowForecastWidgetWithHourly> {
   List<DailyFlowForecast> _dailyForecasts = [];
   Map<String, double> _flowBounds = {'min': 0, 'max': 100};
   int? _expandedIndex;
@@ -41,7 +42,7 @@ class _DailyFlowForecastWidgetState extends State<DailyFlowForecastWidget> {
   }
 
   @override
-  void didUpdateWidget(DailyFlowForecastWidget oldWidget) {
+  void didUpdateWidget(DailyFlowForecastWidgetWithHourly oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.forecastCollection != widget.forecastCollection ||
         oldWidget.returnPeriod != widget.returnPeriod) {
@@ -161,7 +162,7 @@ class _DailyFlowForecastWidgetState extends State<DailyFlowForecastWidget> {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
 
-    // Build the list of daily forecast rows
+    // Build the list of daily forecast rows with hourly data
     return Card(
       elevation: 2,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -173,14 +174,13 @@ class _DailyFlowForecastWidgetState extends State<DailyFlowForecastWidget> {
           Container(
             width: double.infinity,
             padding: const EdgeInsets.all(16),
-            // color: colorScheme.primary,
             child: Text(
               '${_dailyForecasts.length}-Day Flow Forecast',
               style: textTheme.titleMedium,
             ),
           ),
 
-          // List of daily forecast rows
+          // List of daily forecast rows with hourly data
           ...List.generate(_dailyForecasts.length, (index) {
             final forecast = _dailyForecasts[index];
             final isToday =
@@ -188,7 +188,7 @@ class _DailyFlowForecastWidgetState extends State<DailyFlowForecastWidget> {
                 forecast.date.month == today.month &&
                 forecast.date.day == today.day;
 
-            return ExpandableDailyForecastRow(
+            return ExpandableDailyForecastRowWithHourly(
               forecast: forecast,
               minFlowBound: _flowBounds['min']!,
               maxFlowBound: _flowBounds['max']!,

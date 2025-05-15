@@ -1,6 +1,7 @@
 // lib/features/forecast/presentation/pages/forecast_page.dart
 
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:rivr/core/network/connection_monitor.dart';
 import 'package:rivr/core/widgets/loading_indicator.dart';
@@ -9,6 +10,7 @@ import 'package:rivr/features/forecast/domain/entities/forecast_types.dart';
 import 'package:rivr/features/forecast/presentation/providers/forecast_provider.dart';
 import 'package:rivr/features/forecast/presentation/providers/return_period_provider.dart';
 import 'package:rivr/features/forecast/presentation/widgets/flow_status_card.dart';
+import 'package:rivr/features/forecast/presentation/widgets/medium_range/daily_flow_forecast/daily_flow_forecast_widget.dart';
 import 'package:rivr/features/forecast/presentation/widgets/short_range/horizontal_flow_timeline.dart';
 import 'package:rivr/features/forecast/presentation/widgets/hydrograph/hydrograph_factory.dart';
 import 'package:rivr/features/forecast/presentation/widgets/long_range_calendar.dart';
@@ -292,7 +294,6 @@ class _ForecastPageState extends State<ForecastPage>
       widget.reachId,
       ForecastType.mediumRange,
     );
-    final dailyData = forecastProvider.getDailyDataFor(widget.reachId);
 
     if (mediumRangeForecasts == null) {
       return Center(
@@ -307,8 +308,6 @@ class _ForecastPageState extends State<ForecastPage>
         ),
       );
     }
-
-    final forecasts = mediumRangeForecasts.forecasts;
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16.0),
@@ -325,32 +324,12 @@ class _ForecastPageState extends State<ForecastPage>
 
           const SizedBox(height: 24),
 
-          // Daily Hydrograph
-          Card(
-            elevation: 2,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.all(8.0),
-              child: SizedBox(
-                height: 300,
-                child:
-                    forecasts.isEmpty
-                        ? EmptyStateView(
-                          title: 'No daily data',
-                          icon: Icons.bar_chart,
-                          iconSize: 40,
-                        )
-                        : HydrographFactory.createHydrograph(
-                          reachId: widget.reachId,
-                          forecastType: ForecastType.mediumRange,
-                          forecasts: forecasts,
-                          returnPeriod: returnPeriod,
-                          dailyStats: dailyData,
-                        ),
-              ),
-            ),
+          // Daily Flow Forecast widget (using our new weather-app style widget)
+          DailyFlowForecastWidget(
+            forecastCollection: mediumRangeForecasts,
+            returnPeriod: returnPeriod,
+            onRefresh: _handleRefresh,
+            flowFormatter: NumberFormat('#,##0'),
           ),
 
           const SizedBox(height: 24),

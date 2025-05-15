@@ -59,22 +59,50 @@ class ForecastModel {
 
     // Handle different API response structures
     if (forecastType == ForecastType.shortRange) {
-      if (json.containsKey('shortRange') &&
-          json['shortRange'] != null &&
-          json['shortRange'].containsKey('series') &&
-          json['shortRange']['series'] != null &&
-          json['shortRange']['series'].containsKey('data')) {
-        final List<dynamic> data = json['shortRange']['series']['data'];
-        for (var item in data) {
-          if (item['flow'] != null && item['validTime'] != null) {
-            forecasts.add(
-              ForecastModel.fromApiJson(item, reachId, forecastType),
-            );
+      if (json.containsKey('shortRange') && json['shortRange'] != null) {
+        // Try to get series data first (mean data for short range)
+        if (json['shortRange'].containsKey('series') &&
+            json['shortRange']['series'] != null &&
+            json['shortRange']['series'].containsKey('data')) {
+          final List<dynamic> data = json['shortRange']['series']['data'];
+          for (var item in data) {
+            if (item['flow'] != null && item['validTime'] != null) {
+              forecasts.add(
+                ForecastModel.fromApiJson(item, reachId, forecastType),
+              );
+            }
+          }
+        }
+
+        // If no forecasts from series, try to get data from members
+        if (forecasts.isEmpty) {
+          for (int i = 1; i <= 6; i++) {
+            final memberKey = 'member$i';
+            if (json['shortRange'].containsKey(memberKey) &&
+                json['shortRange'][memberKey] != null &&
+                json['shortRange'][memberKey].containsKey('data')) {
+              final List<dynamic> memberData =
+                  json['shortRange'][memberKey]['data'];
+              for (var item in memberData) {
+                if (item['flow'] != null && item['validTime'] != null) {
+                  forecasts.add(
+                    ForecastModel.fromApiJson(
+                      item,
+                      reachId,
+                      forecastType,
+                      member: memberKey,
+                    ),
+                  );
+                }
+              }
+              // If we found valid forecasts from this member, stop searching further
+              if (forecasts.isNotEmpty) break;
+            }
           }
         }
       }
     } else if (forecastType == ForecastType.mediumRange) {
-      if (json.containsKey('mediumRange')) {
+      if (json.containsKey('mediumRange') && json['mediumRange'] != null) {
         // Try to get mean data first
         if (json['mediumRange'].containsKey('mean') &&
             json['mediumRange']['mean'] != null &&
@@ -87,8 +115,10 @@ class ForecastModel {
               );
             }
           }
-        } else {
-          // If mean is not available, try to get data from members
+        }
+
+        // If no forecasts from mean, try to get data from members
+        if (forecasts.isEmpty) {
           for (int i = 1; i <= 6; i++) {
             final memberKey = 'member$i';
             if (json['mediumRange'].containsKey(memberKey) &&
@@ -108,14 +138,14 @@ class ForecastModel {
                   );
                 }
               }
-              // Break after finding the first valid member
+              // If we found valid forecasts from this member, stop searching further
               if (forecasts.isNotEmpty) break;
             }
           }
         }
       }
     } else if (forecastType == ForecastType.longRange) {
-      if (json.containsKey('longRange')) {
+      if (json.containsKey('longRange') && json['longRange'] != null) {
         // Try to get mean data first
         if (json['longRange'].containsKey('mean') &&
             json['longRange']['mean'] != null &&
@@ -128,8 +158,10 @@ class ForecastModel {
               );
             }
           }
-        } else {
-          // If mean is not available, try to get data from members
+        }
+
+        // If no forecasts from mean, try to get data from members
+        if (forecasts.isEmpty) {
           for (int i = 1; i <= 6; i++) {
             final memberKey = 'member$i';
             if (json['longRange'].containsKey(memberKey) &&
@@ -149,7 +181,7 @@ class ForecastModel {
                   );
                 }
               }
-              // Break after finding the first valid member
+              // If we found valid forecasts from this member, stop searching further
               if (forecasts.isNotEmpty) break;
             }
           }

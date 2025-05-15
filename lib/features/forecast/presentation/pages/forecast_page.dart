@@ -497,12 +497,7 @@ class _ForecastPageState extends State<ForecastPage>
             onTap: () {},
           ),
 
-          const SizedBox(height: 24),
-          Text(
-            'Monthly View (Long-Range Forecast)',
-            style: theme.textTheme.titleMedium,
-          ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 12),
 
           // Calendar with forecast data
           forecasts.isEmpty
@@ -519,6 +514,16 @@ class _ForecastPageState extends State<ForecastPage>
                 longRangeFlows: dailyData,
                 onRefresh: () => _handleRefresh(),
               ),
+
+          const SizedBox(height: 12),
+
+          // Add expandable hydrograph for monthly forecasts
+          HydrographFactory.createExpandableHydrograph(
+            reachId: widget.reachId,
+            forecastType: ForecastType.longRange,
+            forecasts: forecasts,
+            returnPeriod: returnPeriod,
+          ),
 
           const SizedBox(height: 24),
 

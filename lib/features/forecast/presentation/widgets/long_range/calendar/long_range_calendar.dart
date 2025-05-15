@@ -5,7 +5,6 @@ import 'package:intl/intl.dart';
 import 'package:rivr/features/forecast/domain/entities/forecast.dart';
 import 'package:rivr/features/forecast/domain/entities/return_period.dart';
 import 'package:rivr/features/forecast/presentation/widgets/calendar/calendar_day_cell.dart';
-import 'package:rivr/features/forecast/presentation/widgets/calendar/calendar_legend.dart';
 
 class LongRangeCalendar extends StatefulWidget {
   final List<Forecast> forecasts;
@@ -353,27 +352,6 @@ class _LongRangeCalendarState extends State<LongRangeCalendar> {
         ),
 
         const SizedBox(height: 16),
-
-        // Flow legend
-        const CollapsibleLegend(initiallyExpanded: false),
-
-        const SizedBox(height: 16),
-
-        // Refresh button
-        if (widget.onRefresh != null)
-          ElevatedButton.icon(
-            onPressed: () {
-              _removeTooltip();
-              widget.onRefresh?.call();
-            },
-            icon: const Icon(Icons.refresh),
-            label: const Text('Refresh Forecast Data'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.blue,
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-            ),
-          ),
       ],
     );
   }

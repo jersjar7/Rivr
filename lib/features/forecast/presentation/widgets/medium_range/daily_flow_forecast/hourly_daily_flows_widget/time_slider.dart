@@ -96,69 +96,54 @@ class HourlyTimeSlider extends StatelessWidget {
       color: Theme.of(context).colorScheme.onSurfaceVariant,
     );
 
-    // We'll place markers for key times (12 AM, 6 AM, 12 PM, 6 PM)
-    return Stack(
-      children: [
-        // AM marker
-        if (_hasHourInRange(0, 2))
-          Positioned(left: 0, child: Text('12 AM', style: markerStyle)),
+    // Get the earliest and latest hour in our data
+    if (hourLabels.isEmpty) return const SizedBox.shrink();
 
-        // 6 AM marker
-        if (_hasHourInRange(5, 7))
-          Positioned(
-            left: _calculateMarkerPosition(6),
-            child: Text('6 AM', style: markerStyle),
-          ),
+    final DateTime firstTime = hourLabels.first;
+    final DateTime lastTime = hourLabels.last;
 
-        // Noon marker
-        if (_hasHourInRange(11, 13))
-          Positioned(
-            left: _calculateMarkerPosition(12),
-            child: Text('Noon', style: markerStyle),
-          ),
+    // Calculate the total time span in hours (might span multiple days)
+    final int totalHours = lastTime.difference(firstTime).inHours;
+    if (totalHours <= 0) return const SizedBox.shrink();
 
-        // 6 PM marker
-        if (_hasHourInRange(17, 19))
-          Positioned(
-            left: _calculateMarkerPosition(18),
-            child: Text('6 PM', style: markerStyle),
-          ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // Fixed positions regardless of available data
+        return Stack(
+          children: [
+            // Start marker (first hour)
+            Positioned(
+              left: 0,
+              child: Text(
+                DateFormat('h a').format(firstTime),
+                style: markerStyle,
+              ),
+            ),
 
-        // Midnight marker if we have late hours
-        if (_hasHourInRange(22, 24))
-          Positioned(right: 0, child: Text('12 AM', style: markerStyle)),
-      ],
+            // Middle marker (halfway point)
+            if (totalHours >= 6)
+              Positioned(
+                left: constraints.maxWidth / 2,
+                child: Text(
+                  DateFormat(
+                    'h a',
+                  ).format(firstTime.add(Duration(hours: totalHours ~/ 2))),
+                  style: markerStyle,
+                  textAlign: TextAlign.center,
+                ),
+              ),
+
+            // End marker (last hour)
+            Positioned(
+              right: 0,
+              child: Text(
+                DateFormat('h a').format(lastTime),
+                style: markerStyle,
+              ),
+            ),
+          ],
+        );
+      },
     );
-  }
-
-  /// Checks if we have data for an hour in the given range
-  bool _hasHourInRange(int minHour, int maxHour) {
-    return hourLabels.any(
-      (time) => time.hour >= minHour && time.hour < maxHour,
-    );
-  }
-
-  /// Calculates the position for a time marker
-  double _calculateMarkerPosition(int targetHour) {
-    // Find the closest hour to the target hour
-    DateTime? closestTime;
-    int smallestDifference = 24;
-
-    for (final time in hourLabels) {
-      final difference = (time.hour - targetHour).abs();
-      if (difference < smallestDifference) {
-        smallestDifference = difference;
-        closestTime = time;
-      }
-    }
-
-    if (closestTime == null) return 0;
-
-    // Calculate the index of this time in our list
-    final index = hourLabels.indexOf(closestTime);
-    if (index < 0) return 0;
-
-    // Convert to percentage of width
-    return (index / (hourCount - 1) * 100).clamp(0, 100);
   }
 }

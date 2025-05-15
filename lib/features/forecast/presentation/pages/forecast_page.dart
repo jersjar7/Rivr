@@ -99,6 +99,66 @@ class _ForecastPageState extends State<ForecastPage>
     return Future.delayed(const Duration(milliseconds: 500));
   }
 
+  Future<void> _refreshShortRangeForecast() async {
+    final forecastProvider = Provider.of<ForecastProvider>(
+      context,
+      listen: false,
+    );
+
+    setState(() {
+      _isRefreshing = true;
+    });
+
+    await forecastProvider.loadShortRangeForecast(
+      widget.reachId,
+      forceRefresh: true,
+    );
+
+    setState(() {
+      _isRefreshing = false;
+    });
+  }
+
+  Future<void> _refreshMediumRangeForecast() async {
+    final forecastProvider = Provider.of<ForecastProvider>(
+      context,
+      listen: false,
+    );
+
+    setState(() {
+      _isRefreshing = true;
+    });
+
+    await forecastProvider.loadMediumRangeForecast(
+      widget.reachId,
+      forceRefresh: true,
+    );
+
+    setState(() {
+      _isRefreshing = false;
+    });
+  }
+
+  Future<void> _refreshLongRangeForecast() async {
+    final forecastProvider = Provider.of<ForecastProvider>(
+      context,
+      listen: false,
+    );
+
+    setState(() {
+      _isRefreshing = true;
+    });
+
+    await forecastProvider.loadLongRangeForecast(
+      widget.reachId,
+      forceRefresh: true,
+    );
+
+    setState(() {
+      _isRefreshing = false;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -269,6 +329,23 @@ class _ForecastPageState extends State<ForecastPage>
 
           const SizedBox(height: 24),
 
+          // Refresh Short Range Forecast Button
+          Center(
+            child: ElevatedButton.icon(
+              onPressed: _refreshShortRangeForecast,
+              icon: const Icon(Icons.refresh),
+              label: const Text('Refresh Hourly Forecast'),
+              style: ElevatedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 12,
+                ),
+              ),
+            ),
+          ),
+
+          const SizedBox(height: 24),
+
           // Last Updated Info
           Text(
             'Last updated: ${DateTime.now().toString().substring(0, 16)}',
@@ -330,6 +407,23 @@ class _ForecastPageState extends State<ForecastPage>
             returnPeriod: returnPeriod,
             onRefresh: _handleRefresh,
             flowFormatter: NumberFormat('#,##0'),
+          ),
+
+          const SizedBox(height: 24),
+
+          // Refresh Medium Range Forecast Button
+          Center(
+            child: ElevatedButton.icon(
+              onPressed: _refreshMediumRangeForecast,
+              icon: const Icon(Icons.refresh),
+              label: const Text('Refresh Daily Forecast'),
+              style: ElevatedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 12,
+                ),
+              ),
+            ),
           ),
 
           const SizedBox(height: 24),
@@ -412,6 +506,23 @@ class _ForecastPageState extends State<ForecastPage>
                 longRangeFlows: dailyData,
                 onRefresh: () => _handleRefresh(),
               ),
+
+          const SizedBox(height: 24),
+
+          // Refresh Long Range Forecast Button
+          Center(
+            child: ElevatedButton.icon(
+              onPressed: _refreshLongRangeForecast,
+              icon: const Icon(Icons.refresh),
+              label: const Text('Refresh Monthly Forecast'),
+              style: ElevatedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 12,
+                ),
+              ),
+            ),
+          ),
 
           const SizedBox(height: 24),
 

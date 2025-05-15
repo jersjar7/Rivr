@@ -199,21 +199,7 @@ class _DailyFlowForecastWidgetWithHourlyState
               onExpandChanged: (expanded) => _toggleExpanded(index),
             );
           }),
-
-          // Optional refresh button at bottom
-          if (widget.onRefresh != null)
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(12),
-              color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
-              child: Center(
-                child: OutlinedButton.icon(
-                  onPressed: widget.onRefresh,
-                  icon: const Icon(Icons.refresh),
-                  label: const Text('Refresh Forecast'),
-                ),
-              ),
-            ),
+          SizedBox(height: 5),
         ],
       ),
     );

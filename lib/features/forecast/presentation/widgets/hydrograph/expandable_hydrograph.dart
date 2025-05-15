@@ -397,7 +397,6 @@ class _ExpandableHydrographState extends State<ExpandableHydrograph>
   }
 
   // Build the full hydrograph for the expanded view
-  // Updated _buildFullHydrograph method in expandable_hydrograph.dart to use the zoomable chart
 
   Widget _buildFullHydrograph() {
     // Use our custom zoomable chart instead of the standard hydrograph

@@ -187,6 +187,9 @@ class _DailyFlowForecastWidgetWithHourlyState
                 forecast.date.year == today.year &&
                 forecast.date.month == today.month &&
                 forecast.date.day == today.day;
+            final isLastRow =
+                index ==
+                _dailyForecasts.length - 1; // Check if this is the last row
 
             return ExpandableDailyForecastRowWithHourly(
               forecast: forecast,
@@ -197,6 +200,7 @@ class _DailyFlowForecastWidgetWithHourlyState
               returnPeriod: widget.returnPeriod,
               isExpanded: _expandedIndex == index,
               onExpandChanged: (expanded) => _toggleExpanded(index),
+              isLastRow: isLastRow,
             );
           }),
           SizedBox(height: 5),

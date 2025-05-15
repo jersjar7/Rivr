@@ -18,6 +18,7 @@ class ExpandableDailyForecastRowWithHourly extends StatefulWidget {
   final ReturnPeriod? returnPeriod;
   final bool isExpanded;
   final Function(bool)? onExpandChanged;
+  final bool isLastRow;
 
   const ExpandableDailyForecastRowWithHourly({
     super.key,
@@ -29,6 +30,7 @@ class ExpandableDailyForecastRowWithHourly extends StatefulWidget {
     this.returnPeriod,
     this.isExpanded = false,
     this.onExpandChanged,
+    this.isLastRow = false,
   });
 
   @override
@@ -101,94 +103,104 @@ class _ExpandableDailyForecastRowWithHourlyState
       widget.isToday,
     );
 
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
-      decoration: BoxDecoration(
-        color:
-            _isExpanded
-                ? colorScheme.surfaceContainerHighest.withValues(alpha: 0.5)
-                : null,
-        border: Border(
-          bottom: BorderSide(
-            color: colorScheme.outline.withValues(alpha: 0.2),
-            width: 0.5,
+    return Column(
+      children: [
+        // Main content container
+        Container(
+          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
+          decoration: BoxDecoration(
+            color:
+                _isExpanded
+                    ? colorScheme.surfaceContainerHighest.withValues(alpha: 0.5)
+                    : null,
           ),
-        ),
-      ),
-      child: Row(
-        children: [
-          // Day label (left-aligned)
-          SizedBox(
-            width: 90,
-            child: Text(
-              dayLabel,
-              style: textTheme.titleMedium?.copyWith(
-                fontWeight:
-                    widget.isToday ? FontWeight.bold : FontWeight.normal,
-              ),
-            ),
-          ),
-
-          // Flow icon with data source badge
-          Stack(
+          child: Row(
             children: [
-              FlowConditionIcon(
-                flowCategory: widget.forecast.flowCategory,
-                size: 24,
-                withBackground: true,
+              // Day label (left-aligned)
+              SizedBox(
+                width: 90,
+                child: Text(
+                  dayLabel,
+                  style: textTheme.titleMedium?.copyWith(
+                    fontWeight:
+                        widget.isToday ? FontWeight.bold : FontWeight.normal,
+                  ),
+                ),
+              ),
+
+              // Flow icon with data source badge
+              Stack(
+                children: [
+                  FlowConditionIcon(
+                    flowCategory: widget.forecast.flowCategory,
+                    size: 24,
+                    withBackground: true,
+                  ),
+                ],
+              ),
+
+              const SizedBox(width: 40),
+
+              // Flow values and range bar
+              Expanded(
+                child: Row(
+                  children: [
+                    // Minimum flow value
+                    Text(
+                      _flowFormatter.format(widget.forecast.minFlow),
+                      style: textTheme.bodyMedium?.copyWith(
+                        fontSize: 16,
+                        color:
+                            widget.isToday
+                                ? colorScheme.primary
+                                : colorScheme.onSurface.withValues(alpha: 0.8),
+                      ),
+                    ),
+
+                    const SizedBox(width: 8),
+
+                    // Flow range bar
+                    Expanded(
+                      child: FlowRangeBar(
+                        forecast: widget.forecast,
+                        minFlowBound: widget.minFlowBound,
+                        maxFlowBound: widget.maxFlowBound,
+                        height: 7.0,
+                        returnPeriod: widget.returnPeriod,
+                      ),
+                    ),
+
+                    const SizedBox(width: 8),
+
+                    // Maximum flow value
+                    Text(
+                      _flowFormatter.format(widget.forecast.maxFlow),
+                      style: textTheme.bodyMedium?.copyWith(
+                        fontSize: 16,
+                        color:
+                            widget.isToday
+                                ? colorScheme.primary
+                                : colorScheme.onSurface.withValues(alpha: 0.8),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ],
           ),
+        ),
 
-          const SizedBox(width: 40),
-
-          // Flow values and range bar
-          Expanded(
-            child: Row(
-              children: [
-                // Minimum flow value
-                Text(
-                  _flowFormatter.format(widget.forecast.minFlow),
-                  style: textTheme.bodyMedium?.copyWith(
-                    fontSize: 16,
-                    color:
-                        widget.isToday
-                            ? colorScheme.primary
-                            : colorScheme.onSurface.withValues(alpha: 0.8),
-                  ),
-                ),
-
-                const SizedBox(width: 8),
-
-                // Flow range bar
-                Expanded(
-                  child: FlowRangeBar(
-                    forecast: widget.forecast,
-                    minFlowBound: widget.minFlowBound,
-                    maxFlowBound: widget.maxFlowBound,
-                    height: 7.0,
-                    returnPeriod: widget.returnPeriod,
-                  ),
-                ),
-
-                const SizedBox(width: 8),
-
-                // Maximum flow value
-                Text(
-                  _flowFormatter.format(widget.forecast.maxFlow),
-                  style: textTheme.bodyMedium?.copyWith(
-                    fontSize: 16,
-                    color:
-                        widget.isToday
-                            ? colorScheme.primary
-                            : colorScheme.onSurface.withValues(alpha: 0.8),
-                  ),
-                ),
-              ],
+        // Add the divider as a separate element after the row
+        if (!widget.isLastRow)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 15.0),
+            child: Divider(
+              height: 1,
+              thickness: 1.5,
+              color: colorScheme.outline.withValues(alpha: 0.3),
             ),
           ),
-        ],
-      ),
+      ],
     );
   }
 

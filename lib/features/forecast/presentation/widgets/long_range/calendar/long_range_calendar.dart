@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:rivr/features/forecast/domain/entities/forecast.dart';
 import 'package:rivr/features/forecast/domain/entities/return_period.dart';
-import 'package:rivr/features/forecast/presentation/widgets/calendar/calendar_day_cell.dart';
+import 'package:rivr/features/forecast/presentation/widgets/long_range/calendar/calendar_day_cell.dart';
 
 class LongRangeCalendar extends StatefulWidget {
   final List<Forecast> forecasts;

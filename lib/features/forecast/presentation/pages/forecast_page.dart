@@ -13,7 +13,7 @@ import 'package:rivr/features/forecast/presentation/widgets/flow_status_card.dar
 import 'package:rivr/features/forecast/presentation/widgets/medium_range/9_day_flow_forecast_widget/daily_flow_forecast_widget.dart';
 import 'package:rivr/features/forecast/presentation/widgets/short_range/horizontal_flow_timeline.dart';
 import 'package:rivr/features/forecast/presentation/widgets/hydrograph/hydrograph_factory.dart';
-import 'package:rivr/features/forecast/presentation/widgets/long_range_calendar.dart';
+import 'package:rivr/features/forecast/presentation/widgets/long_range/calendar/long_range_calendar.dart';
 
 class ForecastPage extends StatefulWidget {
   final String reachId;
@@ -165,7 +165,12 @@ class _ForecastPageState extends State<ForecastPage>
 
     return Scaffold(
       appBar: AppBar(
-        title: Text('${widget.stationName} Forecast'),
+        title: Text(
+          '${widget.stationName} Flow Forecast',
+          maxLines: 2,
+          softWrap: true,
+          textAlign: TextAlign.center,
+        ),
         bottom: TabBar(
           controller: _tabController,
           labelColor:

@@ -6,7 +6,7 @@ import 'package:rivr/features/forecast/domain/entities/forecast.dart';
 import 'package:rivr/features/forecast/domain/entities/forecast_types.dart';
 import 'package:rivr/features/forecast/domain/entities/return_period.dart';
 import 'package:rivr/features/forecast/presentation/widgets/hydrograph/chart_only/hydrograph_chart.dart';
-import 'package:rivr/features/forecast/presentation/widgets/expandable_hydrograph.dart';
+import 'package:rivr/features/forecast/presentation/widgets/hydrograph/expandable_hydrograph.dart';
 import 'package:rivr/features/forecast/presentation/widgets/hydrograph/hydrograph_ranges/long_range_hydrograph.dart';
 import 'package:rivr/features/forecast/presentation/widgets/hydrograph/hydrograph_ranges/medium_range_hydrograph.dart';
 import 'package:rivr/features/forecast/presentation/widgets/hydrograph/hydrograph_ranges/short_range_hydrograph.dart';

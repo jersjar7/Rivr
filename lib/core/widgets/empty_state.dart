@@ -75,16 +75,6 @@ class EmptyFavoritesView extends StatelessWidget {
           'Add your favorite rivers to track their flow conditions easily.',
       icon: Icons.favorite_border,
       iconColor: colors.primaryContainer, // lighter “primary” accent
-      actionButton: ElevatedButton.icon(
-        onPressed: onExploreMap,
-        icon: const Icon(Icons.map),
-        label: const Text('Explore Map'),
-        style: ElevatedButton.styleFrom(
-          backgroundColor: colors.primary, // primary button fill
-          foregroundColor: colors.onPrimary, // text/icon on primary
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-        ),
-      ),
     );
   }
 }

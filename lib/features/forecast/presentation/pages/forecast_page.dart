@@ -64,11 +64,11 @@ class _ForecastPageState extends State<ForecastPage>
 
   // Handle tab changes to load location when needed
   void _handleTabChange() {
-    if (_tabController.index == 1 &&
-        _locationInfo == null &&
-        !_isLoadingLocation) {
-      // We're on the Daily tab, load location info
-      _loadLocationInfo();
+    if (_tabController.index == 0) {
+      // If we're on the Daily tab, ensure location info is loaded
+      if (_locationInfo == null && !_isLoadingLocation) {
+        _loadLocationInfo();
+      }
     }
   }
 
@@ -100,10 +100,8 @@ class _ForecastPageState extends State<ForecastPage>
           _isRefreshing = false;
         });
 
-        // If we're on the daily tab, load location info
-        if (_tabController.index == 1) {
-          _loadLocationInfo();
-        }
+        // Always load location info, not just for the Daily tab
+        _loadLocationInfo();
       }
     }
   }
@@ -120,7 +118,9 @@ class _ForecastPageState extends State<ForecastPage>
     // Get reach location from provider
     final reachLocation = forecastProvider.getReachLocationFor(widget.reachId);
     if (reachLocation == null) {
-      // No location available
+      print(
+        "Location info not loaded: No coordinates available for reach ${widget.reachId}",
+      );
       return;
     }
 
@@ -129,6 +129,10 @@ class _ForecastPageState extends State<ForecastPage>
     });
 
     try {
+      print(
+        "Loading location info for coordinates: ${reachLocation.lat}, ${reachLocation.lon}",
+      );
+
       // Get geocoding service from service locator
       final geocodingService = sl<GeocodingService>();
 
@@ -137,6 +141,16 @@ class _ForecastPageState extends State<ForecastPage>
         reachLocation.lat,
         reachLocation.lon,
       );
+
+      if (locationInfo != null) {
+        print(
+          "Location info loaded successfully: ${locationInfo.formattedLocation}",
+        );
+      } else {
+        print(
+          "Location info request returned null - geocoding service may have failed",
+        );
+      }
 
       if (mounted) {
         setState(() {

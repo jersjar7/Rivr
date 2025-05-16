@@ -34,34 +34,74 @@ class _MapOverlayState extends State<MapOverlay>
   bool _isMapReady = false;
   MapboxMap? _mapboxMap;
   String _errorMessage = '';
+  bool _closing = false;
 
   @override
   void initState() {
     super.initState();
+    print('🗺️ [MapOverlay] initState()');
 
-    // Set up animations
     _animationController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 300),
-    );
-
+    )..addStatusListener((status) {
+      print('🗺️ [Animation] status: $status');
+    });
     _animation = CurvedAnimation(
       parent: _animationController,
       curve: Curves.easeOutCubic,
     );
 
-    // Start animation
-    _animationController.forward();
+    _animationController.forward().then((_) {
+      print('🗺️ [Animation] forward complete');
+    });
+  }
+
+  void _closeOverlay() {
+    if (_closing) return; // ← ignore if already closing
+    _closing = true;
+    print('🗺️ [MapOverlay] _closeOverlay() tapped');
+
+    _animationController.reverse().then((_) {
+      print('🗺️ [Animation] reverse complete — popping overlay');
+
+      // Grab your map reference, then clear it so nobody else holds on.
+      final mapToDispose = _mapboxMap;
+      _mapboxMap = null;
+
+      // First pop the overlay (this unmounts MapWidget)
+      Navigator.of(context).pop();
+
+      // THEN schedule the actual dispose *after* this frame
+      if (mapToDispose != null) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          try {
+            print('🗺️ [MapOverlay] now disposing native map');
+            mapToDispose.dispose();
+            print('🗺️ [MapOverlay] map.dispose() succeeded');
+          } catch (e, st) {
+            print('⚠️ [MapOverlay] dispose() threw: $e\n$st');
+          }
+        });
+      }
+    });
   }
 
   @override
   void dispose() {
+    print('🗺️ [MapOverlay] dispose(): disposing animationController');
     _animationController.dispose();
+
+    // NOTE: map disposal will happen in _closeOverlay()
     super.dispose();
+    print('🗺️ [MapOverlay] dispose() done');
   }
 
   @override
   Widget build(BuildContext context) {
+    print(
+      '🗺️ [MapOverlay] build() — isMapReady=$_isMapReady, error="$_errorMessage"',
+    );
     final screenSize = MediaQuery.of(context).size;
     final theme = Theme.of(context);
 
@@ -73,12 +113,13 @@ class _MapOverlayState extends State<MapOverlay>
             _closeOverlay();
           },
           child: Container(
-            width: screenSize.width,
-            height: screenSize.height,
+            // width: screenSize.width,
+            // height: screenSize.height,
             color: Colors.black.withValues(alpha: 0.5 * _animation.value),
             child: Center(
-              child: GestureDetector(
-                onTap: () {}, // Prevent closing when tapping the map container
+              child: ScaleTransition(
+                scale:
+                    _animation, // Prevent closing when tapping the map container
                 child: Container(
                   width: screenSize.width * 0.9 * _animation.value,
                   height: screenSize.height * 0.7 * _animation.value,
@@ -264,10 +305,12 @@ class _MapOverlayState extends State<MapOverlay>
   }
 
   Future<void> _onMapCreated(MapboxMap mapboxMap) async {
+    print('🗺️ [MapOverlay] onMapCreated → $mapboxMap');
     _mapboxMap = mapboxMap;
 
     // Add a marker at the river's location
     try {
+      print('🗺️ [MapOverlay] setting up annotations…');
       // Delay slightly to ensure map is fully initialized
       await Future.delayed(const Duration(milliseconds: 500));
 
@@ -319,15 +362,18 @@ class _MapOverlayState extends State<MapOverlay>
       // Add the annotation to the map
       await annotationManager.create(markerOptions);
 
+      print('🗺️ [MapOverlay] marker created');
       // Update state to show the map
       if (mounted) {
         setState(() {
           _isMapReady = true;
         });
+        print('🗺️ [MapOverlay] setState(_isMapReady=true)');
       }
-    } catch (e) {
+    } catch (e, st) {
       if (kDebugMode) {
         print('Error setting up map: $e');
+        print('⚠️ [MapOverlay] error in _onMapCreated: $e\n$st');
       }
 
       if (mounted) {
@@ -336,32 +382,5 @@ class _MapOverlayState extends State<MapOverlay>
         });
       }
     }
-  }
-
-  void _closeOverlay() {
-    // Reverse animation and then close
-    _animationController.reverse().then((_) {
-      // Dispose the map before popping to avoid "used after being disposed" error
-      final mapToDispose = _mapboxMap;
-      _mapboxMap = null; // Clear the reference first
-
-      // Now it's safe to pop the route
-      Navigator.of(context).pop();
-
-      // Dispose the map after we've popped the route
-      // We use a microtask to ensure this happens after the frame is complete
-      if (mapToDispose != null) {
-        Future.microtask(() {
-          try {
-            mapToDispose.dispose();
-          } catch (e) {
-            // Ignore errors if the map was already disposed
-            if (kDebugMode) {
-              print('Error disposing map: $e');
-            }
-          }
-        });
-      }
-    });
   }
 }

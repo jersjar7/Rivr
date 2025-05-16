@@ -2,6 +2,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:rivr/core/error/failures.dart';
+import 'package:rivr/core/services/geocoding_service.dart';
 import 'package:rivr/features/forecast/domain/entities/forecast.dart';
 import 'package:rivr/features/forecast/domain/entities/forecast_types.dart';
 import 'package:rivr/features/forecast/domain/entities/reach_location.dart';
@@ -126,8 +127,51 @@ class ForecastProvider extends ChangeNotifier {
   }
 
   // Get location for a reach/river
-  ReachLocation? getReachLocationFor(String reachId) {
-    return _reachLocations[reachId];
+  Future<ReachLocation?> getReachLocationFor(String reachId) async {
+    // Get existing location data (coordinates)
+    ReachLocation? location = _reachLocations[reachId];
+
+    // If no location data available, return null
+    if (location == null) return null;
+
+    // If we have coordinates but no city/state, attempt geocoding
+    if (location.city == null || location.state == null) {
+      try {
+        print("ForecastProvider: Geocoding location for reach $reachId");
+        final geocodingService = sl<GeocodingService>();
+        final locationInfo = await geocodingService.getLocationInfo(
+          location.lat,
+          location.lon,
+        );
+
+        if (locationInfo != null) {
+          print(
+            "ForecastProvider: Geocoding successful for reach $reachId: ${locationInfo.formattedLocation}",
+          );
+
+          // Create updated location with city/state
+          location = ReachLocation(
+            lat: location.lat,
+            lon: location.lon,
+            elevation: location.elevation,
+            city: locationInfo.city,
+            state: locationInfo.state,
+          );
+
+          // Update stored location
+          _reachLocations[reachId] = location;
+          notifyListeners();
+        } else {
+          print("ForecastProvider: Geocoding returned null for reach $reachId");
+        }
+      } catch (e) {
+        print(
+          'ForecastProvider: Error geocoding location for reach $reachId: $e',
+        );
+      }
+    }
+
+    return location;
   }
 
   // Set location for a reach/river

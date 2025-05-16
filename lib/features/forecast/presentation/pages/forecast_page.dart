@@ -3,14 +3,10 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
-import 'package:rivr/core/di/service_locator.dart';
 import 'package:rivr/core/models/location_info.dart';
 import 'package:rivr/core/network/connection_monitor.dart';
-import 'package:rivr/core/services/geocoding_service.dart';
 import 'package:rivr/core/widgets/loading_indicator.dart';
 import 'package:rivr/core/widgets/empty_state.dart';
-import 'package:rivr/features/auth/presentation/providers/auth_provider.dart';
-import 'package:rivr/features/favorites/presentation/providers/favorites_provider.dart';
 import 'package:rivr/features/forecast/domain/entities/forecast_types.dart';
 import 'package:rivr/features/forecast/presentation/providers/forecast_provider.dart';
 import 'package:rivr/features/forecast/presentation/providers/return_period_provider.dart';
@@ -112,107 +108,57 @@ class _ForecastPageState extends State<ForecastPage>
   Future<void> _loadLocationInfo() async {
     if (!mounted) return;
 
-    final forecastProvider = Provider.of<ForecastProvider>(
-      context,
-      listen: false,
-    );
-
-    // Get favoritesProvider to check if this station is a favorite
-    final favoritesProvider = Provider.of<FavoritesProvider>(
-      context,
-      listen: false,
-    );
-
-    final authProvider = Provider.of<AuthProvider>(context, listen: false);
-
-    // Check if this station is a favorite and has location info
-    bool locationFromFavorite = false;
-    if (authProvider.currentUser != null) {
-      try {
-        final userId = authProvider.currentUser!.uid;
-        final favorites = favoritesProvider.favorites;
-
-        // Use where instead of firstWhere to avoid the "orElse" problem
-        final matchingFavorites =
-            favorites
-                .where(
-                  (f) => f.stationId == widget.reachId && f.userId == userId,
-                )
-                .toList();
-
-        // Check if we found a matching favorite
-        if (matchingFavorites.isNotEmpty) {
-          final favorite = matchingFavorites.first;
-
-          // If we found a favorite with city and state, use that
-          if (favorite.city != null && favorite.state != null) {
-            setState(() {
-              _locationInfo = LocationInfo(
-                city: favorite.city!,
-                state: favorite.state!,
-                lat: favorite.lat ?? 0,
-                lon: favorite.lon ?? 0,
-              );
-              _isLoadingLocation = false;
-            });
-
-            print(
-              'Using location info from favorite: ${_locationInfo!.formattedLocation}',
-            );
-            locationFromFavorite = true;
-          }
-        }
-      } catch (e) {
-        print('Error while checking for favorite location data: $e');
-        // Continue with geocoding service
-      }
-    }
-
-    // If we didn't get location from favorites, continue with normal flow
-    if (locationFromFavorite) return;
-
-    // Get reach location from provider
-    final reachLocation = forecastProvider.getReachLocationFor(widget.reachId);
-    if (reachLocation == null) {
-      print(
-        "Location info not loaded: No coordinates available for reach ${widget.reachId}",
-      );
-      return;
-    }
-
     setState(() {
       _isLoadingLocation = true;
     });
 
     try {
-      print(
-        "Loading location info for coordinates: ${reachLocation.lat}, ${reachLocation.lon}",
+      final forecastProvider = Provider.of<ForecastProvider>(
+        context,
+        listen: false,
       );
 
-      // Get geocoding service from service locator
-      final geocodingService = sl<GeocodingService>();
-
-      // Get location info from coordinates
-      final locationInfo = await geocodingService.getLocationInfo(
-        reachLocation.lat,
-        reachLocation.lon,
+      // Use the enhanced getReachLocationFor method that includes geocoding
+      final reachLocation = await forecastProvider.getReachLocationFor(
+        widget.reachId,
       );
 
-      if (locationInfo != null) {
+      if (reachLocation == null) {
         print(
-          "Location info loaded successfully: ${locationInfo.formattedLocation}",
+          "Location info not loaded: No coordinates available for reach ${widget.reachId}",
         );
-      } else {
-        print(
-          "Location info request returned null - geocoding service may have failed",
-        );
+        if (mounted) {
+          setState(() {
+            _isLoadingLocation = false;
+          });
+        }
+        return;
       }
 
-      if (mounted) {
-        setState(() {
-          _locationInfo = locationInfo;
-          _isLoadingLocation = false;
-        });
+      // If we have city and state from the provider, use them
+      if (reachLocation.city != null && reachLocation.state != null) {
+        if (mounted) {
+          setState(() {
+            _locationInfo = LocationInfo(
+              city: reachLocation.city!,
+              state: reachLocation.state!,
+              lat: reachLocation.lat,
+              lon: reachLocation.lon,
+            );
+            _isLoadingLocation = false;
+          });
+        }
+        print(
+          "Location info set from provider: ${reachLocation.city}, ${reachLocation.state}",
+        );
+      } else {
+        // If no city/state available even after geocoding attempt in the provider
+        if (mounted) {
+          setState(() {
+            _isLoadingLocation = false;
+          });
+        }
+        print("Location info not available: Geocoding failed or not attempted");
       }
     } catch (e) {
       print('Error loading location info: $e');
@@ -416,9 +362,6 @@ class _ForecastPageState extends State<ForecastPage>
       ForecastType.shortRange,
     );
 
-    // Get reach location for map
-    final reachLocation = forecastProvider.getReachLocationFor(widget.reachId);
-
     if (shortRangeForecasts == null) {
       return Center(
         child: EmptyStateView(
@@ -440,16 +383,16 @@ class _ForecastPageState extends State<ForecastPage>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Add Location Info Row if we have coordinates
-          if (reachLocation != null)
-            LocationInfoRow(
-              locationInfo: _locationInfo,
-              lat: reachLocation.lat,
-              lon: reachLocation.lon,
-              riverName: widget.stationName,
-              isLoading: _isLoadingLocation,
-              onRefresh: _loadLocationInfo,
-            ),
+          // Location Info Row - Use the pre-loaded _locationInfo or show loading state
+          // This data is managed by _loadLocationInfo()
+          LocationInfoRow(
+            locationInfo: _locationInfo,
+            lat: _locationInfo?.lat ?? 0,
+            lon: _locationInfo?.lon ?? 0,
+            riverName: widget.stationName,
+            isLoading: _isLoadingLocation,
+            onRefresh: _loadLocationInfo,
+          ),
 
           // Current Flow Status Card
           FlowStatusCard(

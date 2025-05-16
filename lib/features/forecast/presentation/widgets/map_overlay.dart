@@ -99,10 +99,23 @@ class _MapOverlayState extends State<MapOverlay>
           '🗺️ [MapOverlay] PostFrameCallback in dispose(): Now disposing native map.',
         );
         try {
-          mapToDisposeInstance?.dispose(); // Use the captured instance
-          print(
-            '🗺️ [MapOverlay] PostFrameCallback in dispose(): map.dispose() succeeded.',
-          );
+          // Add null check here to prevent error
+          if (mapToDisposeInstance != null) {
+            // Check if disposed using a try/catch approach
+            try {
+              // A simple test call to see if the map is still usable
+              mapToDisposeInstance.style.getStyleURI();
+              // If we got here, the map is still valid, so dispose it
+              mapToDisposeInstance.dispose();
+              print(
+                '🗺️ [MapOverlay] PostFrameCallback in dispose(): map.dispose() succeeded.',
+              );
+            } catch (e) {
+              print(
+                '🗺️ [MapOverlay] Map already disposed, skipping duplicate disposal',
+              );
+            }
+          }
         } catch (e, st) {
           print(
             '⚠️ [MapOverlay] PostFrameCallback in dispose(): map.dispose() threw: $e\n$st',

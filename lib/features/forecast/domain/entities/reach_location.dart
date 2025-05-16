@@ -5,8 +5,16 @@ class ReachLocation {
   final double lat;
   final double lon;
   final double? elevation;
+  final String? city;
+  final String? state;
 
-  const ReachLocation({required this.lat, required this.lon, this.elevation});
+  const ReachLocation({
+    required this.lat,
+    required this.lon,
+    this.elevation,
+    this.city,
+    this.state,
+  });
 
   factory ReachLocation.fromJson(Map<String, dynamic> json) {
     return ReachLocation(
@@ -16,6 +24,8 @@ class ReachLocation {
           json['elevation'] != null
               ? (json['elevation'] as num).toDouble()
               : null,
+      city: json['city'] as String?,
+      state: json['state'] as String?,
     );
   }
 
@@ -24,10 +34,12 @@ class ReachLocation {
       'lat': lat,
       'lon': lon,
       if (elevation != null) 'elevation': elevation,
+      if (city != null) 'city': city,
+      if (state != null) 'state': state,
     };
   }
 
   @override
   String toString() =>
-      'ReachLocation(lat: $lat, lon: $lon, elevation: $elevation)';
+      'ReachLocation(lat: $lat, lon: $lon, elevation: $elevation, city: $city, state: $state)';
 }

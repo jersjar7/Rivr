@@ -265,7 +265,7 @@ class _FavoriteCardState extends State<FavoriteCard> {
 
                   // Station name at the bottom of the image
                   Positioned(
-                    bottom: 12,
+                    bottom: 20,
                     left: 16,
                     right: 16,
                     child: Row(
@@ -329,7 +329,7 @@ class _FavoriteCardState extends State<FavoriteCard> {
                   if (widget.favorite.city != null &&
                       widget.favorite.state != null)
                     Positioned(
-                      bottom: 40, // Position above the station name
+                      bottom: 10, // Position above the station name
                       left: 16,
                       right: 16,
                       child: Row(

@@ -465,7 +465,7 @@ class _MapOverlayState extends State<MapOverlay>
 
       final markerOptions = PointAnnotationOptions(
         geometry: Point(coordinates: Position(widget.lon, widget.lat)),
-        iconSize: 0.5,
+        iconSize: 0.1,
         iconOffset: [0, 0], // Default, can be omitted
         symbolSortKey: 10, // Optional
         iconImage: imageId,

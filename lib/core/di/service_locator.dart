@@ -10,6 +10,7 @@ import 'package:rivr/core/di/map_di.dart';
 import 'package:rivr/core/network/connection_monitor.dart';
 import 'package:rivr/core/services/geocoding_service.dart';
 import 'package:rivr/core/services/stream_name_service.dart';
+import 'package:rivr/features/map/data/datasources/map_station_local_datasource.dart';
 
 // Core
 import '../network/network_info.dart';
@@ -295,6 +296,9 @@ void _registerProviders() {
       getAllForecasts: sl<GetAllForecasts>(),
       getLatestFlow: sl<GetLatestFlow>(),
       getReturnPeriods: sl<GetReturnPeriods>(),
+      mapStationDataSource:
+          sl<MapStationLocalDataSource>(), // Added this dependency
+      databaseHelper: sl<DatabaseHelper>(), // Added this dependency
     ),
   );
 }

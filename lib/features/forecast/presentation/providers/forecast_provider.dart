@@ -10,6 +10,8 @@ import 'package:rivr/features/forecast/domain/usecases/get_forecast.dart';
 import 'package:rivr/features/forecast/domain/usecases/get_return_periods.dart';
 import 'package:rivr/core/services/stream_name_service.dart';
 import 'package:rivr/core/di/service_locator.dart';
+import 'package:rivr/features/map/data/datasources/map_station_local_datasource.dart';
+import 'package:rivr/common/data/local/database_helper.dart';
 
 enum ForecastLoadingState { initial, loading, loaded, error }
 
@@ -23,6 +25,10 @@ class ForecastProvider extends ChangeNotifier {
   final GetReturnPeriods _getReturnPeriods;
   final StreamNameService _streamNameService;
 
+  // Add map station data source for location data
+  final MapStationLocalDataSource _mapStationDataSource;
+  final DatabaseHelper _databaseHelper;
+
   ForecastProvider({
     required GetForecast getForecast,
     required GetShortRangeForecast getShortRangeForecast,
@@ -32,6 +38,8 @@ class ForecastProvider extends ChangeNotifier {
     required GetLatestFlow getLatestFlow,
     required GetReturnPeriods getReturnPeriods,
     StreamNameService? streamNameService,
+    MapStationLocalDataSource? mapStationDataSource, // New optional parameter
+    DatabaseHelper? databaseHelper, // New optional parameter
   }) : _getForecast = getForecast,
        _getShortRangeForecast = getShortRangeForecast,
        _getMediumRangeForecast = getMediumRangeForecast,
@@ -39,7 +47,10 @@ class ForecastProvider extends ChangeNotifier {
        _getAllForecasts = getAllForecasts,
        _getLatestFlow = getLatestFlow,
        _getReturnPeriods = getReturnPeriods,
-       _streamNameService = streamNameService ?? sl<StreamNameService>();
+       _streamNameService = streamNameService ?? sl<StreamNameService>(),
+       _mapStationDataSource =
+           mapStationDataSource ?? sl<MapStationLocalDataSource>(),
+       _databaseHelper = databaseHelper ?? DatabaseHelper();
 
   // State variables
   final Map<String, ForecastLoadingState> _loadingStates = {};
@@ -222,7 +233,7 @@ class ForecastProvider extends ChangeNotifier {
         _loadReturnPeriod(reachId);
         _processDailyData(reachId);
 
-        // Try to extract location information
+        // Try to extract location information - now uses real data!
         _tryExtractLocationInfo(reachId);
 
         // Prefetch the station name if we don't have it
@@ -233,6 +244,218 @@ class ForecastProvider extends ChangeNotifier {
         return true;
       },
     );
+  }
+
+  // UPDATED: Extract real location info from database instead of dummy data
+  Future<void> _tryExtractLocationInfo(String reachId) async {
+    // Skip if we already have location data for this reach
+    if (_reachLocations.containsKey(reachId)) {
+      return;
+    }
+
+    try {
+      print("Attempting to find location data for reach ID: $reachId");
+
+      // Method 1: Try direct lookup by station ID
+      // This approach assumes the reachId might match a station ID in the database
+      bool found = await _tryDirectLookup(reachId);
+      if (found) return;
+
+      // Method 2: Try to find stations with similar IDs or names
+      found = await _trySimilarIdLookup(reachId);
+      if (found) return;
+
+      // Method 3: If nothing found, check if we have any stations and use nearest ones
+      await _tryNearestStationsLookup(reachId);
+    } catch (e) {
+      print('Error extracting location data for reach $reachId: $e');
+      // Fall back to a default location but don't set it in _reachLocations
+      // so we can try again later if more data becomes available
+    }
+  }
+
+  // Try to find station directly by ID
+  Future<bool> _tryDirectLookup(String reachId) async {
+    try {
+      // Try to query the database directly first
+      final db = await _databaseHelper.database;
+
+      // First, check if Geolocations table exists
+      final tableExists = await _databaseHelper.tableExists('Geolocations');
+      if (!tableExists) {
+        print("Geolocations table not found in database!");
+        return false;
+      }
+
+      // Query for stations with matching ID
+      // Try different formats of the ID - as is, as integer, with/without leading zeros
+      final int? reachIdInt = int.tryParse(reachId);
+      final List<String> idVariations = [
+        reachId,
+        if (reachIdInt != null) reachIdInt.toString(),
+      ];
+
+      for (final idVariation in idVariations) {
+        final List<Map<String, dynamic>> results = await db.query(
+          'Geolocations',
+          where: 'stationId = ?',
+          whereArgs: [idVariation],
+          limit: 1,
+        );
+
+        if (results.isNotEmpty) {
+          final data = results.first;
+          final double? lat = _extractDouble(data['lat']);
+          final double? lon = _extractDouble(data['lon']);
+
+          if (lat != null && lon != null) {
+            print("Found exact station match for $reachId: lat=$lat, lon=$lon");
+
+            // Extract elevation if available
+            double? elevation = _extractDouble(data['elevation']);
+
+            // Store the location
+            _reachLocations[reachId] = ReachLocation(
+              lat: lat,
+              lon: lon,
+              elevation: elevation,
+            );
+
+            return true;
+          }
+        }
+      }
+
+      print("No exact station match found for $reachId");
+      return false;
+    } catch (e) {
+      print("Error during direct station lookup: $e");
+      return false;
+    }
+  }
+
+  // Try to find stations with similar IDs
+  Future<bool> _trySimilarIdLookup(String reachId) async {
+    try {
+      final db = await _databaseHelper.database;
+
+      // Try to find stations with IDs that contain our reachId
+      final List<Map<String, dynamic>> results = await db.query(
+        'Geolocations',
+        where: 'stationId LIKE ?',
+        whereArgs: ['%$reachId%'],
+        limit: 5,
+      );
+
+      if (results.isNotEmpty) {
+        final data = results.first; // Take the first match
+        final double? lat = _extractDouble(data['lat']);
+        final double? lon = _extractDouble(data['lon']);
+
+        if (lat != null && lon != null) {
+          print("Found similar station ID for $reachId: lat=$lat, lon=$lon");
+
+          // Extract elevation if available
+          double? elevation = _extractDouble(data['elevation']);
+
+          // Store the location
+          _reachLocations[reachId] = ReachLocation(
+            lat: lat,
+            lon: lon,
+            elevation: elevation,
+          );
+
+          return true;
+        }
+      }
+
+      // Also try to search by name if we have a stream name
+      final streamName = _stationNameCache[reachId];
+      if (streamName != null && streamName != "Stream $reachId") {
+        // Extract keywords from the name
+        final keywords =
+            streamName
+                .split(' ')
+                .where((word) => word.length > 3) // Only use meaningful words
+                .toList();
+
+        for (final keyword in keywords) {
+          final List<Map<String, dynamic>> nameResults = await db.query(
+            'Geolocations',
+            where: 'name LIKE ?',
+            whereArgs: ['%$keyword%'],
+            limit: 5,
+          );
+
+          if (nameResults.isNotEmpty) {
+            final data = nameResults.first;
+            final double? lat = _extractDouble(data['lat']);
+            final double? lon = _extractDouble(data['lon']);
+
+            if (lat != null && lon != null) {
+              print(
+                "Found station by name keyword '$keyword' for $reachId: lat=$lat, lon=$lon",
+              );
+
+              // Extract elevation if available
+              double? elevation = _extractDouble(data['elevation']);
+
+              // Store the location
+              _reachLocations[reachId] = ReachLocation(
+                lat: lat,
+                lon: lon,
+                elevation: elevation,
+              );
+
+              return true;
+            }
+          }
+        }
+      }
+
+      return false;
+    } catch (e) {
+      print("Error during similar station lookup: $e");
+      return false;
+    }
+  }
+
+  // Try to use nearest stations as fallback
+  Future<void> _tryNearestStationsLookup(String reachId) async {
+    try {
+      // Get sample stations
+      final stations = await _mapStationDataSource.getSampleStations(limit: 10);
+
+      if (stations.isEmpty) {
+        print("No stations available in database for location lookup");
+        return;
+      }
+
+      // Use the first station as a reasonable location (better than nothing)
+      final firstStation = stations.first;
+      print(
+        "Using sample station for $reachId: lat=${firstStation.lat}, lon=${firstStation.lon}",
+      );
+
+      _reachLocations[reachId] = ReachLocation(
+        lat: firstStation.lat,
+        lon: firstStation.lon,
+        elevation: firstStation.elevation,
+      );
+    } catch (e) {
+      print("Error getting nearest stations: $e");
+    }
+  }
+
+  // Helper method to safely extract double values from database results
+  double? _extractDouble(dynamic value) {
+    if (value == null) return null;
+
+    if (value is double) return value;
+    if (value is int) return value.toDouble();
+    if (value is String) return double.tryParse(value);
+
+    return null;
   }
 
   // Load a specific forecast type
@@ -275,6 +498,11 @@ class ForecastProvider extends ChangeNotifier {
         _lastFetchTimes[reachId] = DateTime.now();
         _loadingStates[reachId] = ForecastLoadingState.loaded;
         _processDailyData(reachId);
+
+        // Try to extract location info if we don't have it yet
+        if (!_reachLocations.containsKey(reachId)) {
+          _tryExtractLocationInfo(reachId);
+        }
 
         // Prefetch the station name if we don't have it
         if (!_stationNameCache.containsKey(reachId)) {
@@ -319,6 +547,12 @@ class ForecastProvider extends ChangeNotifier {
         _lastFetchTimes[reachId] = DateTime.now();
         _loadingStates[reachId] = ForecastLoadingState.loaded;
         _processDailyData(reachId);
+
+        // Try to extract location info if we don't have it yet
+        if (!_reachLocations.containsKey(reachId)) {
+          _tryExtractLocationInfo(reachId);
+        }
+
         notifyListeners();
         return forecast;
       },
@@ -357,6 +591,12 @@ class ForecastProvider extends ChangeNotifier {
         _lastFetchTimes[reachId] = DateTime.now();
         _loadingStates[reachId] = ForecastLoadingState.loaded;
         _processDailyData(reachId);
+
+        // Try to extract location info if we don't have it yet
+        if (!_reachLocations.containsKey(reachId)) {
+          _tryExtractLocationInfo(reachId);
+        }
+
         notifyListeners();
         return forecast;
       },
@@ -395,6 +635,12 @@ class ForecastProvider extends ChangeNotifier {
         _lastFetchTimes[reachId] = DateTime.now();
         _loadingStates[reachId] = ForecastLoadingState.loaded;
         _processDailyData(reachId);
+
+        // Try to extract location info if we don't have it yet
+        if (!_reachLocations.containsKey(reachId)) {
+          _tryExtractLocationInfo(reachId);
+        }
+
         notifyListeners();
         return forecast;
       },
@@ -493,38 +739,6 @@ class ForecastProvider extends ChangeNotifier {
     _aggregatedDailyData[reachId] = dailyStats;
   }
 
-  // Extract location info from forecast data if available
-  void _tryExtractLocationInfo(String reachId) {
-    // Skip if we already have location data for this reach
-    if (_reachLocations.containsKey(reachId)) {
-      return;
-    }
-
-    // For now, we'll use a basic method to generate a location based on the reachId
-    // In a real implementation, this would extract coordinates from actual data
-    // This could come from favorites, from the API response, or other sources
-
-    try {
-      // This is just a placeholder implementation
-      // In a real app, you'd extract this data from your forecasts or API
-      // For demonstration purposes, we'll generate dummy coordinates
-
-      int reachSeed = 0;
-      for (var digit in reachId.runes) {
-        reachSeed += digit;
-      }
-
-      final random = reachSeed % 1000 / 1000;
-      final lat = 39.5 + random; // Center around Denver
-      final lon = -105.0 - random * 2;
-
-      // Store the location
-      _reachLocations[reachId] = ReachLocation(lat: lat, lon: lon);
-    } catch (e) {
-      print('Error extracting location from reach data: $e');
-    }
-  }
-
   // Refresh all data for a reach
   Future<bool> refreshAllData(String reachId) async {
     // Also refresh the station name
@@ -532,6 +746,9 @@ class ForecastProvider extends ChangeNotifier {
       _stationNameCache.remove(reachId);
       getStationName(reachId);
     }
+
+    // Clear location data so we try to fetch it again
+    _reachLocations.remove(reachId);
 
     return loadAllForecasts(reachId, forceRefresh: true);
   }
@@ -546,6 +763,7 @@ class ForecastProvider extends ChangeNotifier {
     _returnPeriods.remove(reachId);
     _aggregatedDailyData.remove(reachId);
     _stationNameCache.remove(reachId);
+    _reachLocations.remove(reachId);
     notifyListeners();
   }
 
@@ -559,6 +777,7 @@ class ForecastProvider extends ChangeNotifier {
     _returnPeriods.clear();
     _aggregatedDailyData.clear();
     _stationNameCache.clear();
+    _reachLocations.clear();
     notifyListeners();
   }
 
@@ -582,11 +801,5 @@ class ForecastProvider extends ChangeNotifier {
       final localTime = forecast.validDateTime.toLocal();
       return localTime.isAfter(now);
     }).toList();
-
-    // If there are no future forecasts, you might want to keep at least one:
-    // if (filtered.isEmpty && forecasts.isNotEmpty) {
-    //   return [forecasts.last];
-    // }
-    // return filtered;
   }
 }

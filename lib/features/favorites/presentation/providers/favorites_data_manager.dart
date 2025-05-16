@@ -46,6 +46,9 @@ class FavoritesDataManager {
     String? city, // New parameters for location text
     String? state,
   }) async {
+    print('DEBUG: DataManager.addFavorite called with:');
+    print('DEBUG: lat=$lat, lon=$lon, city=$city, state=$state');
+
     if (parent.isProcessing) return false;
 
     try {
@@ -110,6 +113,10 @@ class FavoritesDataManager {
         elevation: elevation,
         city: city, // Store city
         state: state, // Store state
+      );
+
+      print(
+        'DEBUG: Created FavoriteModel with city=${favorite.city}, state=${favorite.state}',
       );
 
       // Update the name in StreamNameService for future consistency

@@ -147,10 +147,21 @@ class DatabaseHelper {
     final db = providedDb ?? await database;
 
     try {
+      print(
+        "DEBUG: Checking if column '$columnName' exists in table '$tableName'",
+      );
       final tableInfo = await db.rawQuery('PRAGMA table_info($tableName)');
-      return tableInfo.any((column) => column['name'] == columnName);
+      print(
+        "DEBUG: Table '$tableName' columns: ${tableInfo.map((c) => c['name']).toList()}",
+      );
+
+      final exists = tableInfo.any((column) => column['name'] == columnName);
+      print("DEBUG: Column '$columnName' exists: $exists");
+
+      return exists;
     } catch (e) {
       print("ERROR: Failed to check if column exists: $e");
+      print("ERROR: Stack trace: ${StackTrace.current}");
       return false;
     }
   }
@@ -278,31 +289,39 @@ class DatabaseHelper {
     final db = providedDb ?? await database;
 
     if (!await tableExists(tableFavorites, db)) {
-      print("DEBUG: Creating favorites table");
+      print("DEBUG: Creating favorites table with city and state columns");
       try {
         await db.execute('''
-        CREATE TABLE $tableFavorites (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          stationId TEXT NOT NULL,
-          name TEXT NOT NULL,
-          userId TEXT NOT NULL,
-          position INTEGER NOT NULL,
-          color TEXT,
-          description TEXT,
-          imgNumber INTEGER,
-          lastUpdated INTEGER NOT NULL,
-          originalApiName TEXT,
-          customImagePath TEXT,
-          lat REAL,
-          lon REAL,
-          elevation REAL,
-          UNIQUE(stationId, userId)
-        )
+      CREATE TABLE $tableFavorites (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        stationId TEXT NOT NULL,
+        name TEXT NOT NULL,
+        userId TEXT NOT NULL,
+        position INTEGER NOT NULL,
+        color TEXT,
+        description TEXT,
+        imgNumber INTEGER,
+        lastUpdated INTEGER NOT NULL,
+        originalApiName TEXT,
+        customImagePath TEXT,
+        lat REAL,
+        lon REAL,
+        elevation REAL,
+        city TEXT,
+        state TEXT,
+        UNIQUE(stationId, userId)
+      )
       ''');
-        print("DEBUG: Favorites table created successfully");
+        print("DEBUG: Favorites table created successfully with all columns");
+
+        // Verify the table creation
+        final columns = await db.rawQuery('PRAGMA table_info($tableFavorites)');
+        print(
+          "DEBUG: Created table columns: ${columns.map((c) => c['name']).toList()}",
+        );
       } catch (e) {
         print("ERROR: Failed to create favorites table: $e");
-        // Don't throw an exception - just log the error
+        print("ERROR: Stack trace: ${StackTrace.current}");
       }
     } else {
       print("DEBUG: Favorites table already exists");

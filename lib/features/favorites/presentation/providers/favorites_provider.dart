@@ -287,6 +287,10 @@ class FavoritesProvider with ChangeNotifier {
     String? city, // Add city parameter
     String? state, // Add state parameter
   }) async {
+    print(
+      'DEBUG: addFavoriteFromStation called with lat=$lat, lon=$lon, city=$city, state=$state',
+    );
+
     return _dataManager.addFavorite(
       userId,
       stationId,

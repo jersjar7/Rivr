@@ -120,6 +120,11 @@ class FavoritesIntegrationHelper {
 
       // Add to favorites with proper name information, coordinates, and location
       print('GEOCODING: Creating favorite with city=$city, state=$state');
+
+      // Here's where the problem is - add debugging right before addFavoriteFromStation
+      print('DEBUGGING LAT/LON VALUES: lat=${station.lat}, lon=${station.lon}');
+
+      // This method call needs to include the lat, lon, city, and state values
       final success = await favoritesProvider.addFavoriteFromStation(
         user.uid,
         station.stationId.toString(),

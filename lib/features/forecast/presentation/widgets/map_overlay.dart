@@ -7,7 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
 import 'package:flutter/foundation.dart';
-import '../../../../core/models/location_info.dart';
+import '../../../../core/models/location_info.dart'; // Ensure this path is correct
 
 class MapOverlay extends StatefulWidget {
   final double lat;
@@ -35,6 +35,7 @@ class _MapOverlayState extends State<MapOverlay>
   MapboxMap? _mapboxMap;
   String _errorMessage = '';
   bool _closing = false;
+  bool _isMapResourceDisposed = true; // Initialize as true (no map yet)
 
   @override
   void initState() {
@@ -52,47 +53,79 @@ class _MapOverlayState extends State<MapOverlay>
       curve: Curves.easeOutCubic,
     );
 
-    _animationController.forward().then((_) {
-      print('🗺️ [Animation] forward complete');
-    });
-  }
-
-  void _closeOverlay() {
-    if (_closing) return; // ← ignore if already closing
-    _closing = true;
-    print('🗺️ [MapOverlay] _closeOverlay() tapped');
-
-    _animationController.reverse().then((_) {
-      print('🗺️ [Animation] reverse complete — popping overlay');
-
-      // Grab your map reference, then clear it so nobody else holds on.
-      final mapToDispose = _mapboxMap;
-      _mapboxMap = null;
-
-      // First pop the overlay (this unmounts MapWidget)
-      Navigator.of(context).pop();
-
-      // THEN schedule the actual dispose *after* this frame
-      if (mapToDispose != null) {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          try {
-            print('🗺️ [MapOverlay] now disposing native map');
-            mapToDispose.dispose();
-            print('🗺️ [MapOverlay] map.dispose() succeeded');
-          } catch (e, st) {
-            print('⚠️ [MapOverlay] dispose() threw: $e\n$st');
+    // Forward animation for opening
+    // It's good practice to start after the first frame.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _animationController.forward().then((_) {
+          if (mounted) {
+            print('🗺️ [Animation] forward complete');
           }
         });
       }
     });
   }
 
+  void _closeOverlay() {
+    if (_closing || !mounted) return;
+    _closing = true;
+    print(
+      '🗺️ [MapOverlay] _closeOverlay() tapped - immediate close initiated',
+    );
+
+    // Pop the navigator. This will trigger MapOverlayState.dispose()
+    // which will handle map resource cleanup.
+    Navigator.of(context).pop();
+  }
+
   @override
   void dispose() {
-    print('🗺️ [MapOverlay] dispose(): disposing animationController');
+    print('🗺️ [MapOverlay] dispose(): Disposing _animationController.');
     _animationController.dispose();
 
-    // NOTE: map disposal will happen in _closeOverlay()
+    // Dispose map if it exists and hasn't been disposed yet.
+    // This will be called when Navigator.pop() unmounts the widget.
+    if (_mapboxMap != null && !_isMapResourceDisposed) {
+      final mapToDisposeInstance = _mapboxMap; // Capture instance locally
+      _mapboxMap =
+          null; // Clear instance variable immediately to prevent further use
+
+      print(
+        '🗺️ [MapOverlay] dispose(): Scheduling native map disposal via addPostFrameCallback.',
+      );
+      // Schedule disposal for after the current frame, ensuring UI is unmounted.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        print(
+          '🗺️ [MapOverlay] PostFrameCallback in dispose(): Now disposing native map.',
+        );
+        try {
+          mapToDisposeInstance?.dispose(); // Use the captured instance
+          print(
+            '🗺️ [MapOverlay] PostFrameCallback in dispose(): map.dispose() succeeded.',
+          );
+        } catch (e, st) {
+          print(
+            '⚠️ [MapOverlay] PostFrameCallback in dispose(): map.dispose() threw: $e\n$st',
+          );
+        } finally {
+          // This flag is managed by this dispose sequence.
+          // No need to set _isMapResourceDisposed here as it's part of the state's own teardown.
+        }
+      });
+      _isMapResourceDisposed = true; // Mark that disposal has been initiated.
+    } else {
+      if (_mapboxMap == null) {
+        print('🗺️ [MapOverlay] dispose(): _mapboxMap is already null.');
+      }
+      if (_isMapResourceDisposed) {
+        print(
+          '🗺️ [MapOverlay] dispose(): Map resources already marked as disposed.',
+        );
+      }
+      _mapboxMap = null; // Ensure it's null
+      _isMapResourceDisposed = true; // Ensure flag reflects state
+    }
+
     super.dispose();
     print('🗺️ [MapOverlay] dispose() done');
   }
@@ -108,192 +141,255 @@ class _MapOverlayState extends State<MapOverlay>
     return AnimatedBuilder(
       animation: _animation,
       builder: (context, child) {
+        // Since _closeOverlay now pops immediately, the widget will disappear.
+        // The _animation.value will be 1.0 (or its last state from opening).
+        // ScaleTransition will use this value.
+
         return GestureDetector(
-          onTap: () {
-            _closeOverlay();
-          },
+          onTap: _closeOverlay, // Tap background to close
           child: Container(
-            // width: screenSize.width,
-            // height: screenSize.height,
-            color: Colors.black.withValues(alpha: 0.5 * _animation.value),
+            color: Colors.black.withOpacity(
+              0.5 * _animation.value,
+            ), // Corrected
             child: Center(
-              child: ScaleTransition(
-                scale:
-                    _animation, // Prevent closing when tapping the map container
-                child: Container(
-                  width: screenSize.width * 0.9 * _animation.value,
-                  height: screenSize.height * 0.7 * _animation.value,
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.surface,
-                    borderRadius: BorderRadius.circular(16),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.2),
-                        blurRadius: 10,
-                        offset: const Offset(0, 5),
-                      ),
-                    ],
-                  ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(16),
-                    child: Column(
-                      children: [
-                        // Header
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 12,
-                          ),
-                          decoration: BoxDecoration(
-                            color: theme.colorScheme.surface,
-                            border: Border(
-                              bottom: BorderSide(
-                                color: theme.dividerColor,
-                                width: 1,
-                              ),
-                            ),
-                          ),
-                          child: Row(
-                            children: [
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      widget.riverName,
-                                      style: theme.textTheme.titleMedium
-                                          ?.copyWith(
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                    if (widget.locationInfo != null)
-                                      Text(
-                                        widget.locationInfo!.formattedLocation,
-                                        style: theme.textTheme.bodySmall,
-                                      ),
-                                  ],
-                                ),
-                              ),
-                              IconButton(
-                                icon: const Icon(Icons.close),
-                                onPressed: _closeOverlay,
-                                visualDensity: VisualDensity.compact,
-                              ),
-                            ],
-                          ),
-                        ),
-
-                        // Map
-                        Expanded(
-                          child: Stack(
-                            children: [
-                              // Show loading indicator or static map until MapBox is ready
-                              if (!_isMapReady)
-                                Container(
-                                  color:
-                                      theme.colorScheme.surfaceContainerHighest,
-                                  child: Center(
-                                    child: Column(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        CircularProgressIndicator(
-                                          valueColor:
-                                              AlwaysStoppedAnimation<Color>(
-                                                theme.colorScheme.primary,
-                                              ),
-                                        ),
-                                        const SizedBox(height: 16),
-                                        Text(
-                                          'Loading map...',
-                                          style: theme.textTheme.bodyMedium,
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-
-                              // Error message if map fails to load
-                              if (_errorMessage.isNotEmpty)
-                                Container(
-                                  color:
-                                      theme.colorScheme.surfaceContainerHighest,
-                                  padding: const EdgeInsets.all(16),
-                                  child: Center(
-                                    child: Column(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Icon(
-                                          Icons.error_outline,
-                                          color: theme.colorScheme.error,
-                                          size: 48,
-                                        ),
-                                        const SizedBox(height: 16),
-                                        Text(
-                                          'Could not load map',
-                                          style: theme.textTheme.titleMedium,
-                                          textAlign: TextAlign.center,
-                                        ),
-                                        const SizedBox(height: 8),
-                                        Text(
-                                          _errorMessage,
-                                          style: theme.textTheme.bodyMedium,
-                                          textAlign: TextAlign.center,
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-
-                              // Mapbox map
-                              if (_errorMessage.isEmpty)
-                                Positioned.fill(
-                                  child: MapWidget(
-                                    key: ValueKey(
-                                      'map_${widget.lat}_${widget.lon}',
-                                    ),
-                                    onMapCreated: _onMapCreated,
-                                    styleUri: MapboxStyles.STANDARD,
-                                    cameraOptions: CameraOptions(
-                                      center: Point(
-                                        coordinates: Position(
-                                          widget.lon,
-                                          widget.lat,
-                                        ),
-                                      ),
-                                      zoom: 12.0,
-                                    ),
-                                  ),
-                                ),
-
-                              // Attribution
-                              Positioned(
-                                bottom: 4,
-                                right: 4,
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 4,
-                                    vertical: 2,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: Colors.white.withValues(alpha: 0.7),
-                                    borderRadius: BorderRadius.circular(4),
-                                  ),
-                                  child: Text(
-                                    '© Mapbox',
-                                    style: theme.textTheme.bodySmall?.copyWith(
-                                      fontSize: 10,
-                                      color: Colors.black54,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
+              child: GestureDetector(
+                // To prevent taps on the card from closing
+                onTap: () {},
+                child: ScaleTransition(
+                  scale: _animation, // Opening animation still uses this
+                  child: Container(
+                    // CRITICAL CHANGE for RenderFlex and MapBox invalid size:
+                    // Use fixed dimensions; ScaleTransition handles the visual scaling.
+                    width: screenSize.width * 0.9,
+                    height: screenSize.height * 0.7,
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.surface,
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.2), // Corrected
+                          blurRadius: 10,
+                          offset: const Offset(0, 5),
                         ),
                       ],
                     ),
+                    // Only build content if scale is not zero (avoids issues at start of animation)
+                    child:
+                        _animation.value == 0 &&
+                                !_animationController.isAnimating
+                            ? const SizedBox.shrink()
+                            : ClipRRect(
+                              borderRadius: BorderRadius.circular(16),
+                              child: Column(
+                                children: [
+                                  // Header
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 16,
+                                      vertical: 12,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: theme.colorScheme.surface,
+                                      border: Border(
+                                        bottom: BorderSide(
+                                          color: theme.dividerColor,
+                                          width: 1,
+                                        ),
+                                      ),
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            mainAxisSize:
+                                                MainAxisSize.min, // Important
+                                            children: [
+                                              // CRITICAL CHANGE for RenderFlex: Wrap Text in Flexible
+                                              Flexible(
+                                                child: Text(
+                                                  widget.riverName,
+                                                  style: theme
+                                                      .textTheme
+                                                      .titleMedium
+                                                      ?.copyWith(
+                                                        fontWeight:
+                                                            FontWeight.bold,
+                                                      ),
+                                                  maxLines: 1,
+                                                  overflow:
+                                                      TextOverflow.ellipsis,
+                                                ),
+                                              ),
+                                              if (widget.locationInfo != null)
+                                                Padding(
+                                                  padding:
+                                                      const EdgeInsets.only(
+                                                        top: 2.0,
+                                                      ),
+                                                  child: Text(
+                                                    widget
+                                                        .locationInfo!
+                                                        .formattedLocation,
+                                                    style:
+                                                        theme
+                                                            .textTheme
+                                                            .bodySmall,
+                                                    maxLines:
+                                                        1, // Ensure this also truncates
+                                                    overflow:
+                                                        TextOverflow.ellipsis,
+                                                  ),
+                                                ),
+                                            ],
+                                          ),
+                                        ),
+                                        IconButton(
+                                          icon: const Icon(Icons.close),
+                                          onPressed: _closeOverlay,
+                                          visualDensity: VisualDensity.compact,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+
+                                  // Map Section
+                                  Expanded(
+                                    child: Stack(
+                                      children: [
+                                        // Loading Indicator
+                                        if (!_isMapReady &&
+                                            _errorMessage.isEmpty)
+                                          Container(
+                                            color:
+                                                theme
+                                                    .colorScheme
+                                                    .surfaceContainerHighest,
+                                            child: Center(
+                                              child: Column(
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  CircularProgressIndicator(
+                                                    valueColor:
+                                                        AlwaysStoppedAnimation<
+                                                          Color
+                                                        >(
+                                                          theme
+                                                              .colorScheme
+                                                              .primary,
+                                                        ),
+                                                  ),
+                                                  const SizedBox(height: 16),
+                                                  Text(
+                                                    'Loading map...',
+                                                    style:
+                                                        theme
+                                                            .textTheme
+                                                            .bodyMedium,
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                          ),
+                                        // Error Message
+                                        if (_errorMessage.isNotEmpty)
+                                          Container(
+                                            color:
+                                                theme
+                                                    .colorScheme
+                                                    .surfaceContainerHighest,
+                                            padding: const EdgeInsets.all(16),
+                                            child: Center(
+                                              child: Column(
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  Icon(
+                                                    Icons.error_outline,
+                                                    color:
+                                                        theme.colorScheme.error,
+                                                    size: 48,
+                                                  ),
+                                                  const SizedBox(height: 16),
+                                                  Text(
+                                                    'Could not load map',
+                                                    style:
+                                                        theme
+                                                            .textTheme
+                                                            .titleMedium,
+                                                    textAlign: TextAlign.center,
+                                                  ),
+                                                  const SizedBox(height: 8),
+                                                  Text(
+                                                    _errorMessage,
+                                                    style:
+                                                        theme
+                                                            .textTheme
+                                                            .bodyMedium,
+                                                    textAlign: TextAlign.center,
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                          ),
+                                        // MapWidget: Only build if no error and animation has progressed
+                                        if (_errorMessage.isEmpty &&
+                                            (_animation.value > 0 ||
+                                                _animationController
+                                                    .isCompleted))
+                                          Positioned.fill(
+                                            child: MapWidget(
+                                              key: ValueKey(
+                                                'map_${widget.lat}_${widget.lon}',
+                                              ),
+                                              onMapCreated: _onMapCreated,
+                                              styleUri: MapboxStyles.STANDARD,
+                                              cameraOptions: CameraOptions(
+                                                center: Point(
+                                                  coordinates: Position(
+                                                    widget.lon,
+                                                    widget.lat,
+                                                  ),
+                                                ),
+                                                zoom: 12.0,
+                                              ),
+                                            ),
+                                          ),
+                                        // Attribution (Mapbox logo)
+                                        if (_isMapReady &&
+                                            _errorMessage.isEmpty)
+                                          Positioned(
+                                            bottom: 4,
+                                            right: 4,
+                                            child: Container(
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                    horizontal: 4,
+                                                    vertical: 2,
+                                                  ),
+                                              decoration: BoxDecoration(
+                                                color: Colors.white.withOpacity(
+                                                  0.7,
+                                                ), // Corrected
+                                                borderRadius:
+                                                    BorderRadius.circular(4),
+                                              ),
+                                              child: Text(
+                                                '© Mapbox',
+                                                style: theme.textTheme.bodySmall
+                                                    ?.copyWith(
+                                                      fontSize: 10,
+                                                      color: Colors.black54,
+                                                    ),
+                                              ),
+                                            ),
+                                          ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
                   ),
                 ),
               ),
@@ -305,68 +401,86 @@ class _MapOverlayState extends State<MapOverlay>
   }
 
   Future<void> _onMapCreated(MapboxMap mapboxMap) async {
+    if (!mounted || _closing) {
+      print(
+        '🗺️ [MapOverlay] onMapCreated: Widget not mounted or closing. Disposing newly created map.',
+      );
+      mapboxMap.dispose(); // Dispose this instance as it won't be used.
+      return;
+    }
+
     print('🗺️ [MapOverlay] onMapCreated → $mapboxMap');
     _mapboxMap = mapboxMap;
+    _isMapResourceDisposed = false; // New map is active, not disposed.
 
-    // Add a marker at the river's location
     try {
       print('🗺️ [MapOverlay] setting up annotations…');
-      // Delay slightly to ensure map is fully initialized
+      // User's original delay, consider if still needed or can be shorter.
       await Future.delayed(const Duration(milliseconds: 500));
 
-      // Create a point annotation manager
+      if (!mounted || _closing) return;
+
       final annotationManager =
           await mapboxMap.annotations.createPointAnnotationManager();
+      if (!mounted || _closing) return;
 
-      // Load image from assets
       final ByteData bytes = await rootBundle.load(
         'assets/img/marker_selected.png',
       );
+      if (!mounted || _closing) return;
       final Uint8List assetBytes = bytes.buffer.asUint8List();
 
-      // Get image dimensions for proper loading
       final completer = Completer<ui.Image>();
       ui.decodeImageFromList(assetBytes, (image) {
+        if (!mounted) {
+          // Check mounted state within this async callback too
+          completer.completeError(
+            StateError("Widget unmounted before image decoded."),
+          );
+          return;
+        }
         completer.complete(image);
       });
-      final markerImage = await completer.future;
 
-      // Create MbxImage object with proper dimensions
+      final markerImage = await completer.future;
+      if (!mounted || _closing) return;
+
       final mbxImage = MbxImage(
         width: markerImage.width,
         height: markerImage.height,
         data: assetBytes,
       );
 
-      // Add the image to the style
       final imageId = 'selected-marker';
       await mapboxMap.style.addStyleImage(
         imageId,
-        1.0, // scale
+        1.0,
         mbxImage,
-        false, // sdf
-        [], // stretchX
-        [], // stretchY
-        null, // content
+        false,
+        [],
+        [],
+        null,
       );
+      if (!mounted || _closing) return;
 
-      // Create a marker at the river's location
       final markerOptions = PointAnnotationOptions(
         geometry: Point(coordinates: Position(widget.lon, widget.lat)),
         iconSize: 0.5,
-        iconOffset: [0, 0],
-        symbolSortKey: 10,
+        iconOffset: [0, 0], // Default, can be omitted
+        symbolSortKey: 10, // Optional
         iconImage: imageId,
       );
 
-      // Add the annotation to the map
       await annotationManager.create(markerOptions);
+      if (!mounted || _closing)
+        return; // Check after last await before setState
 
       print('🗺️ [MapOverlay] marker created');
-      // Update state to show the map
-      if (mounted) {
+      if (mounted && !_closing) {
+        // Final check before setState
         setState(() {
           _isMapReady = true;
+          _errorMessage = ''; // Clear any previous error
         });
         print('🗺️ [MapOverlay] setState(_isMapReady=true)');
       }
@@ -375,10 +489,12 @@ class _MapOverlayState extends State<MapOverlay>
         print('Error setting up map: $e');
         print('⚠️ [MapOverlay] error in _onMapCreated: $e\n$st');
       }
-
-      if (mounted) {
+      if (mounted && !_closing) {
+        // Check before setState
         setState(() {
-          _errorMessage = 'Could not display map. Please try again later.';
+          _errorMessage =
+              'Could not display map features. Please try again later.';
+          _isMapReady = false; // Ensure map isn't considered ready on error
         });
       }
     }

@@ -74,24 +74,52 @@ class FavoritesIntegrationHelper {
       String? city;
       String? state;
       try {
-        print('Getting location info for station ${station.stationId}');
-        final geocodingService = sl<GeocodingService>();
-        final locationInfo = await geocodingService.getLocationInfo(
-          station.lat,
-          station.lon,
+        // Add extensive logging
+        print(
+          'GEOCODING: Starting location lookup for station ${station.stationId}',
+        );
+        print(
+          'GEOCODING: Station coordinates: lat=${station.lat}, lon=${station.lon}',
         );
 
-        if (locationInfo != null) {
-          city = locationInfo.city;
-          state = locationInfo.state;
-          print('Found location: ${locationInfo.formattedLocation}');
+        final geocodingService = sl<GeocodingService>();
+
+        // Check if coordinates are reasonable (not zero or extreme values)
+        // 0,0 is in the ocean off the coast of Africa and likely invalid
+        if (station.lat.abs() < 0.0001 ||
+            station.lon.abs() < 0.0001 ||
+            station.lat > 90 ||
+            station.lat < -90 ||
+            station.lon > 180 ||
+            station.lon < -180) {
+          print(
+            'GEOCODING: Invalid or suspicious coordinates (${station.lat}, ${station.lon}), cannot perform geocoding',
+          );
+        } else {
+          final locationInfo = await geocodingService.getLocationInfo(
+            station.lat,
+            station.lon,
+          );
+
+          if (locationInfo != null) {
+            city = locationInfo.city;
+            state = locationInfo.state;
+            print(
+              'GEOCODING: Success! Found location: ${locationInfo.formattedLocation}',
+            );
+          } else {
+            print('GEOCODING: Service returned null location info');
+          }
         }
-      } catch (e) {
-        print('Error getting location info: $e');
+      } catch (e, stackTrace) {
+        // Log both error and stack trace
+        print('GEOCODING: Error getting location info: $e');
+        print('GEOCODING: Stack trace: $stackTrace');
         // Continue without location info
       }
 
       // Add to favorites with proper name information, coordinates, and location
+      print('GEOCODING: Creating favorite with city=$city, state=$state');
       final success = await favoritesProvider.addFavoriteFromStation(
         user.uid,
         station.stationId.toString(),

@@ -49,7 +49,7 @@ class FavoriteModel extends Favorite {
   }
 
   Map<String, dynamic> toMap() {
-    return {
+    final map = {
       'stationId': stationId,
       'name': name,
       'userId': userId,
@@ -68,5 +68,10 @@ class FavoriteModel extends Favorite {
       'city': city,
       'state': state,
     };
+
+    print(
+      'DEBUG: FavoriteModel.toMap(): city=${map['city']}, state=${map['state']}',
+    );
+    return map;
   }
 }

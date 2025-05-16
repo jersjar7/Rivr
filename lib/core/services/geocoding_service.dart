@@ -97,7 +97,7 @@ class GeocodingService {
           'https://api.mapbox.com/geocoding/v5/mapbox.places/$lon,$lat.json?access_token=$mapboxToken&types=place,region';
 
       print(
-        'GeocodingService: Sending request to Mapbox API: ${url.substring(0, url.indexOf('access_token=') + 13)}...',
+        'GeocodingService: URL being called: ${url.substring(0, url.indexOf('access_token=') + 13)}...',
       );
 
       final response = await _httpClient

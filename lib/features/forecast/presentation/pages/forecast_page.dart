@@ -10,7 +10,6 @@ import 'package:rivr/core/services/geocoding_service.dart';
 import 'package:rivr/core/widgets/loading_indicator.dart';
 import 'package:rivr/core/widgets/empty_state.dart';
 import 'package:rivr/features/auth/presentation/providers/auth_provider.dart';
-import 'package:rivr/features/favorites/domain/entities/favorite.dart';
 import 'package:rivr/features/favorites/presentation/providers/favorites_provider.dart';
 import 'package:rivr/features/forecast/domain/entities/forecast_types.dart';
 import 'package:rivr/features/forecast/presentation/providers/forecast_provider.dart';
@@ -129,33 +128,43 @@ class _ForecastPageState extends State<ForecastPage>
     // Check if this station is a favorite and has location info
     bool locationFromFavorite = false;
     if (authProvider.currentUser != null) {
-      final userId = authProvider.currentUser!.uid;
-      final favorites = favoritesProvider.favorites;
+      try {
+        final userId = authProvider.currentUser!.uid;
+        final favorites = favoritesProvider.favorites;
 
-      // Find the favorite for this station
-      final favorite = favorites.firstWhere(
-        (f) => f.stationId == widget.reachId && f.userId == userId,
-        orElse:
-            () =>
-                null as Favorite, // This will throw if not found, but that's OK
-      );
+        // Use where instead of firstWhere to avoid the "orElse" problem
+        final matchingFavorites =
+            favorites
+                .where(
+                  (f) => f.stationId == widget.reachId && f.userId == userId,
+                )
+                .toList();
 
-      // If we found a favorite with city and state, use that
-      if (favorite.city != null && favorite.state != null) {
-        setState(() {
-          _locationInfo = LocationInfo(
-            city: favorite.city!,
-            state: favorite.state!,
-            lat: favorite.lat ?? 0,
-            lon: favorite.lon ?? 0,
-          );
-          _isLoadingLocation = false;
-        });
+        // Check if we found a matching favorite
+        if (matchingFavorites.isNotEmpty) {
+          final favorite = matchingFavorites.first;
 
-        print(
-          'Using location info from favorite: ${_locationInfo!.formattedLocation}',
-        );
-        locationFromFavorite = true;
+          // If we found a favorite with city and state, use that
+          if (favorite.city != null && favorite.state != null) {
+            setState(() {
+              _locationInfo = LocationInfo(
+                city: favorite.city!,
+                state: favorite.state!,
+                lat: favorite.lat ?? 0,
+                lon: favorite.lon ?? 0,
+              );
+              _isLoadingLocation = false;
+            });
+
+            print(
+              'Using location info from favorite: ${_locationInfo!.formattedLocation}',
+            );
+            locationFromFavorite = true;
+          }
+        }
+      } catch (e) {
+        print('Error while checking for favorite location data: $e');
+        // Continue with geocoding service
       }
     }
 

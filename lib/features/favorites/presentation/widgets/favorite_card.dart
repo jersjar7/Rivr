@@ -37,7 +37,6 @@ class _FavoriteCardState extends State<FavoriteCard> {
 
   // Add location-related state variables
   LocationInfo? _locationInfo;
-  bool _isLoadingLocation = false;
 
   @override
   void initState() {
@@ -60,8 +59,6 @@ class _FavoriteCardState extends State<FavoriteCard> {
       return;
     }
 
-    setState(() => _isLoadingLocation = true);
-
     try {
       // Get geocoding service from service locator
       final geocodingService = sl<GeocodingService>();
@@ -75,14 +72,10 @@ class _FavoriteCardState extends State<FavoriteCard> {
       if (mounted) {
         setState(() {
           _locationInfo = locationInfo;
-          _isLoadingLocation = false;
         });
       }
     } catch (e) {
       print('Error loading location info: $e');
-      if (mounted) {
-        setState(() => _isLoadingLocation = false);
-      }
     }
   }
 
@@ -333,9 +326,8 @@ class _FavoriteCardState extends State<FavoriteCard> {
                   ),
 
                   // Location information display
-                  if (_locationInfo != null ||
-                      (widget.favorite.lat != null &&
-                          widget.favorite.lon != null))
+                  if (widget.favorite.city != null &&
+                      widget.favorite.state != null)
                     Positioned(
                       bottom: 40, // Position above the station name
                       left: 16,
@@ -360,29 +352,14 @@ class _FavoriteCardState extends State<FavoriteCard> {
                                   color: Colors.white,
                                 ),
                                 const SizedBox(width: 4),
-                                _isLoadingLocation
-                                    ? SizedBox(
-                                      width: 12,
-                                      height: 12,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                        valueColor: AlwaysStoppedAnimation(
-                                          Colors.white,
-                                        ),
-                                      ),
-                                    )
-                                    : Text(
-                                      _locationInfo?.formattedLocation ??
-                                          (widget.favorite.city != null &&
-                                                  widget.favorite.state != null
-                                              ? '${widget.favorite.city}, ${widget.favorite.state}'
-                                              : 'Location information'),
-                                      style: TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 10,
-                                        fontWeight: FontWeight.w500,
-                                      ),
-                                    ),
+                                Text(
+                                  '${widget.favorite.city}, ${widget.favorite.state}',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
                               ],
                             ),
                           ),

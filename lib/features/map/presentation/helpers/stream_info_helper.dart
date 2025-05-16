@@ -1,13 +1,11 @@
 // lib/features/map/presentation/helpers/stream_info_helper.dart
 
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 import 'package:rivr/common/data/remote/reach_service.dart';
 import 'package:rivr/core/error/error_handler.dart';
 import 'package:rivr/core/repositories/offline_storage_repository.dart';
 import 'package:rivr/core/services/stream_name_service.dart';
-import 'package:rivr/features/auth/presentation/providers/auth_provider.dart';
-import 'package:rivr/features/favorites/presentation/providers/favorites_provider.dart';
+import 'package:rivr/features/favorites/helpers/favorites_integration_helper.dart';
 import 'package:rivr/features/map/domain/entities/map_station.dart';
 import 'package:rivr/features/map/presentation/widgets/dialogs/stream_name_dialog.dart';
 
@@ -145,6 +143,11 @@ class StreamInfoHelper {
     String? customDisplayName,
     String? description,
   }) async {
+    // Add debug statement
+    print(
+      "StreamInfoHelper: addToFavorites called for station ${station.stationId}",
+    );
+
     final stationId = station.stationId.toString();
 
     // Get the current display name
@@ -212,56 +215,14 @@ class StreamInfoHelper {
       }
     }
 
-    // After handling the name, proceed with adding to favorites
-    final authProvider = Provider.of<AuthProvider>(context, listen: false);
-    final favoritesProvider = Provider.of<FavoritesProvider>(
+    // Use FavoritesIntegrationHelper instead of directly using FavoritesProvider
+    // This will handle geocoding to get city and state
+    return FavoritesIntegrationHelper.addStationToFavorites(
       context,
-      listen: false,
+      station,
+      displayName: displayName,
+      description: description,
     );
-
-    // Check if user is logged in
-    final user = authProvider.currentUser;
-    if (user == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please log in to add favorites')),
-      );
-      return false;
-    }
-
-    try {
-      // Add station to favorites with the display name and original API name
-      final success = await favoritesProvider.addFavoriteFromStation(
-        user.uid,
-        stationId,
-        displayName: displayName,
-        description: description,
-        originalApiName: originalApiName,
-      );
-
-      if (success) {
-        // Show confirmation snackbar
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Added $displayName to favorites'),
-            duration: const Duration(seconds: 1),
-          ),
-        );
-        return true;
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Failed to add to favorites. Please try again.'),
-          ),
-        );
-        return false;
-      }
-    } catch (e) {
-      print("Error adding to favorites: $e");
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Error: ${e.toString()}')));
-      return false;
-    }
   }
 
   /// Update the display name

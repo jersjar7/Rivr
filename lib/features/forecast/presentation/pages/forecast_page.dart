@@ -3,13 +3,17 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
+import 'package:rivr/core/di/service_locator.dart';
+import 'package:rivr/core/models/location_info.dart';
 import 'package:rivr/core/network/connection_monitor.dart';
+import 'package:rivr/core/services/geocoding_service.dart';
 import 'package:rivr/core/widgets/loading_indicator.dart';
 import 'package:rivr/core/widgets/empty_state.dart';
 import 'package:rivr/features/forecast/domain/entities/forecast_types.dart';
 import 'package:rivr/features/forecast/presentation/providers/forecast_provider.dart';
 import 'package:rivr/features/forecast/presentation/providers/return_period_provider.dart';
 import 'package:rivr/features/forecast/presentation/widgets/flow_status_card.dart';
+import 'package:rivr/features/forecast/presentation/widgets/location_info_row.dart';
 import 'package:rivr/features/forecast/presentation/widgets/medium_range/9_day_flow_forecast_widget/daily_flow_forecast_widget.dart';
 import 'package:rivr/features/forecast/presentation/widgets/short_range/horizontal_flow_timeline.dart';
 import 'package:rivr/features/forecast/presentation/widgets/hydrograph/hydrograph_factory.dart';
@@ -34,6 +38,10 @@ class _ForecastPageState extends State<ForecastPage>
   late TabController _tabController;
   bool _isRefreshing = false;
 
+  // Variables for location information
+  LocationInfo? _locationInfo;
+  bool _isLoadingLocation = false;
+
   @override
   void initState() {
     super.initState();
@@ -42,13 +50,26 @@ class _ForecastPageState extends State<ForecastPage>
     // Load forecasts when the page loads
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _loadForecasts();
+      // Load location info after forecasts to ensure we have coordinates
+      _tabController.addListener(_handleTabChange);
     });
   }
 
   @override
   void dispose() {
+    _tabController.removeListener(_handleTabChange);
     _tabController.dispose();
     super.dispose();
+  }
+
+  // Handle tab changes to load location when needed
+  void _handleTabChange() {
+    if (_tabController.index == 1 &&
+        _locationInfo == null &&
+        !_isLoadingLocation) {
+      // We're on the Daily tab, load location info
+      _loadLocationInfo();
+    }
   }
 
   Future<void> _loadForecasts() async {
@@ -77,6 +98,57 @@ class _ForecastPageState extends State<ForecastPage>
       if (mounted) {
         setState(() {
           _isRefreshing = false;
+        });
+
+        // If we're on the daily tab, load location info
+        if (_tabController.index == 1) {
+          _loadLocationInfo();
+        }
+      }
+    }
+  }
+
+  // Load location information for the river
+  Future<void> _loadLocationInfo() async {
+    if (!mounted) return;
+
+    final forecastProvider = Provider.of<ForecastProvider>(
+      context,
+      listen: false,
+    );
+
+    // Get reach location from provider
+    final reachLocation = forecastProvider.getReachLocationFor(widget.reachId);
+    if (reachLocation == null) {
+      // No location available
+      return;
+    }
+
+    setState(() {
+      _isLoadingLocation = true;
+    });
+
+    try {
+      // Get geocoding service from service locator
+      final geocodingService = sl<GeocodingService>();
+
+      // Get location info from coordinates
+      final locationInfo = await geocodingService.getLocationInfo(
+        reachLocation.lat,
+        reachLocation.lon,
+      );
+
+      if (mounted) {
+        setState(() {
+          _locationInfo = locationInfo;
+          _isLoadingLocation = false;
+        });
+      }
+    } catch (e) {
+      print('Error loading location info: $e');
+      if (mounted) {
+        setState(() {
+          _isLoadingLocation = false;
         });
       }
     }
@@ -274,6 +346,9 @@ class _ForecastPageState extends State<ForecastPage>
       ForecastType.shortRange,
     );
 
+    // Get reach location for map
+    final reachLocation = forecastProvider.getReachLocationFor(widget.reachId);
+
     if (shortRangeForecasts == null) {
       return Center(
         child: EmptyStateView(
@@ -295,6 +370,17 @@ class _ForecastPageState extends State<ForecastPage>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Add Location Info Row if we have coordinates
+          if (reachLocation != null)
+            LocationInfoRow(
+              locationInfo: _locationInfo,
+              lat: reachLocation.lat,
+              lon: reachLocation.lon,
+              riverName: widget.stationName,
+              isLoading: _isLoadingLocation,
+              onRefresh: _loadLocationInfo,
+            ),
+
           // Current Flow Status Card
           FlowStatusCard(
             currentFlow: latestFlow,

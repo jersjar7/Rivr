@@ -8,6 +8,7 @@ import 'package:http/http.dart' as http;
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:rivr/core/di/map_di.dart';
 import 'package:rivr/core/network/connection_monitor.dart';
+import 'package:rivr/core/services/geocoding_service.dart';
 import 'package:rivr/core/services/stream_name_service.dart';
 
 // Core
@@ -127,6 +128,9 @@ Future<void> setupServiceLocator() async {
   _registerForecastDependencies(); // Forecast dependencies
   registerMapDependencies(sl); // Register map dependencies
   _registerProviders(); // Register all providers
+
+  // Register geocoding service
+  registerGeocodingService(sl);
 
   // Biometric Authentication
   sl.registerLazySingleton<BiometricAuthService>(
@@ -291,6 +295,18 @@ void _registerProviders() {
       getAllForecasts: sl<GetAllForecasts>(),
       getLatestFlow: sl<GetLatestFlow>(),
       getReturnPeriods: sl<GetReturnPeriods>(),
+    ),
+  );
+}
+
+/// Update service locator with geocoding service registration
+void registerGeocodingService(GetIt sl) {
+  // Geocoding service
+  sl.registerLazySingleton<GeocodingService>(
+    () => GeocodingService(
+      httpClient: sl<http.Client>(),
+      cacheService: sl<CacheService>(),
+      networkInfo: sl<NetworkInfo>(),
     ),
   );
 }

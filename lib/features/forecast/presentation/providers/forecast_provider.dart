@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:rivr/core/error/failures.dart';
 import 'package:rivr/features/forecast/domain/entities/forecast.dart';
 import 'package:rivr/features/forecast/domain/entities/forecast_types.dart';
+import 'package:rivr/features/forecast/domain/entities/reach_location.dart';
 import 'package:rivr/features/forecast/domain/entities/return_period.dart';
 import 'package:rivr/features/forecast/domain/usecases/get_forecast.dart';
 import 'package:rivr/features/forecast/domain/usecases/get_return_periods.dart';
@@ -50,6 +51,7 @@ class ForecastProvider extends ChangeNotifier {
   final Map<String, DateTime> _lastFetchTimes = {};
   final Map<String, Map<DateTime, Map<String, double>>> _aggregatedDailyData =
       {};
+  final Map<String, ReachLocation> _reachLocations = {};
 
   // Cache for station names to reduce service calls
   final Map<String, String> _stationNameCache = {};
@@ -110,6 +112,26 @@ class ForecastProvider extends ChangeNotifier {
   // Get aggregated daily data for calendar view
   Map<DateTime, Map<String, double>>? getDailyDataFor(String reachId) {
     return _aggregatedDailyData[reachId];
+  }
+
+  // Get location for a reach/river
+  ReachLocation? getReachLocationFor(String reachId) {
+    return _reachLocations[reachId];
+  }
+
+  // Set location for a reach/river
+  void setReachLocation(
+    String reachId,
+    double lat,
+    double lon, {
+    double? elevation,
+  }) {
+    _reachLocations[reachId] = ReachLocation(
+      lat: lat,
+      lon: lon,
+      elevation: elevation,
+    );
+    notifyListeners();
   }
 
   // Get the station name from StreamNameService
@@ -199,6 +221,9 @@ class ForecastProvider extends ChangeNotifier {
         _loadLatestFlow(reachId);
         _loadReturnPeriod(reachId);
         _processDailyData(reachId);
+
+        // Try to extract location information
+        _tryExtractLocationInfo(reachId);
 
         // Prefetch the station name if we don't have it
         if (!_stationNameCache.containsKey(reachId)) {
@@ -466,6 +491,38 @@ class ForecastProvider extends ChangeNotifier {
     });
 
     _aggregatedDailyData[reachId] = dailyStats;
+  }
+
+  // Extract location info from forecast data if available
+  void _tryExtractLocationInfo(String reachId) {
+    // Skip if we already have location data for this reach
+    if (_reachLocations.containsKey(reachId)) {
+      return;
+    }
+
+    // For now, we'll use a basic method to generate a location based on the reachId
+    // In a real implementation, this would extract coordinates from actual data
+    // This could come from favorites, from the API response, or other sources
+
+    try {
+      // This is just a placeholder implementation
+      // In a real app, you'd extract this data from your forecasts or API
+      // For demonstration purposes, we'll generate dummy coordinates
+
+      int reachSeed = 0;
+      for (var digit in reachId.runes) {
+        reachSeed += digit;
+      }
+
+      final random = reachSeed % 1000 / 1000;
+      final lat = 39.5 + random; // Center around Denver
+      final lon = -105.0 - random * 2;
+
+      // Store the location
+      _reachLocations[reachId] = ReachLocation(lat: lat, lon: lon);
+    } catch (e) {
+      print('Error extracting location from reach data: $e');
+    }
   }
 
   // Refresh all data for a reach

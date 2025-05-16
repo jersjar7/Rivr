@@ -188,30 +188,8 @@ class _StreamInfoPanelState extends State<StreamInfoPanel> {
     );
 
     if (success) {
-      // Close the info panel
+      // Close the info panel without navigation
       widget.onClose();
-
-      // Navigate to favorites if callback provided
-      if (widget.onNavigateToFavorites != null) {
-        // Small delay to let the UI update
-        await Future.delayed(const Duration(milliseconds: 300));
-        widget.onNavigateToFavorites!();
-      }
-    }
-  }
-
-  /// Handle editing the name
-  Future<void> _editName() async {
-    // Use the helper to update display name
-    final success = await _infoHelper.updateDisplayName(
-      context,
-      widget.station.stationId.toString(),
-      widget.station,
-    );
-
-    if (success && mounted) {
-      // Reload name info
-      _loadStationName();
     }
   }
 
@@ -261,9 +239,14 @@ class _StreamInfoPanelState extends State<StreamInfoPanel> {
       lat: widget.station.lat,
       lon: widget.station.lon,
       elevation: widget.station.elevation,
+      onClose: widget.onClose, // Pass the onClose callback
       onRefresh: _fetchReachData,
       onAddToFavorites: _addToFavorites,
       onViewForecast: (reachId, name) {
+        // First close the panel
+        widget.onClose();
+
+        // Then navigate to forecast screen
         if (widget.onViewForecast != null) {
           widget.onViewForecast!(reachId, name);
         } else {
@@ -286,6 +269,7 @@ class _StreamInfoPanelState extends State<StreamInfoPanel> {
       lat: widget.station.lat,
       lon: widget.station.lon,
       elevation: widget.station.elevation,
+      onClose: widget.onClose, // Pass the onClose callback
       onAddToFavorites: () {
         if (widget.onAddToFavorites != null) {
           widget.onAddToFavorites!(widget.station);
@@ -293,8 +277,11 @@ class _StreamInfoPanelState extends State<StreamInfoPanel> {
           _addToFavorites();
         }
       },
-      onEditName: _editName,
       onViewForecast: (reachId, name) {
+        // First close the panel
+        widget.onClose();
+
+        // Then navigate to forecast screen
         if (widget.onViewForecast != null) {
           widget.onViewForecast!(reachId, name);
         } else {

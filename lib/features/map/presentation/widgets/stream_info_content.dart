@@ -10,11 +10,11 @@ class StreamInfoContent extends StatelessWidget {
   final Map<String, dynamic>? reachData;
   final Function(String, String) onViewForecast;
   final Function() onAddToFavorites;
-  final Function() onEditName;
   final String stationId;
   final double lat;
   final double lon;
   final double? elevation;
+  final VoidCallback onClose;
 
   const StreamInfoContent({
     super.key,
@@ -23,10 +23,10 @@ class StreamInfoContent extends StatelessWidget {
     required this.reachData,
     required this.onViewForecast,
     required this.onAddToFavorites,
-    required this.onEditName,
     required this.stationId,
     required this.lat,
     required this.lon,
+    required this.onClose,
     this.elevation,
   });
 
@@ -59,32 +59,19 @@ class StreamInfoContent extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Expanded(
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        streamName,
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                        ),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    // Edit button for renaming
-                    IconButton(
-                      icon: const Icon(Icons.edit, size: 16),
-                      onPressed: onEditName,
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(),
-                      tooltip: 'Edit Name',
-                    ),
-                  ],
+                child: Text(
+                  streamName,
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
               IconButton(
                 icon: const Icon(Icons.close),
-                onPressed: () => Navigator.of(context).pop(),
+                onPressed:
+                    onClose, // Use the callback instead of Navigator.pop()
                 padding: EdgeInsets.zero,
                 constraints: const BoxConstraints(),
               ),
@@ -254,6 +241,7 @@ class StreamInfoErrorContent extends StatelessWidget {
   final VoidCallback onRefresh;
   final VoidCallback onAddToFavorites;
   final Function(String, String) onViewForecast;
+  final VoidCallback onClose;
 
   const StreamInfoErrorContent({
     super.key,
@@ -269,6 +257,7 @@ class StreamInfoErrorContent extends StatelessWidget {
     required this.onRefresh,
     required this.onAddToFavorites,
     required this.onViewForecast,
+    required this.onClose,
   });
 
   @override
@@ -312,7 +301,8 @@ class StreamInfoErrorContent extends StatelessWidget {
               ),
               IconButton(
                 icon: const Icon(Icons.close),
-                onPressed: () => Navigator.of(context).pop(),
+                onPressed:
+                    onClose, // Use the callback instead of Navigator.pop()
                 padding: EdgeInsets.zero,
                 constraints: const BoxConstraints(),
               ),

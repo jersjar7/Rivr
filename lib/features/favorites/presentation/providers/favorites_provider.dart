@@ -281,6 +281,11 @@ class FavoritesProvider with ChangeNotifier {
     String? displayName,
     String? description,
     String? originalApiName,
+    double? lat,
+    double? lon,
+    double? elevation,
+    String? city, // Add city parameter
+    String? state, // Add state parameter
   }) async {
     return _dataManager.addFavorite(
       userId,
@@ -288,6 +293,11 @@ class FavoritesProvider with ChangeNotifier {
       displayName: displayName,
       description: description,
       originalApiName: originalApiName,
+      lat: lat,
+      lon: lon,
+      elevation: elevation,
+      city: city, // Pass city to data manager
+      state: state, // Pass state to data manager
     );
   }
 

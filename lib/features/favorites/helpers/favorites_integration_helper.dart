@@ -3,6 +3,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:rivr/core/di/service_locator.dart';
+import 'package:rivr/core/services/geocoding_service.dart';
 import 'package:rivr/core/services/stream_name_service.dart';
 import 'package:rivr/features/map/presentation/helpers/stream_info_helper.dart';
 import '../../../features/auth/presentation/providers/auth_provider.dart';
@@ -69,19 +70,50 @@ class FavoritesIntegrationHelper {
         // Continue without original API name
       }
 
-      // Add to favorites with proper name information
+      // Get location information using GeocodingService
+      String? city;
+      String? state;
+      try {
+        print('Getting location info for station ${station.stationId}');
+        final geocodingService = sl<GeocodingService>();
+        final locationInfo = await geocodingService.getLocationInfo(
+          station.lat,
+          station.lon,
+        );
+
+        if (locationInfo != null) {
+          city = locationInfo.city;
+          state = locationInfo.state;
+          print('Found location: ${locationInfo.formattedLocation}');
+        }
+      } catch (e) {
+        print('Error getting location info: $e');
+        // Continue without location info
+      }
+
+      // Add to favorites with proper name information, coordinates, and location
       final success = await favoritesProvider.addFavoriteFromStation(
         user.uid,
         station.stationId.toString(),
         displayName: nameToUse,
         description: description,
         originalApiName: originalApiName,
+        lat: station.lat,
+        lon: station.lon,
+        elevation: station.elevation,
+        city: city, // Include city
+        state: state, // Include state
       );
 
       if (success && showSnackbar) {
+        String message = '$nameToUse added to favorites';
+        if (city != null && state != null) {
+          message = '$nameToUse in $city, $state added to favorites';
+        }
+
         scaffoldMessenger.showSnackBar(
           SnackBar(
-            content: Text('$nameToUse added to favorites'),
+            content: Text(message),
             duration: const Duration(seconds: 2),
           ),
         );

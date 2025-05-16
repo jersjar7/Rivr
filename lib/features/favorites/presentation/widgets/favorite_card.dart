@@ -4,6 +4,8 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:rivr/core/models/location_info.dart';
+import 'package:rivr/core/services/geocoding_service.dart';
 import 'package:rivr/features/favorites/services/favorite_image_service.dart';
 import '../../domain/entities/favorite.dart';
 import '../../../../core/services/stream_name_service.dart';
@@ -33,11 +35,55 @@ class _FavoriteCardState extends State<FavoriteCard> {
   bool _isLoadingName = true;
   bool _isCustomName = false;
 
+  // Add location-related state variables
+  LocationInfo? _locationInfo;
+  bool _isLoadingLocation = false;
+
   @override
   void initState() {
     super.initState();
     _streamNameService = sl<StreamNameService>();
     _loadNameInfo();
+
+    // Load location information if coordinates are available
+    if (widget.favorite.lat != null && widget.favorite.lon != null) {
+      _loadLocationInfo();
+    }
+  }
+
+  // Add method to load location information
+  Future<void> _loadLocationInfo() async {
+    /// Skip if no coordinates available or if we already have city and state
+    if (widget.favorite.lat == null ||
+        widget.favorite.lon == null ||
+        (_locationInfo != null && _locationInfo!.city.isNotEmpty)) {
+      return;
+    }
+
+    setState(() => _isLoadingLocation = true);
+
+    try {
+      // Get geocoding service from service locator
+      final geocodingService = sl<GeocodingService>();
+
+      // Get location info from coordinates
+      final locationInfo = await geocodingService.getLocationInfo(
+        widget.favorite.lat!,
+        widget.favorite.lon!,
+      );
+
+      if (mounted) {
+        setState(() {
+          _locationInfo = locationInfo;
+          _isLoadingLocation = false;
+        });
+      }
+    } catch (e) {
+      print('Error loading location info: $e');
+      if (mounted) {
+        setState(() => _isLoadingLocation = false);
+      }
+    }
   }
 
   // Load name information from the service
@@ -96,6 +142,14 @@ class _FavoriteCardState extends State<FavoriteCard> {
         oldWidget.favorite.name != widget.favorite.name ||
         oldWidget.favorite.lastUpdated != widget.favorite.lastUpdated) {
       _loadNameInfo();
+    }
+
+    // Reload location info if coordinates changed
+    if (oldWidget.favorite.lat != widget.favorite.lat ||
+        oldWidget.favorite.lon != widget.favorite.lon) {
+      if (widget.favorite.lat != null && widget.favorite.lon != null) {
+        _loadLocationInfo();
+      }
     }
   }
 
@@ -277,6 +331,64 @@ class _FavoriteCardState extends State<FavoriteCard> {
                       ],
                     ),
                   ),
+
+                  // Location information display
+                  if (_locationInfo != null ||
+                      (widget.favorite.lat != null &&
+                          widget.favorite.lon != null))
+                    Positioned(
+                      bottom: 40, // Position above the station name
+                      left: 16,
+                      right: 16,
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.black.withOpacity(0.6),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.location_on,
+                                  size: 12,
+                                  color: Colors.white,
+                                ),
+                                const SizedBox(width: 4),
+                                _isLoadingLocation
+                                    ? SizedBox(
+                                      width: 12,
+                                      height: 12,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        valueColor: AlwaysStoppedAnimation(
+                                          Colors.white,
+                                        ),
+                                      ),
+                                    )
+                                    : Text(
+                                      _locationInfo?.formattedLocation ??
+                                          (widget.favorite.city != null &&
+                                                  widget.favorite.state != null
+                                              ? '${widget.favorite.city}, ${widget.favorite.state}'
+                                              : 'Location information'),
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
 
                   // Drag Handle Indicator
                   Positioned(

@@ -9,6 +9,9 @@ import 'package:rivr/core/network/connection_monitor.dart';
 import 'package:rivr/core/services/geocoding_service.dart';
 import 'package:rivr/core/widgets/loading_indicator.dart';
 import 'package:rivr/core/widgets/empty_state.dart';
+import 'package:rivr/features/auth/presentation/providers/auth_provider.dart';
+import 'package:rivr/features/favorites/domain/entities/favorite.dart';
+import 'package:rivr/features/favorites/presentation/providers/favorites_provider.dart';
 import 'package:rivr/features/forecast/domain/entities/forecast_types.dart';
 import 'package:rivr/features/forecast/presentation/providers/forecast_provider.dart';
 import 'package:rivr/features/forecast/presentation/providers/return_period_provider.dart';
@@ -114,6 +117,50 @@ class _ForecastPageState extends State<ForecastPage>
       context,
       listen: false,
     );
+
+    // Get favoritesProvider to check if this station is a favorite
+    final favoritesProvider = Provider.of<FavoritesProvider>(
+      context,
+      listen: false,
+    );
+
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+
+    // Check if this station is a favorite and has location info
+    bool locationFromFavorite = false;
+    if (authProvider.currentUser != null) {
+      final userId = authProvider.currentUser!.uid;
+      final favorites = favoritesProvider.favorites;
+
+      // Find the favorite for this station
+      final favorite = favorites.firstWhere(
+        (f) => f.stationId == widget.reachId && f.userId == userId,
+        orElse:
+            () =>
+                null as Favorite, // This will throw if not found, but that's OK
+      );
+
+      // If we found a favorite with city and state, use that
+      if (favorite.city != null && favorite.state != null) {
+        setState(() {
+          _locationInfo = LocationInfo(
+            city: favorite.city!,
+            state: favorite.state!,
+            lat: favorite.lat ?? 0,
+            lon: favorite.lon ?? 0,
+          );
+          _isLoadingLocation = false;
+        });
+
+        print(
+          'Using location info from favorite: ${_locationInfo!.formattedLocation}',
+        );
+        locationFromFavorite = true;
+      }
+    }
+
+    // If we didn't get location from favorites, continue with normal flow
+    if (locationFromFavorite) return;
 
     // Get reach location from provider
     final reachLocation = forecastProvider.getReachLocationFor(widget.reachId);

@@ -293,6 +293,9 @@ class DatabaseHelper {
           lastUpdated INTEGER NOT NULL,
           originalApiName TEXT,
           customImagePath TEXT,
+          lat REAL,
+          lon REAL,
+          elevation REAL,
           UNIQUE(stationId, userId)
         )
       ''');
@@ -319,7 +322,14 @@ class DatabaseHelper {
     // Check and add customImagePath column if needed
     await addColumnIfNeeded(tableFavorites, 'customImagePath', 'TEXT', db);
 
-    // Add any future columns here in the same pattern
+    // Check and add location columns if needed
+    await addColumnIfNeeded(tableFavorites, 'lat', 'REAL', db);
+    await addColumnIfNeeded(tableFavorites, 'lon', 'REAL', db);
+    await addColumnIfNeeded(tableFavorites, 'elevation', 'REAL', db);
+
+    // Add city and state columns
+    await addColumnIfNeeded(tableFavorites, 'city', 'TEXT', db);
+    await addColumnIfNeeded(tableFavorites, 'state', 'TEXT', db);
   }
 
   // Specific method for ensuring customImagePath column exists

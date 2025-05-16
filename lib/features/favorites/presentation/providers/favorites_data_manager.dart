@@ -40,6 +40,11 @@ class FavoritesDataManager {
     String? displayName,
     String? description,
     String? originalApiName,
+    double? lat,
+    double? lon,
+    double? elevation,
+    String? city, // New parameters for location text
+    String? state,
   }) async {
     if (parent.isProcessing) return false;
 
@@ -89,7 +94,7 @@ class FavoritesDataManager {
         }
       }
 
-      // Create favorite model
+      // Create favorite model with location data and city/state
       final favorite = FavoriteModel(
         stationId: stationId,
         name: riverName,
@@ -100,6 +105,11 @@ class FavoritesDataManager {
         imgNumber: randomImgNumber,
         lastUpdated: DateTime.now().millisecondsSinceEpoch,
         originalApiName: apiName,
+        lat: lat, // Store coordinates
+        lon: lon,
+        elevation: elevation,
+        city: city, // Store city
+        state: state, // Store state
       );
 
       // Update the name in StreamNameService for future consistency

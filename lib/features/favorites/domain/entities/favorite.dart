@@ -11,6 +11,13 @@ class Favorite {
   final int? lastUpdated;
   final String? originalApiName;
   final String? customImagePath;
+  // Location properties
+  final double? lat;
+  final double? lon;
+  final double? elevation;
+  // Add city and state to the model
+  final String? city;
+  final String? state;
 
   const Favorite({
     required this.stationId,
@@ -23,5 +30,12 @@ class Favorite {
     this.lastUpdated,
     this.originalApiName,
     this.customImagePath,
+    // Location properties
+    this.lat,
+    this.lon,
+    this.elevation,
+    // New location text properties
+    this.city,
+    this.state,
   });
 }

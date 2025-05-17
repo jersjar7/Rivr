@@ -2,6 +2,9 @@
 
 import 'package:flutter/material.dart';
 import 'package:rivr/core/error/failures.dart';
+import 'package:rivr/core/formatters/flow_value_formatter.dart';
+import 'package:rivr/core/models/flow_unit.dart';
+import 'package:rivr/core/services/flow_units_service.dart';
 import 'package:rivr/core/services/geocoding_service.dart';
 import 'package:rivr/features/forecast/domain/entities/forecast.dart';
 import 'package:rivr/features/forecast/domain/entities/forecast_types.dart';
@@ -30,6 +33,12 @@ class ForecastProvider extends ChangeNotifier {
   final MapStationLocalDataSource _mapStationDataSource;
   final DatabaseHelper _databaseHelper;
 
+  // FlowUnitsService
+  final FlowUnitsService _flowUnitsService;
+
+  // FlowValueFormatter
+  final FlowValueFormatter _flowFormatter;
+
   ForecastProvider({
     required GetForecast getForecast,
     required GetShortRangeForecast getShortRangeForecast,
@@ -39,8 +48,10 @@ class ForecastProvider extends ChangeNotifier {
     required GetLatestFlow getLatestFlow,
     required GetReturnPeriods getReturnPeriods,
     StreamNameService? streamNameService,
-    MapStationLocalDataSource? mapStationDataSource, // New optional parameter
-    DatabaseHelper? databaseHelper, // New optional parameter
+    MapStationLocalDataSource? mapStationDataSource,
+    DatabaseHelper? databaseHelper,
+    required FlowUnitsService flowUnitsService, // Add this parameter
+    required FlowValueFormatter flowFormatter, // Add this parameter
   }) : _getForecast = getForecast,
        _getShortRangeForecast = getShortRangeForecast,
        _getMediumRangeForecast = getMediumRangeForecast,
@@ -51,7 +62,12 @@ class ForecastProvider extends ChangeNotifier {
        _streamNameService = streamNameService ?? sl<StreamNameService>(),
        _mapStationDataSource =
            mapStationDataSource ?? sl<MapStationLocalDataSource>(),
-       _databaseHelper = databaseHelper ?? DatabaseHelper();
+       _databaseHelper = databaseHelper ?? DatabaseHelper(),
+       _flowUnitsService = flowUnitsService,
+       _flowFormatter = flowFormatter {
+    // Listen for unit changes
+    _flowUnitsService.addListener(_onUnitChanged);
+  }
 
   // State variables
   final Map<String, ForecastLoadingState> _loadingStates = {};
@@ -67,6 +83,54 @@ class ForecastProvider extends ChangeNotifier {
 
   // Cache for station names to reduce service calls
   final Map<String, String> _stationNameCache = {};
+
+  @override
+  void dispose() {
+    _flowUnitsService.removeListener(_onUnitChanged);
+    super.dispose();
+  }
+
+  // Handler for when flow unit changes
+  void _onUnitChanged() {
+    // Just notify listeners so UI components can update
+    // The actual conversion happens when the values are used
+    notifyListeners();
+  }
+
+  // Get the current flow unit
+  FlowUnit get currentFlowUnit => _flowUnitsService.preferredUnit;
+
+  // Get the flow formatter for consistent formatting
+  FlowValueFormatter get flowFormatter => _flowFormatter;
+
+  // Mthod to format flow values
+  String formatFlow(double flow, {FlowUnit? fromUnit}) {
+    if (fromUnit != null && fromUnit != _flowUnitsService.preferredUnit) {
+      // Convert before formatting
+      final convertedFlow = _flowUnitsService.convertToPreferredUnit(
+        flow,
+        fromUnit,
+      );
+      return _flowFormatter.format(convertedFlow);
+    }
+
+    return _flowFormatter.format(flow);
+  }
+
+  // New helper method to convert flow values if needed
+  double convertFlowIfNeeded(double flow, FlowUnit fromUnit) {
+    if (fromUnit == _flowUnitsService.preferredUnit) {
+      return flow; // No conversion needed
+    }
+
+    return _flowUnitsService.convertToPreferredUnit(flow, fromUnit);
+  }
+
+  // Get the unit string for display
+  String get unitString => _flowUnitsService.unitLabel;
+
+  // Get the short unit name
+  String get unitShortName => _flowUnitsService.unitShortName;
 
   // Getters
   bool isLoading(String reachId) =>
@@ -723,7 +787,7 @@ class ForecastProvider extends ChangeNotifier {
     );
   }
 
-  // Process forecasts into daily data for calendar view
+  // Process forecasts into daily data for calendar view - with unit handling
   void _processDailyData(String reachId) {
     if (!_cachedForecasts.containsKey(reachId)) return;
 
@@ -746,7 +810,14 @@ class ForecastProvider extends ChangeNotifier {
           dailyFlowValues[date] = [];
         }
 
-        dailyFlowValues[date]!.add(forecast.flow);
+        // Assume forecast flow values are in CFS (API standard)
+        // and convert if needed
+        double flowValue = forecast.flow;
+        if (_flowUnitsService.preferredUnit == FlowUnit.cms) {
+          flowValue = _flowUnitsService.cfsToCms(flowValue);
+        }
+
+        dailyFlowValues[date]!.add(flowValue);
       }
     }
 

@@ -2,6 +2,9 @@
 
 import 'package:flutter/material.dart';
 import 'package:rivr/core/error/failures.dart';
+import 'package:rivr/core/formatters/flow_value_formatter.dart';
+import 'package:rivr/core/models/flow_unit.dart';
+import 'package:rivr/core/services/flow_units_service.dart';
 import 'package:rivr/features/forecast/domain/entities/return_period.dart';
 import 'package:rivr/features/forecast/domain/usecases/get_return_periods.dart';
 import 'package:rivr/features/forecast/presentation/providers/forecast_provider.dart';
@@ -15,15 +18,28 @@ class ReturnPeriodProvider extends ChangeNotifier {
   final CheckFlowExceedsThreshold _checkFlowExceedsThreshold;
   final ForecastProvider _forecastProvider;
 
+  // FlowUnitsService
+  final FlowUnitsService _flowUnitsService;
+
+  // FlowValueFormatter
+  final FlowValueFormatter _flowFormatter;
+
   ReturnPeriodProvider({
     required GetReturnPeriods getReturnPeriods,
     required GetFlowCategory getFlowCategory,
     required CheckFlowExceedsThreshold checkFlowExceedsThreshold,
     required ForecastProvider forecastProvider,
+    required FlowUnitsService flowUnitsService, // Add this parameter
+    required FlowValueFormatter flowFormatter, // Add this parameter
   }) : _getReturnPeriods = getReturnPeriods,
        _getFlowCategory = getFlowCategory,
        _checkFlowExceedsThreshold = checkFlowExceedsThreshold,
-       _forecastProvider = forecastProvider;
+       _forecastProvider = forecastProvider,
+       _flowUnitsService = flowUnitsService,
+       _flowFormatter = flowFormatter {
+    // Listen for unit changes and update data as needed
+    _flowUnitsService.addListener(_onUnitChanged);
+  }
 
   final Map<String, ReturnPeriod> _cachedReturnPeriods = {};
   final Map<String, String> _errorMessages = {};
@@ -32,6 +48,35 @@ class ReturnPeriodProvider extends ChangeNotifier {
 
   // Map of reachId -> flow thresholds for quick access
   final Map<String, Map<String, double>> _flowThresholds = {};
+
+  @override
+  void dispose() {
+    _flowUnitsService.removeListener(_onUnitChanged);
+    super.dispose();
+  }
+
+  // Handler for when the flow unit changes
+  void _onUnitChanged() {
+    // Refresh all cached return periods to reflect the new unit
+    _refreshAllCachedReturnPeriods();
+
+    // Notify listeners so UI components can update
+    notifyListeners();
+  }
+
+  // Get the current flow unit
+  FlowUnit get currentFlowUnit => _flowUnitsService.preferredUnit;
+
+  // Get the flow formatter for consistent formatting
+  FlowValueFormatter get flowFormatter => _flowFormatter;
+
+  // Refresh all cached return periods when the unit changes
+  void _refreshAllCachedReturnPeriods() {
+    // For each cached return period, refresh it with the new unit
+    for (final reachId in _cachedReturnPeriods.keys.toList()) {
+      refreshReturnPeriod(reachId);
+    }
+  }
 
   // Getters
   bool isLoading(String reachId) =>
@@ -70,17 +115,32 @@ class ReturnPeriodProvider extends ChangeNotifier {
     // Check if forecast provider already has the return period data
     final forecastReturnPeriod = _forecastProvider.getReturnPeriodFor(reachId);
     if (forecastReturnPeriod != null && !forceRefresh) {
+      // Ensure it's in the current preferred unit
+      final returnPeriodInCorrectUnit = _ensureCorrectUnit(
+        forecastReturnPeriod,
+      );
       // Update our cache from forecast provider
-      _cachedReturnPeriods[reachId] = forecastReturnPeriod;
-      _updateFlowThresholds(reachId, forecastReturnPeriod);
-      return forecastReturnPeriod;
+      _cachedReturnPeriods[reachId] = returnPeriodInCorrectUnit;
+      _updateFlowThresholds(reachId, returnPeriodInCorrectUnit);
+      return returnPeriodInCorrectUnit;
     }
 
     // Return cached data if available and not forced to refresh
     if (!forceRefresh &&
         _cachedReturnPeriods.containsKey(reachId) &&
         !needsRefresh(reachId)) {
-      return _cachedReturnPeriods[reachId];
+      // Ensure it's in the current preferred unit
+      final cachedReturnPeriod = _cachedReturnPeriods[reachId]!;
+      if (cachedReturnPeriod.unit != _flowUnitsService.preferredUnit) {
+        final convertedReturnPeriod = cachedReturnPeriod.convertTo(
+          _flowUnitsService.preferredUnit,
+          _flowUnitsService,
+        );
+        _cachedReturnPeriods[reachId] = convertedReturnPeriod;
+        _updateFlowThresholds(reachId, convertedReturnPeriod);
+        return convertedReturnPeriod;
+      }
+      return cachedReturnPeriod;
     }
 
     _loadingStates[reachId] = ReturnPeriodLoadingState.loading;
@@ -97,6 +157,7 @@ class ReturnPeriodProvider extends ChangeNotifier {
         return null;
       },
       (returnPeriod) {
+        // returnPeriod should already be in the preferred unit from the repository
         _cachedReturnPeriods[reachId] = returnPeriod;
         _lastFetchTimes[reachId] = DateTime.now();
         _loadingStates[reachId] = ReturnPeriodLoadingState.loaded;
@@ -107,8 +168,21 @@ class ReturnPeriodProvider extends ChangeNotifier {
     );
   }
 
+  // Helper to ensure a return period is in the correct unit
+  ReturnPeriod _ensureCorrectUnit(ReturnPeriod returnPeriod) {
+    if (returnPeriod.unit == _flowUnitsService.preferredUnit) {
+      return returnPeriod;
+    }
+
+    return returnPeriod.convertTo(
+      _flowUnitsService.preferredUnit,
+      _flowUnitsService,
+    );
+  }
+
   // Update the flow thresholds map for quick access
   void _updateFlowThresholds(String reachId, ReturnPeriod returnPeriod) {
+    // This method stays the same since ReturnPeriod now handles units internally
     final thresholds = <String, double>{};
 
     // Get thresholds for all standard years
@@ -123,20 +197,28 @@ class ReturnPeriodProvider extends ChangeNotifier {
   }
 
   // Get flow category for a specific flow value
-  Future<String?> getFlowCategory(String reachId, double flow) async {
+  Future<String?> getFlowCategory(
+    String reachId,
+    double flow, {
+    FlowUnit flowUnit =
+        FlowUnit.cfs, // Add parameter to specify unit of provided flow
+  }) async {
     // Try from cached return period first
     if (_cachedReturnPeriods.containsKey(reachId)) {
-      return _cachedReturnPeriods[reachId]!.getFlowCategory(flow);
+      return _cachedReturnPeriods[reachId]!.getFlowCategory(
+        flow,
+        fromUnit: flowUnit,
+      );
     }
 
     // Try from forecast provider
     final forecastReturnPeriod = _forecastProvider.getReturnPeriodFor(reachId);
     if (forecastReturnPeriod != null) {
-      return forecastReturnPeriod.getFlowCategory(flow);
+      return forecastReturnPeriod.getFlowCategory(flow, fromUnit: flowUnit);
     }
 
     // Fetch from repository if needed
-    final result = await _getFlowCategory(reachId, flow);
+    final result = await _getFlowCategory(reachId, flow, flowUnit: flowUnit);
 
     return result.fold((failure) {
       _errorMessages[reachId] = _mapFailureToMessage(failure);

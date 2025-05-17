@@ -7,10 +7,13 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:http/http.dart' as http;
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:rivr/core/di/map_di.dart';
+import 'package:rivr/core/formatters/flow_value_formatter.dart';
 import 'package:rivr/core/network/connection_monitor.dart';
+import 'package:rivr/core/services/flow_units_service.dart';
 import 'package:rivr/core/services/geocoding_service.dart';
 import 'package:rivr/core/services/stream_name_service.dart';
 import 'package:rivr/features/map/data/datasources/map_station_local_datasource.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 // Core
 import '../network/network_info.dart';
@@ -141,6 +144,20 @@ Future<void> setupServiceLocator() async {
   // Add this to the setupServiceLocator function
   sl.registerLazySingleton<ConnectionMonitor>(
     () => ConnectionMonitor(networkInfo: sl<NetworkInfo>()),
+  );
+
+  // Register SharedPreferences instance
+  final sharedPreferences = await SharedPreferences.getInstance();
+  sl.registerLazySingleton<SharedPreferences>(() => sharedPreferences);
+
+  // Register FlowUnitsService
+  sl.registerLazySingleton<FlowUnitsService>(
+    () => FlowUnitsService(preferences: sl<SharedPreferences>()),
+  );
+
+  // Register FlowValueFormatter
+  sl.registerLazySingleton<FlowValueFormatter>(
+    () => FlowValueFormatter(unitsService: sl<FlowUnitsService>()),
   );
 }
 

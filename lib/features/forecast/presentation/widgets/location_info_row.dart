@@ -105,7 +105,7 @@ class LocationInfoRow extends StatelessWidget {
                         padding: const EdgeInsets.symmetric(vertical: 2),
                         color: theme.colorScheme.surface.withOpacity(0.7),
                         child: Text(
-                          'View map',
+                          'View in map',
                           textAlign: TextAlign.center,
                           style: theme.textTheme.bodySmall?.copyWith(
                             fontSize: 10,

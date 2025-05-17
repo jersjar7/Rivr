@@ -300,6 +300,10 @@ void _registerProviders() {
       checkFlowExceedsThreshold: sl<CheckFlowExceedsThreshold>(),
       forecastProvider:
           sl<ForecastProvider>(), // This will be replaced by ProxyProvider
+      flowUnitsService:
+          sl<FlowUnitsService>(), // Add FlowUnitsService dependency
+      flowFormatter:
+          sl<FlowValueFormatter>(), // Add FlowValueFormatter dependency
     ),
   );
 
@@ -313,9 +317,12 @@ void _registerProviders() {
       getAllForecasts: sl<GetAllForecasts>(),
       getLatestFlow: sl<GetLatestFlow>(),
       getReturnPeriods: sl<GetReturnPeriods>(),
-      mapStationDataSource:
-          sl<MapStationLocalDataSource>(), // Added this dependency
-      databaseHelper: sl<DatabaseHelper>(), // Added this dependency
+      mapStationDataSource: sl<MapStationLocalDataSource>(),
+      databaseHelper: sl<DatabaseHelper>(),
+      flowUnitsService:
+          sl<FlowUnitsService>(), // Add FlowUnitsService dependency
+      flowFormatter:
+          sl<FlowValueFormatter>(), // Add FlowValueFormatter dependency
     ),
   );
 }

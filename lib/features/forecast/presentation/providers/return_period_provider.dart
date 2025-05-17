@@ -16,7 +16,7 @@ class ReturnPeriodProvider extends ChangeNotifier {
   final GetReturnPeriods _getReturnPeriods;
   final GetFlowCategory _getFlowCategory;
   final CheckFlowExceedsThreshold _checkFlowExceedsThreshold;
-  final ForecastProvider _forecastProvider;
+  ForecastProvider _forecastProvider;
 
   // FlowUnitsService
   final FlowUnitsService _flowUnitsService;
@@ -29,8 +29,8 @@ class ReturnPeriodProvider extends ChangeNotifier {
     required GetFlowCategory getFlowCategory,
     required CheckFlowExceedsThreshold checkFlowExceedsThreshold,
     required ForecastProvider forecastProvider,
-    required FlowUnitsService flowUnitsService, // Add this parameter
-    required FlowValueFormatter flowFormatter, // Add this parameter
+    required FlowUnitsService flowUnitsService,
+    required FlowValueFormatter flowFormatter,
   }) : _getReturnPeriods = getReturnPeriods,
        _getFlowCategory = getFlowCategory,
        _checkFlowExceedsThreshold = checkFlowExceedsThreshold,
@@ -200,25 +200,31 @@ class ReturnPeriodProvider extends ChangeNotifier {
   Future<String?> getFlowCategory(
     String reachId,
     double flow, {
-    FlowUnit flowUnit =
-        FlowUnit.cfs, // Add parameter to specify unit of provided flow
+    FlowUnit fromUnit = FlowUnit.cfs, // For client-side conversion
   }) async {
     // Try from cached return period first
     if (_cachedReturnPeriods.containsKey(reachId)) {
       return _cachedReturnPeriods[reachId]!.getFlowCategory(
         flow,
-        fromUnit: flowUnit,
+        fromUnit: fromUnit,
       );
     }
 
     // Try from forecast provider
     final forecastReturnPeriod = _forecastProvider.getReturnPeriodFor(reachId);
     if (forecastReturnPeriod != null) {
-      return forecastReturnPeriod.getFlowCategory(flow, fromUnit: flowUnit);
+      return forecastReturnPeriod.getFlowCategory(flow, fromUnit: fromUnit);
     }
 
-    // Fetch from repository if needed
-    final result = await _getFlowCategory(reachId, flow, flowUnit: flowUnit);
+    // Convert the flow to the preferred unit before calling the use case
+    // since the use case doesn't accept a fromUnit parameter
+    double convertedFlow = flow;
+    if (fromUnit != _flowUnitsService.preferredUnit) {
+      convertedFlow = _flowUnitsService.convertToPreferredUnit(flow, fromUnit);
+    }
+
+    // Fetch from repository if needed - without the fromUnit parameter
+    final result = await _getFlowCategory(reachId, convertedFlow);
 
     return result.fold((failure) {
       _errorMessages[reachId] = _mapFailureToMessage(failure);
@@ -236,30 +242,57 @@ class ReturnPeriodProvider extends ChangeNotifier {
   Future<bool?> checkFlowExceedsThreshold(
     String reachId,
     double flow,
-    int returnPeriodYear,
-  ) async {
+    int returnPeriodYear, {
+    FlowUnit fromUnit = FlowUnit.cfs, // For client-side conversion
+  }) async {
     // Try from cached return period first
     if (_cachedReturnPeriods.containsKey(reachId)) {
+      // Convert flow to match the unit of the cached return period if needed
+      double comparableFlow = flow;
+      if (fromUnit != _cachedReturnPeriods[reachId]!.unit) {
+        comparableFlow = _flowUnitsService.convertToPreferredUnit(
+          flow,
+          fromUnit,
+        );
+      }
+
       final threshold = _cachedReturnPeriods[reachId]!.getFlowForYear(
         returnPeriodYear,
       );
       if (threshold != null) {
-        return flow >= threshold;
+        return comparableFlow >= threshold;
       }
     }
 
     // Try from forecast provider
     final forecastReturnPeriod = _forecastProvider.getReturnPeriodFor(reachId);
     if (forecastReturnPeriod != null) {
+      // Convert flow to match the unit of the forecast return period if needed
+      double comparableFlow = flow;
+      if (fromUnit != forecastReturnPeriod.unit) {
+        comparableFlow =
+            fromUnit == FlowUnit.cfs
+                ? _flowUnitsService.cfsToCms(flow)
+                : _flowUnitsService.cmsToCfs(flow);
+      }
+
       final threshold = forecastReturnPeriod.getFlowForYear(returnPeriodYear);
       if (threshold != null) {
-        return flow >= threshold;
+        return comparableFlow >= threshold;
       }
     }
 
+    // Convert the flow to the preferred unit before calling the use case
+    // since the use case doesn't accept a fromUnit parameter
+    double convertedFlow = flow;
+    if (fromUnit != _flowUnitsService.preferredUnit) {
+      convertedFlow = _flowUnitsService.convertToPreferredUnit(flow, fromUnit);
+    }
+
+    // Call the use case without the fromUnit parameter
     final result = await _checkFlowExceedsThreshold(
       reachId,
-      flow,
+      convertedFlow,
       returnPeriodYear,
     );
 
@@ -271,11 +304,24 @@ class ReturnPeriodProvider extends ChangeNotifier {
   }
 
   // Get color for flow based on return period thresholds
-  Color getColorForFlow(String reachId, double flow) {
+  Color getColorForFlow(
+    String reachId,
+    double flow, {
+    FlowUnit fromUnit = FlowUnit.cfs, // Add parameter for flow unit
+  }) {
     // Try from cached return period first
     if (_cachedReturnPeriods.containsKey(reachId)) {
+      // Convert flow if needed
+      double comparableFlow = flow;
+      if (fromUnit != _cachedReturnPeriods[reachId]!.unit) {
+        comparableFlow = _flowUnitsService.convertToPreferredUnit(
+          flow,
+          fromUnit,
+        );
+      }
+
       return FlowThresholds.getColorForFlow(
-        flow,
+        comparableFlow,
         _cachedReturnPeriods[reachId]!,
       );
     }
@@ -283,18 +329,43 @@ class ReturnPeriodProvider extends ChangeNotifier {
     // Try from forecast provider
     final forecastReturnPeriod = _forecastProvider.getReturnPeriodFor(reachId);
     if (forecastReturnPeriod != null) {
-      return FlowThresholds.getColorForFlow(flow, forecastReturnPeriod);
+      // Convert flow if needed
+      double comparableFlow = flow;
+      if (fromUnit != forecastReturnPeriod.unit) {
+        comparableFlow =
+            fromUnit == FlowUnit.cfs
+                ? _flowUnitsService.cfsToCms(flow)
+                : _flowUnitsService.cmsToCfs(flow);
+      }
+
+      return FlowThresholds.getColorForFlow(
+        comparableFlow,
+        forecastReturnPeriod,
+      );
     }
 
     return Colors.grey; // Default color if no return period data available
   }
 
   // Get detailed description of flow condition
-  String getFlowDescription(String reachId, double flow) {
+  String getFlowDescription(
+    String reachId,
+    double flow, {
+    FlowUnit fromUnit = FlowUnit.cfs, // Add parameter for flow unit
+  }) {
     // Try from cached return period first
     if (_cachedReturnPeriods.containsKey(reachId)) {
+      // Convert flow if needed
+      double comparableFlow = flow;
+      if (fromUnit != _cachedReturnPeriods[reachId]!.unit) {
+        comparableFlow = _flowUnitsService.convertToPreferredUnit(
+          flow,
+          fromUnit,
+        );
+      }
+
       return FlowThresholds.getFlowSummary(
-        flow,
+        comparableFlow,
         _cachedReturnPeriods[reachId]!,
       );
     }
@@ -302,18 +373,43 @@ class ReturnPeriodProvider extends ChangeNotifier {
     // Try from forecast provider
     final forecastReturnPeriod = _forecastProvider.getReturnPeriodFor(reachId);
     if (forecastReturnPeriod != null) {
-      return FlowThresholds.getFlowSummary(flow, forecastReturnPeriod);
+      // Convert flow if needed
+      double comparableFlow = flow;
+      if (fromUnit != forecastReturnPeriod.unit) {
+        comparableFlow =
+            fromUnit == FlowUnit.cfs
+                ? _flowUnitsService.cfsToCms(flow)
+                : _flowUnitsService.cmsToCfs(flow);
+      }
+
+      return FlowThresholds.getFlowSummary(
+        comparableFlow,
+        forecastReturnPeriod,
+      );
     }
 
     return 'Flow information not available';
   }
 
   // Calculate the flow as a percentage relative to return period thresholds
-  double getFlowPercentage(String reachId, double flow) {
+  double getFlowPercentage(
+    String reachId,
+    double flow, {
+    FlowUnit fromUnit = FlowUnit.cfs, // Add parameter for flow unit
+  }) {
     // Try from cached return period first
     if (_cachedReturnPeriods.containsKey(reachId)) {
+      // Convert flow if needed
+      double comparableFlow = flow;
+      if (fromUnit != _cachedReturnPeriods[reachId]!.unit) {
+        comparableFlow = _flowUnitsService.convertToPreferredUnit(
+          flow,
+          fromUnit,
+        );
+      }
+
       return FlowThresholds.calculateFlowPercentage(
-        flow,
+        comparableFlow,
         _cachedReturnPeriods[reachId]!,
       );
     }
@@ -321,18 +417,43 @@ class ReturnPeriodProvider extends ChangeNotifier {
     // Try from forecast provider
     final forecastReturnPeriod = _forecastProvider.getReturnPeriodFor(reachId);
     if (forecastReturnPeriod != null) {
-      return FlowThresholds.calculateFlowPercentage(flow, forecastReturnPeriod);
+      // Convert flow if needed
+      double comparableFlow = flow;
+      if (fromUnit != forecastReturnPeriod.unit) {
+        comparableFlow =
+            fromUnit == FlowUnit.cfs
+                ? _flowUnitsService.cfsToCms(flow)
+                : _flowUnitsService.cmsToCfs(flow);
+      }
+
+      return FlowThresholds.calculateFlowPercentage(
+        comparableFlow,
+        forecastReturnPeriod,
+      );
     }
 
     return 0.0; // Default percentage if no return period data available
   }
 
   // Check if the flow is at concerning levels
-  bool isFlowConcerning(String reachId, double flow) {
+  bool isFlowConcerning(
+    String reachId,
+    double flow, {
+    FlowUnit fromUnit = FlowUnit.cfs, // Add parameter for flow unit
+  }) {
     // Try from cached return period first
     if (_cachedReturnPeriods.containsKey(reachId)) {
+      // Convert flow if needed
+      double comparableFlow = flow;
+      if (fromUnit != _cachedReturnPeriods[reachId]!.unit) {
+        comparableFlow = _flowUnitsService.convertToPreferredUnit(
+          flow,
+          fromUnit,
+        );
+      }
+
       return FlowThresholds.isFlowConcerning(
-        flow,
+        comparableFlow,
         _cachedReturnPeriods[reachId]!,
       );
     }
@@ -340,7 +461,19 @@ class ReturnPeriodProvider extends ChangeNotifier {
     // Try from forecast provider
     final forecastReturnPeriod = _forecastProvider.getReturnPeriodFor(reachId);
     if (forecastReturnPeriod != null) {
-      return FlowThresholds.isFlowConcerning(flow, forecastReturnPeriod);
+      // Convert flow if needed
+      double comparableFlow = flow;
+      if (fromUnit != forecastReturnPeriod.unit) {
+        comparableFlow =
+            fromUnit == FlowUnit.cfs
+                ? _flowUnitsService.cfsToCms(flow)
+                : _flowUnitsService.cmsToCfs(flow);
+      }
+
+      return FlowThresholds.isFlowConcerning(
+        comparableFlow,
+        forecastReturnPeriod,
+      );
     }
 
     return false; // Default if no return period data available
@@ -350,10 +483,15 @@ class ReturnPeriodProvider extends ChangeNotifier {
   void syncWithForecastProvider(String reachId) {
     final forecastReturnPeriod = _forecastProvider.getReturnPeriodFor(reachId);
     if (forecastReturnPeriod != null) {
-      _cachedReturnPeriods[reachId] = forecastReturnPeriod;
+      // Ensure return period is in the preferred unit
+      ReturnPeriod returnPeriodInCorrectUnit = _ensureCorrectUnit(
+        forecastReturnPeriod,
+      );
+
+      _cachedReturnPeriods[reachId] = returnPeriodInCorrectUnit;
       _lastFetchTimes[reachId] = DateTime.now();
       _loadingStates[reachId] = ReturnPeriodLoadingState.loaded;
-      _updateFlowThresholds(reachId, forecastReturnPeriod);
+      _updateFlowThresholds(reachId, returnPeriodInCorrectUnit);
       notifyListeners();
     }
   }
@@ -397,7 +535,8 @@ class ReturnPeriodProvider extends ChangeNotifier {
 
   // Update the forecast provider reference
   void updateForecastProvider(ForecastProvider forecastProvider) {
-    forecastProvider = forecastProvider;
+    // Use _forecastProvider = forecastProvider instead of forecastProvider = forecastProvider
+    _forecastProvider = forecastProvider;
     // Sync any cached data
     for (final reachId in _cachedReturnPeriods.keys) {
       syncWithForecastProvider(reachId);

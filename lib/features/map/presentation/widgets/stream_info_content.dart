@@ -175,28 +175,31 @@ class StreamInfoContent extends StatelessWidget {
           const SizedBox(height: 16),
 
           // Action buttons
-          Row(
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: [
-              OutlinedButton.icon(
-                onPressed: onAddToFavorites,
-                icon: const Icon(Icons.favorite_border),
-                label: const Text('Add to Favorites'),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: theme.primaryColor,
+          Padding(
+            padding: const EdgeInsets.only(left: 8, right: 8),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                OutlinedButton.icon(
+                  onPressed: onAddToFavorites,
+                  icon: const Icon(Icons.favorite_border),
+                  label: const Text('Add to Favorites'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: theme.primaryColor,
+                  ),
                 ),
-              ),
-              const SizedBox(width: 8),
-              ElevatedButton.icon(
-                onPressed: () => onViewForecast(stationId, streamName),
-                icon: const Icon(Icons.analytics),
-                label: const Text('View Forecast'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: theme.primaryColor,
-                  foregroundColor: Colors.white,
+                const SizedBox(width: 8),
+                ElevatedButton.icon(
+                  onPressed: () => onViewForecast(stationId, streamName),
+                  icon: const Icon(Icons.analytics),
+                  label: const Text('View Forecast'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: theme.primaryColor,
+                    foregroundColor: Colors.white,
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ],
       ),

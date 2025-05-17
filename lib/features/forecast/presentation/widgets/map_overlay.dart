@@ -368,35 +368,6 @@ class _MapOverlayState extends State<MapOverlay>
                                               ),
                                             ),
                                           ),
-                                        // Attribution (Mapbox logo)
-                                        if (_isMapReady &&
-                                            _errorMessage.isEmpty)
-                                          Positioned(
-                                            bottom: 4,
-                                            right: 4,
-                                            child: Container(
-                                              padding:
-                                                  const EdgeInsets.symmetric(
-                                                    horizontal: 4,
-                                                    vertical: 2,
-                                                  ),
-                                              decoration: BoxDecoration(
-                                                color: Colors.white.withOpacity(
-                                                  0.7,
-                                                ), // Corrected
-                                                borderRadius:
-                                                    BorderRadius.circular(4),
-                                              ),
-                                              child: Text(
-                                                '© Mapbox',
-                                                style: theme.textTheme.bodySmall
-                                                    ?.copyWith(
-                                                      fontSize: 10,
-                                                      color: Colors.black54,
-                                                    ),
-                                              ),
-                                            ),
-                                          ),
                                       ],
                                     ),
                                   ),

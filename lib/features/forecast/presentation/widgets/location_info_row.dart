@@ -39,36 +39,39 @@ class LocationInfoRow extends StatelessWidget {
           children: [
             // Location information
             Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Icon(
-                        Icons.location_on,
-                        color: theme.colorScheme.primary,
-                        size: 18,
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        'River Location',
-                        style: theme.textTheme.titleSmall?.copyWith(
+              child: Padding(
+                padding: const EdgeInsets.only(left: 8.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.location_on,
                           color: theme.colorScheme.primary,
-                          fontWeight: FontWeight.bold,
+                          size: 18,
                         ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 4),
-                  isLoading
-                      ? _buildLoadingIndicator(theme)
-                      : Text(
-                        locationText,
-                        style: theme.textTheme.bodyMedium,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                ],
+                        const SizedBox(width: 4),
+                        Text(
+                          'River Location',
+                          style: theme.textTheme.titleSmall?.copyWith(
+                            color: theme.colorScheme.primary,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    isLoading
+                        ? _buildLoadingIndicator(theme)
+                        : Text(
+                          locationText,
+                          style: theme.textTheme.bodyMedium,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                  ],
+                ),
               ),
             ),
 
@@ -78,8 +81,8 @@ class LocationInfoRow extends StatelessWidget {
                 _showMapOverlay(context);
               },
               child: Container(
-                width: 80,
-                height: 60,
+                width: 100,
+                height: 70,
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(
@@ -88,20 +91,11 @@ class LocationInfoRow extends StatelessWidget {
                   ),
                   image: const DecorationImage(
                     image: AssetImage('assets/img/mini-map.png'),
-                    fit: BoxFit.cover,
+                    fit: BoxFit.contain,
                   ),
                 ),
                 child: Stack(
                   children: [
-                    // Marker icon in the center of mini map
-                    Center(
-                      child: Icon(
-                        Icons.location_pin,
-                        color: theme.colorScheme.primary,
-                        size: 20,
-                      ),
-                    ),
-
                     // "View map" text at the bottom
                     Positioned(
                       bottom: 0,

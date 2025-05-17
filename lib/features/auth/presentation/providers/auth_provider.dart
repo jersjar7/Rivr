@@ -20,7 +20,7 @@ class AuthProvider with ChangeNotifier {
   final SendPasswordResetEmail _sendPasswordResetEmail;
   final SignOut _signOut;
   final AuthStorageService _authStorage;
-  final UpdateUserProfile _updateUserProfile; // Add this field
+  final UpdateUserProfile _updateUserProfile;
   final BiometricAuthService _biometricAuthService;
 
   User? _currentUser;
@@ -36,7 +36,7 @@ class AuthProvider with ChangeNotifier {
     required SendPasswordResetEmail sendPasswordResetEmail,
     required SignOut signOut,
     required AuthStorageService authStorage,
-    required UpdateUserProfile updateUserProfile, // Add this parameter
+    required UpdateUserProfile updateUserProfile,
     required BiometricAuthService biometricAuthService,
   }) : _login = login,
        _register = register,

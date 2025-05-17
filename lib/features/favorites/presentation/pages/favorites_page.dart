@@ -308,7 +308,7 @@ class _FavoritesPageState extends State<FavoritesPage>
                             color:
                                 isSelected
                                     ? colors.primary
-                                    : colors.onSurface.withValues(alpha: 0.12),
+                                    : colors.onSurface.withOpacity(0.12),
                             width: isSelected ? 3 : 1,
                           ),
                           borderRadius: BorderRadius.circular(8),
@@ -480,20 +480,288 @@ class _FavoritesPageState extends State<FavoritesPage>
     }
   }
 
+  // Function to handle logout
+  void _handleLogout() async {
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    try {
+      await authProvider.logout();
+
+      // Add this navigation after successful logout
+      if (mounted) {
+        Navigator.of(context).pushNamedAndRemoveUntil(
+          '/auth',
+          (route) => false, // Clear navigation stack
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error signing out: $e')));
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
     final textTheme = theme.textTheme;
 
+    // Get user from AuthProvider for profile display
+    final authProvider = Provider.of<AuthProvider>(context);
+    final user = authProvider.currentUser;
+
     return Scaffold(
       backgroundColor: colors.surface,
+      // Add drawer to Scaffold
+      drawer: Drawer(
+        child: SafeArea(
+          top: false,
+          child: ListView(
+            padding: EdgeInsets.zero,
+            children: [
+              // User Profile Section
+              UserAccountsDrawerHeader(
+                decoration: BoxDecoration(color: colors.primary),
+                currentAccountPicture: CircleAvatar(
+                  backgroundColor: colors.secondary,
+                  child: Icon(
+                    Icons.person,
+                    size: 40,
+                    color: colors.onSecondary,
+                  ),
+                ),
+                accountName: Text(
+                  user?.firstName ?? 'River Enthusiast',
+                  style: textTheme.titleMedium?.copyWith(
+                    color: colors.onPrimary,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                accountEmail: Text(
+                  user?.email ?? 'user@example.com',
+                  style: textTheme.bodyMedium?.copyWith(
+                    color: colors.onPrimary.withOpacity(0.8),
+                  ),
+                ),
+              ),
+
+              // Measurement & Display Section
+              ListTile(
+                title: Text(
+                  'MEASUREMENT & DISPLAY',
+                  style: textTheme.labelSmall?.copyWith(
+                    color: colors.primary,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                dense: true,
+                visualDensity: VisualDensity.compact,
+              ),
+              ListTile(
+                leading: Icon(Icons.swap_horiz, color: colors.onSurfaceVariant),
+                title: Text('Units (cfs/cms)'),
+                trailing: Icon(Icons.arrow_forward_ios, size: 16),
+                onTap: () {
+                  // Placeholder for units toggle setting
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Units setting coming soon')),
+                  );
+                },
+              ),
+              ListTile(
+                leading: Icon(
+                  Icons.brightness_6,
+                  color: colors.onSurfaceVariant,
+                ),
+                title: Text('Theme Settings'),
+                trailing: Icon(Icons.arrow_forward_ios, size: 16),
+                onTap: () {
+                  // Placeholder for theme setting
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Theme setting coming soon')),
+                  );
+                },
+              ),
+
+              // Notifications & Alerts Section
+              Divider(),
+              ListTile(
+                title: Text(
+                  'NOTIFICATIONS & ALERTS',
+                  style: textTheme.labelSmall?.copyWith(
+                    color: colors.primary,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                dense: true,
+                visualDensity: VisualDensity.compact,
+              ),
+              ListTile(
+                leading: Icon(
+                  Icons.notifications,
+                  color: colors.onSurfaceVariant,
+                ),
+                title: Text('Flow Level Notifications'),
+                trailing: Icon(Icons.arrow_forward_ios, size: 16),
+                onTap: () {
+                  // Placeholder for flow notifications setting
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Flow notifications coming soon'),
+                    ),
+                  );
+                },
+              ),
+
+              // Data Management Section
+              Divider(),
+              ListTile(
+                title: Text(
+                  'DATA MANAGEMENT',
+                  style: textTheme.labelSmall?.copyWith(
+                    color: colors.primary,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                dense: true,
+                visualDensity: VisualDensity.compact,
+              ),
+              ListTile(
+                leading: Icon(
+                  Icons.cleaning_services,
+                  color: colors.onSurfaceVariant,
+                ),
+                title: Text('Clear Cache'),
+                trailing: Icon(Icons.arrow_forward_ios, size: 16),
+                onTap: () {
+                  // Placeholder for clear cache function
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Cache clearing coming soon')),
+                  );
+                },
+              ),
+
+              // Help & Information Section
+              Divider(),
+              ListTile(
+                title: Text(
+                  'HELP & INFORMATION',
+                  style: textTheme.labelSmall?.copyWith(
+                    color: colors.primary,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                dense: true,
+                visualDensity: VisualDensity.compact,
+              ),
+              ListTile(
+                leading: Icon(
+                  Icons.info_outline,
+                  color: colors.onSurfaceVariant,
+                ),
+                title: Text('About the App'),
+                trailing: Icon(Icons.arrow_forward_ios, size: 16),
+                onTap: () {
+                  // Placeholder for about page
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('About page coming soon')),
+                  );
+                },
+              ),
+              ListTile(
+                leading: Icon(Icons.source, color: colors.onSurfaceVariant),
+                title: Text('Data Sources'),
+                trailing: Icon(Icons.arrow_forward_ios, size: 16),
+                onTap: () {
+                  // Placeholder for data sources info
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Data sources info coming soon'),
+                    ),
+                  );
+                },
+              ),
+
+              // Feedback & Support Section
+              Divider(),
+              ListTile(
+                title: Text(
+                  'FEEDBACK & SUPPORT',
+                  style: textTheme.labelSmall?.copyWith(
+                    color: colors.primary,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                dense: true,
+                visualDensity: VisualDensity.compact,
+              ),
+              ListTile(
+                leading: Icon(Icons.bug_report, color: colors.onSurfaceVariant),
+                title: Text('Report a Bug'),
+                trailing: Icon(Icons.arrow_forward_ios, size: 16),
+                onTap: () {
+                  // Placeholder for bug reporting
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Bug reporting coming soon')),
+                  );
+                },
+              ),
+              ListTile(
+                leading: Icon(
+                  Icons.lightbulb_outline,
+                  color: colors.onSurfaceVariant,
+                ),
+                title: Text('Feature Requests'),
+                trailing: Icon(Icons.arrow_forward_ios, size: 16),
+                onTap: () {
+                  // Placeholder for feature requests
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Feature requests coming soon'),
+                    ),
+                  );
+                },
+              ),
+              ListTile(
+                leading: Icon(
+                  Icons.mail_outline,
+                  color: colors.onSurfaceVariant,
+                ),
+                title: Text('Contact Developers'),
+                trailing: Icon(Icons.arrow_forward_ios, size: 16),
+                onTap: () {
+                  // Placeholder for contact developers
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Contact form coming soon')),
+                  );
+                },
+              ),
+
+              // Log Out Section
+              Divider(),
+              ListTile(
+                leading: Icon(Icons.exit_to_app, color: colors.error),
+                title: Text(
+                  'Log Out',
+                  style: TextStyle(
+                    color: colors.error,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                onTap: _handleLogout,
+              ),
+            ],
+          ),
+        ),
+      ),
       appBar: AppBar(
         title: Text(
           'My Rivers',
           style: textTheme.titleMedium?.copyWith(
             fontWeight: FontWeight.bold,
-            color: colors.onPrimary, // Explicitly set the text color to white
+            color: colors.onPrimary,
           ),
         ),
         elevation: 0,

@@ -3,6 +3,8 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:rivr/core/formatters/flow_value_formatter.dart';
+import 'package:rivr/core/services/flow_units_service.dart';
 import 'firebase_options.dart';
 import 'app.dart';
 import 'core/di/service_locator.dart';
@@ -112,7 +114,7 @@ Future<void> main() async {
   runApp(
     MultiProvider(
       providers: [
-        // Provide global providers here that need to be accessible throughout the app
+        // Existing providers
         ChangeNotifierProvider<AuthProvider>(create: (_) => sl<AuthProvider>()),
         ChangeNotifierProvider<FavoritesProvider>(
           create: (_) => sl<FavoritesProvider>(),
@@ -127,8 +129,12 @@ Future<void> main() async {
                   previousReturnPeriodProvider!
                     ..updateForecastProvider(forecastProvider),
         ),
-        // Add StreamNameService to providers so widgets can access it
         Provider<StreamNameService>(create: (_) => sl<StreamNameService>()),
+
+        ChangeNotifierProvider<FlowUnitsService>(
+          create: (_) => sl<FlowUnitsService>(),
+        ),
+        Provider<FlowValueFormatter>(create: (_) => sl<FlowValueFormatter>()),
       ],
       child: const RivrApp(),
     ),

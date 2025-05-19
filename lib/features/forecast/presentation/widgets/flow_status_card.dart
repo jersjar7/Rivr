@@ -150,15 +150,7 @@ class _FlowStatusCardState extends State<FlowStatusCard> {
                         fontWeight: FontWeight.bold,
                       ),
                     ),
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 6.0),
-                      child: Text(
-                        _flowUnitsService.unitLabel,
-                        style: theme.textTheme.bodyMedium!.copyWith(
-                          color: textColor.withValues(alpha: 0.8),
-                        ),
-                      ),
-                    ),
+                    Padding(padding: const EdgeInsets.only(bottom: 6.0)),
                     if (comparisonText.isNotEmpty) const Spacer(),
                     if (comparisonText.isNotEmpty)
                       Container(

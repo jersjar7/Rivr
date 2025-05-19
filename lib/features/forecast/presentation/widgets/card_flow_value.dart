@@ -64,7 +64,7 @@ class FlowValueDisplay extends StatelessWidget {
       height: containerHeight,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        color: color.withOpacity(0.2),
+        color: color.withValues(alpha: .2),
         border: Border.all(color: color, width: 2),
       ),
       child: Center(

@@ -90,7 +90,7 @@ class _FavoritesDrawerState extends State<FavoritesDrawer> {
                       title: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          const Text('Units (flow measurement)'),
+                          const Text('Units'),
                           Consumer<FlowUnitsService>(
                             builder:
                                 (

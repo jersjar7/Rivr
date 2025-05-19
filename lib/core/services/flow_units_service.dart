@@ -56,26 +56,52 @@ class FlowUnitsService extends ChangeNotifier {
 
   /// Converts flow value from CFS to CMS
   double cfsToCms(double flowInCfs) {
+    if (flowInCfs == 0) return 0;
     return flowInCfs * FlowUnit.cfsToFcmsFactor;
   }
 
   /// Converts flow value from CMS to CFS
   double cmsToCfs(double flowInCms) {
+    if (flowInCms == 0) return 0;
     return flowInCms * FlowUnit.cmsToFcsFactor;
   }
 
   /// Converts a flow value to the preferred unit
   double convertToPreferredUnit(double value, FlowUnit fromUnit) {
     if (fromUnit == _preferredUnit) return value;
-
     return fromUnit == FlowUnit.cfs ? cfsToCms(value) : cmsToCfs(value);
   }
 
   /// Converts a flow value from the preferred unit to the specified unit
   double convertFromPreferredUnit(double value, FlowUnit toUnit) {
     if (_preferredUnit == toUnit) return value;
-
     return _preferredUnit == FlowUnit.cfs ? cfsToCms(value) : cmsToCfs(value);
+  }
+
+  /// Converts a list of flow values to the preferred unit
+  List<double> convertListToPreferredUnit(
+    List<double> values,
+    FlowUnit fromUnit,
+  ) {
+    if (fromUnit == _preferredUnit) return List.from(values);
+
+    return values
+        .map((value) => convertToPreferredUnit(value, fromUnit))
+        .toList();
+  }
+
+  /// Converts a map of flow values to the preferred unit
+  Map<K, double> convertMapToPreferredUnit<K>(
+    Map<K, double> values,
+    FlowUnit fromUnit,
+  ) {
+    if (fromUnit == _preferredUnit) return Map.from(values);
+
+    final convertedMap = <K, double>{};
+    values.forEach((key, value) {
+      convertedMap[key] = convertToPreferredUnit(value, fromUnit);
+    });
+    return convertedMap;
   }
 
   /// Returns the appropriate unit label based on the preferred unit
@@ -83,4 +109,13 @@ class FlowUnitsService extends ChangeNotifier {
 
   /// Returns the short unit name based on the preferred unit
   String get unitShortName => _preferredUnit.shortName;
+
+  /// Get the conversion factor from the source unit to the preferred unit
+  double getConversionFactor(FlowUnit fromUnit) {
+    if (fromUnit == _preferredUnit) return 1.0;
+
+    return fromUnit == FlowUnit.cfs
+        ? FlowUnit.cfsToFcmsFactor
+        : FlowUnit.cmsToFcsFactor;
+  }
 }

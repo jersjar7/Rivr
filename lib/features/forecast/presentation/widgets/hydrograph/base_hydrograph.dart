@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:rivr/core/formatters/flow_value_formatter.dart';
+import 'package:rivr/core/models/flow_unit.dart';
 import 'package:rivr/core/services/flow_units_service.dart';
 import 'package:rivr/features/forecast/domain/entities/return_period.dart';
 import 'package:rivr/features/forecast/utils/format_large_number.dart';
@@ -13,12 +14,14 @@ abstract class BaseHydrograph extends StatefulWidget {
   final String reachId;
   final ReturnPeriod? returnPeriod;
   final String title;
+  final FlowUnit sourceUnit;
 
   const BaseHydrograph({
     super.key,
     required this.reachId,
     required this.title,
     this.returnPeriod,
+    this.sourceUnit = FlowUnit.cfs, // Default to CFS as the source unit
   });
 
   @override
@@ -102,6 +105,23 @@ abstract class BaseHydrographState<T extends BaseHydrograph> extends State<T> {
     // Initialize formatter and units service
     _flowUnitsService = Provider.of<FlowUnitsService>(context, listen: false);
     _flowFormatter = Provider.of<FlowValueFormatter>(context, listen: false);
+
+    // Listen for unit changes
+    _flowUnitsService.addListener(_onUnitChanged);
+  }
+
+  @override
+  void dispose() {
+    _flowUnitsService.removeListener(_onUnitChanged);
+    super.dispose();
+  }
+
+  // Handle unit changes
+  void _onUnitChanged() {
+    // Mark that the unit changed so we can update the chart
+    setState(() {
+      _initialBoundsSet = false; // Force recalculation of bounds
+    });
   }
 
   // Reset zoom to original values
@@ -122,8 +142,8 @@ abstract class BaseHydrographState<T extends BaseHydrograph> extends State<T> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     for (final year in [2, 5, 10, 25, 50, 100]) {
+      // Get threshold in the preferred unit
       final threshold = widget.returnPeriod!.getFlowForYear(year);
-
       if (threshold != null) {
         lines.add(
           HorizontalLine(
@@ -197,9 +217,40 @@ abstract class BaseHydrographState<T extends BaseHydrograph> extends State<T> {
     }
   }
 
+  // Convert a flow value from the source unit to the preferred unit
+  double convertFlowIfNeeded(double flowValue) {
+    if (widget.sourceUnit == _flowUnitsService.preferredUnit) {
+      return flowValue; // No conversion needed
+    }
+
+    return _flowUnitsService.convertToPreferredUnit(
+      flowValue,
+      widget.sourceUnit,
+    );
+  }
+
+  // Convert a list of spots if the unit changed
+  List<FlSpot> convertSpotsIfNeeded(List<FlSpot> spots) {
+    if (widget.sourceUnit == _flowUnitsService.preferredUnit) {
+      return spots; // No conversion needed
+    }
+
+    // Convert each spot's y-value (flow)
+    return spots
+        .map((spot) => FlSpot(spot.x, convertFlowIfNeeded(spot.y)))
+        .toList();
+  }
+
   @override
   Widget build(BuildContext context) {
-    final spots = generateSpots();
+    // Get spots and convert if needed
+    List<FlSpot> spots = generateSpots();
+
+    // Convert spots if the source unit doesn't match the preferred unit
+    if (widget.sourceUnit != _flowUnitsService.preferredUnit) {
+      spots = convertSpotsIfNeeded(spots);
+    }
+
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final isDark = theme.brightness == Brightness.dark;
@@ -305,7 +356,7 @@ abstract class BaseHydrographState<T extends BaseHydrograph> extends State<T> {
     // Build the complete UI with scaffold and zoom indicator
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.title),
+        title: Text('${widget.title} (${_flowUnitsService.unitLabel})'),
         backgroundColor: chartBackgroundColor,
         elevation: 0,
         actions: [
@@ -389,13 +440,14 @@ abstract class BaseHydrographState<T extends BaseHydrograph> extends State<T> {
         getTooltipColor:
             (spot) =>
                 isDark
-                    ? colorScheme.surfaceContainerHighest.withOpacity(0.8)
-                    : Colors.blueGrey.withOpacity(0.8),
+                    ? colorScheme.surfaceContainerHighest.withValues(alpha: 0.8)
+                    : Colors.blueGrey.withValues(alpha: 0.8),
         tooltipRoundedRadius: 8,
         getTooltipItems: (List<LineBarSpot> lineBarsSpot) {
           return lineBarsSpot.map((spot) {
+            // Use the flow formatter to properly format the flow value
             return LineTooltipItem(
-              _flowFormatter.format(spot.y), // Use formatter here
+              _flowFormatter.format(spot.y),
               const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
               children: [
                 TextSpan(
@@ -490,7 +542,9 @@ abstract class BaseHydrographState<T extends BaseHydrograph> extends State<T> {
     final textTheme = theme.textTheme;
 
     return Scaffold(
-      appBar: AppBar(title: Text(widget.title)),
+      appBar: AppBar(
+        title: Text('${widget.title} (${_flowUnitsService.unitLabel})'),
+      ),
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,

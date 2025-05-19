@@ -39,30 +39,28 @@ class FlowThresholds {
     }
   }
 
-  /// Get color directly from flow and return period
+  /// Get color directly from flow and return period with unit conversion support
   static Color getColorForFlow(
     double flow,
     ReturnPeriod returnPeriod, {
-    FlowUnit fromUnit = FlowUnit.cfs, // Add flow unit parameter
+    FlowUnit fromUnit = FlowUnit.cfs,
   }) {
-    // Pass the flow unit for proper category determination
-    return getColorForCategory(
-      returnPeriod.getFlowCategory(flow, fromUnit: fromUnit),
-    );
+    // Get category using the provided fromUnit
+    final category = returnPeriod.getFlowCategory(flow, fromUnit: fromUnit);
+    return getColorForCategory(category);
   }
 
-  /// Get return period range description for a flow value
+  /// Get return period range description for a flow value with unit conversion support
   static String getReturnPeriodDescription(
     double flow,
     ReturnPeriod returnPeriod, {
-    FlowUnit fromUnit = FlowUnit.cfs, // Add flow unit parameter
+    FlowUnit fromUnit = FlowUnit.cfs,
   }) {
-    // Use the flow unit parameter for correct category determination
+    // Get category using the provided fromUnit
     final category = returnPeriod.getFlowCategory(flow, fromUnit: fromUnit);
     final description = categories[category] ?? 'Flow information unavailable';
 
     String returnPeriodText = '';
-    // Pass the flow unit for correct return period determination
     int? period = returnPeriod.getReturnPeriod(flow, fromUnit: fromUnit);
     if (period != null) {
       returnPeriodText = ' (approaches $period-year flood level)';
@@ -71,55 +69,66 @@ class FlowThresholds {
     return '$description$returnPeriodText';
   }
 
-  /// Evaluate if the flow is at concerning levels
+  /// Evaluate if the flow is at concerning levels with unit conversion support
   static bool isFlowConcerning(
     double flow,
     ReturnPeriod returnPeriod, {
-    FlowUnit fromUnit = FlowUnit.cfs, // Add flow unit parameter
+    FlowUnit fromUnit = FlowUnit.cfs,
   }) {
-    // Pass the flow unit for correct category determination
+    // Get category using the provided fromUnit
     final category = returnPeriod.getFlowCategory(flow, fromUnit: fromUnit);
+
     return category == 'Elevated' ||
         category == 'High' ||
         category == 'Very High' ||
         category == 'Extreme';
   }
 
-  /// Map a flow value to a percentage within the return period scale (0-100%)
+  /// Map a flow value to a percentage within the return period scale (0-100%) with unit conversion support
   static double calculateFlowPercentage(
     double flow,
     ReturnPeriod returnPeriod, {
-    FlowUnit fromUnit = FlowUnit.cfs, // Add flow unit parameter
+    FlowUnit fromUnit = FlowUnit.cfs,
   }) {
-    // Get the preferred unit for comparison (same as input flow's unit)
-    final preferredUnit = fromUnit;
-
-    // Get the lowest and highest return period values converted to the same unit as flow
-    final lowestThreshold =
-        returnPeriod.getFlowForYear(2, toUnit: preferredUnit) ?? 0.0;
+    // Convert the flow value if needed (done internally by ReturnPeriod)
+    // Get the lowest and highest return period values
+    final lowestThreshold = returnPeriod.getFlowForYear(2) ?? 0.0;
     final highestThreshold =
-        returnPeriod.getFlowForYear(100, toUnit: preferredUnit) ??
-        (lowestThreshold * 10);
+        returnPeriod.getFlowForYear(100) ?? (lowestThreshold * 10);
 
-    if (flow <= lowestThreshold) {
+    // Convert the flow to the same unit as the thresholds if needed
+    double comparableFlow = flow;
+    if (fromUnit != returnPeriod.unit) {
+      // This conversion is done implicitly by ReturnPeriod.getFlowCategory
+      // but we need to handle it explicitly here for the percentage calculation
+      // Use a simple conversion based on the conversion factors
+      comparableFlow =
+          fromUnit == FlowUnit.cfs
+              ? flow *
+                  FlowUnit
+                      .cfsToFcmsFactor // Convert CFS to CMS
+              : flow * FlowUnit.cmsToFcsFactor; // Convert CMS to CFS
+    }
+
+    if (comparableFlow <= lowestThreshold) {
       return 0.0;
-    } else if (flow >= highestThreshold) {
+    } else if (comparableFlow >= highestThreshold) {
       return 100.0;
     }
 
     // Calculate percentage between lowest and highest threshold
-    // (now all values are in the same unit)
-    return ((flow - lowestThreshold) / (highestThreshold - lowestThreshold)) *
+    return ((comparableFlow - lowestThreshold) /
+            (highestThreshold - lowestThreshold)) *
         100.0;
   }
 
-  /// Get a user-friendly response about current flow conditions
+  /// Get a user-friendly response about current flow conditions with unit conversion support
   static String getFlowSummary(
     double flow,
     ReturnPeriod returnPeriod, {
-    FlowUnit fromUnit = FlowUnit.cfs, // Add flow unit parameter
+    FlowUnit fromUnit = FlowUnit.cfs,
   }) {
-    // Pass the flow unit for correct category determination
+    // Get category using the provided fromUnit
     final category = returnPeriod.getFlowCategory(flow, fromUnit: fromUnit);
     final description = categories[category] ?? 'Flow information unavailable';
 
@@ -141,5 +150,86 @@ class FlowThresholds {
       default:
         return 'River flow information unavailable.';
     }
+  }
+
+  /// Get an icon for a flow category
+  static IconData getIconForCategory(String category) {
+    switch (category) {
+      case 'Low':
+        return Icons.waves_outlined;
+      case 'Normal':
+        return Icons.waves;
+      case 'Moderate':
+        return Icons.water;
+      case 'Elevated':
+        return Icons.arrow_upward;
+      case 'High':
+        return Icons.warning_outlined;
+      case 'Very High':
+        return Icons.warning;
+      case 'Extreme':
+        return Icons.dangerous;
+      default:
+        return Icons.waves;
+    }
+  }
+
+  /// Convert a flow value from one unit to another
+  static double convertFlow(double flow, FlowUnit fromUnit, FlowUnit toUnit) {
+    if (fromUnit == toUnit) return flow;
+
+    final factor =
+        fromUnit == FlowUnit.cfs
+            ? FlowUnit.cfsToFcmsFactor
+            : FlowUnit.cmsToFcsFactor;
+
+    return flow * factor;
+  }
+
+  /// Get warning level description based on the flow category
+  static String getWarningLevelDescription(String category) {
+    switch (category) {
+      case 'Low':
+        return 'No concerns at current flow level.';
+      case 'Normal':
+        return 'Safe conditions for most river activities.';
+      case 'Moderate':
+        return 'Use caution, especially for inexperienced paddlers.';
+      case 'Elevated':
+        return 'Elevated conditions - recreational paddlers should use caution.';
+      case 'High':
+        return 'High water alert - consider postponing river activities.';
+      case 'Very High':
+        return 'Dangerous conditions - not recommended for recreational use.';
+      case 'Extreme':
+        return 'Life-threatening conditions - stay away from the river.';
+      default:
+        return 'Warning level information not available.';
+    }
+  }
+
+  /// Calculate flow range (min/max) compared to historical data
+  static Map<String, double> calculateFlowRange(
+    double currentFlow,
+    double historicalAvg, {
+    double rangeMultiplier = 1.5,
+    FlowUnit currentFlowUnit = FlowUnit.cfs,
+    FlowUnit historicalUnit = FlowUnit.cfs,
+  }) {
+    // Convert units if needed
+    double comparableCurrentFlow = currentFlow;
+    if (currentFlowUnit != historicalUnit) {
+      comparableCurrentFlow = convertFlow(
+        currentFlow,
+        currentFlowUnit,
+        historicalUnit,
+      );
+    }
+
+    final double difference = (comparableCurrentFlow - historicalAvg).abs();
+    final double minRange = historicalAvg - (difference * rangeMultiplier);
+    final double maxRange = historicalAvg + (difference * rangeMultiplier);
+
+    return {'min': minRange < 0 ? 0.0 : minRange, 'max': maxRange};
   }
 }

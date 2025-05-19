@@ -613,7 +613,12 @@ class _FavoritesPageState extends State<FavoritesPage>
             color: colors.primary,
             onRefresh: _loadFavorites,
             child: ReorderableListView.builder(
-              padding: const EdgeInsets.all(16.0),
+              padding: const EdgeInsets.only(
+                left: 16,
+                right: 16,
+                top: 16,
+                bottom: 105, // ← add whatever height you like here
+              ),
               itemCount: favorites.length,
               onReorder: favoritesProvider.reorderFavorites,
               itemBuilder: (context, index) {

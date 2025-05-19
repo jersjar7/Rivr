@@ -1,7 +1,11 @@
-// lib/features/forecast/presentation/widgets/calendar/calendar_day_cell.dart
+// lib/features/forecast/presentation/widgets/long_range/calendar/calendar_day_cell.dart
 
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
+import 'package:rivr/core/formatters/flow_value_formatter.dart';
+import 'package:rivr/core/models/flow_unit.dart';
+import 'package:rivr/core/services/flow_units_service.dart';
 import 'package:rivr/features/forecast/domain/entities/return_period.dart';
 import 'package:rivr/features/forecast/utils/flow_thresholds.dart';
 
@@ -13,9 +17,12 @@ class CalendarDayCell extends StatelessWidget {
   final bool isToday;
   final VoidCallback? onTap;
   final bool isSelected;
-  final NumberFormat flowFormatter;
+  final NumberFormat? flowFormatter; // Keep for backward compatibility
+  final FlowValueFormatter?
+  flowValueFormatter; // Add support for FlowValueFormatter
+  final FlowUnit fromUnit; // Non-nullable parameter with default value
 
-  CalendarDayCell({
+  const CalendarDayCell({
     super.key,
     required this.date,
     this.flowValue,
@@ -24,8 +31,10 @@ class CalendarDayCell extends StatelessWidget {
     this.isToday = false,
     this.onTap,
     this.isSelected = false,
-    NumberFormat? flowFormatter,
-  }) : flowFormatter = flowFormatter ?? NumberFormat('#,##0.0');
+    this.flowFormatter,
+    this.flowValueFormatter,
+    this.fromUnit = FlowUnit.cfs, // Default to CFS as source unit
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -34,9 +43,17 @@ class CalendarDayCell extends StatelessWidget {
     Color cellColor = Colors.grey.shade100;
     Color textColor = isCurrentMonth ? Colors.black87 : Colors.grey.shade400;
 
+    // Get formatters from context if not provided
+    final effectiveFlowFormatter =
+        flowValueFormatter ??
+        Provider.of<FlowValueFormatter>(context, listen: false);
+
     // Determine flow category and color if we have data
     if (hasData && returnPeriod != null) {
-      flowCategory = returnPeriod!.getFlowCategory(flowValue!);
+      flowCategory = returnPeriod!.getFlowCategory(
+        flowValue!,
+        fromUnit: fromUnit,
+      );
       cellColor = _getBackgroundColor(flowCategory);
 
       // Ensure text is readable on colored backgrounds
@@ -65,7 +82,7 @@ class CalendarDayCell extends StatelessWidget {
               isSelected
                   ? [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.2),
+                      color: Colors.black.withValues(alpha: 0.2),
                       blurRadius: 4,
                       offset: const Offset(0, 2),
                     ),
@@ -91,7 +108,7 @@ class CalendarDayCell extends StatelessWidget {
               ),
             ),
 
-            // Flow indicator
+            // Flow indicator - Now uses FlowValueFormatter
             if (hasData)
               Positioned(
                 bottom: 0,
@@ -100,7 +117,7 @@ class CalendarDayCell extends StatelessWidget {
                 child: Container(
                   padding: const EdgeInsets.symmetric(vertical: 2),
                   decoration: BoxDecoration(
-                    color: Colors.black.withOpacity(0.1),
+                    color: Colors.black.withValues(alpha: 0.1),
                     borderRadius: const BorderRadius.only(
                       bottomLeft: Radius.circular(7),
                       bottomRight: Radius.circular(7),
@@ -108,7 +125,10 @@ class CalendarDayCell extends StatelessWidget {
                   ),
                   child: Center(
                     child: Text(
-                      flowFormatter.format(flowValue!),
+                      // Format flow using the formatter or fallback to NumberFormat
+                      flowFormatter != null
+                          ? flowFormatter!.format(flowValue!)
+                          : effectiveFlowFormatter.formatNumberOnly(flowValue!),
                       style: TextStyle(
                         fontSize: 10,
                         fontWeight: FontWeight.bold,
@@ -141,7 +161,7 @@ class CalendarDayCell extends StatelessWidget {
 
   Color _getBackgroundColor(String? category) {
     if (category == null) return Colors.grey.shade100;
-    return FlowThresholds.getColorForCategory(category).withOpacity(0.7);
+    return FlowThresholds.getColorForCategory(category).withValues(alpha: 0.7);
   }
 
   Color _getTextColor(Color backgroundColor) {
@@ -176,23 +196,40 @@ class CalendarDayCellTooltip extends StatelessWidget {
   final DateTime date;
   final double flowValue;
   final ReturnPeriod? returnPeriod;
+  final FlowValueFormatter? flowValueFormatter;
+  final FlowUnit fromUnit;
 
   const CalendarDayCellTooltip({
     super.key,
     required this.date,
     required this.flowValue,
     this.returnPeriod,
+    this.flowValueFormatter,
+    this.fromUnit = FlowUnit.cfs,
   });
 
   @override
   Widget build(BuildContext context) {
     final dateStr = DateFormat('EEEE, MMMM d, y').format(date);
-    final flowStr = NumberFormat('#,##0.0').format(flowValue);
+
+    // Get formatters from context if not provided
+    final effectiveFlowFormatter =
+        flowValueFormatter ??
+        Provider.of<FlowValueFormatter>(context, listen: false);
+    final flowUnitsService = Provider.of<FlowUnitsService>(
+      context,
+      listen: false,
+    );
+
+    // Use the proper formatter for the flow value
+    final flowStr = effectiveFlowFormatter.formatNumberOnly(flowValue);
+    final unitLabel = flowUnitsService.unitLabel;
+
     String? category;
     String description = 'Flow information not available';
 
     if (returnPeriod != null) {
-      category = returnPeriod!.getFlowCategory(flowValue);
+      category = returnPeriod!.getFlowCategory(flowValue, fromUnit: fromUnit);
       description = FlowThresholds.getFlowSummary(flowValue, returnPeriod!);
     }
 
@@ -209,7 +246,7 @@ class CalendarDayCellTooltip extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.2),
+            color: Colors.black.withValues(alpha: 0.2),
             blurRadius: 10,
             offset: const Offset(0, 5),
           ),
@@ -230,7 +267,7 @@ class CalendarDayCellTooltip extends StatelessWidget {
                 'Flow: ',
                 style: TextStyle(fontWeight: FontWeight.bold),
               ),
-              Text('$flowStr ft³/s'),
+              Text('$flowStr $unitLabel'),
             ],
           ),
           if (category != null) ...[

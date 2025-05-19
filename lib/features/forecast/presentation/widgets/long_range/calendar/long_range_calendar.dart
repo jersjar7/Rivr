@@ -1,7 +1,11 @@
-// lib/features/forecast/presentation/widgets/long_range_calendar.dart
+// lib/features/forecast/presentation/widgets/long_range/calendar/long_range_calendar.dart
 
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
+import 'package:rivr/core/formatters/flow_value_formatter.dart';
+import 'package:rivr/core/models/flow_unit.dart';
+import 'package:rivr/core/services/flow_units_service.dart';
 import 'package:rivr/features/forecast/domain/entities/forecast.dart';
 import 'package:rivr/features/forecast/domain/entities/return_period.dart';
 import 'package:rivr/features/forecast/presentation/widgets/long_range/calendar/calendar_day_cell.dart';
@@ -29,14 +33,31 @@ class LongRangeCalendar extends StatefulWidget {
 class _LongRangeCalendarState extends State<LongRangeCalendar> {
   late DateTime _currentMonth;
   DateTime? _selectedDate;
-  final NumberFormat _flowFormatter = NumberFormat('#,##0.0');
   OverlayEntry? _tooltipOverlay;
   final GlobalKey _calendarKey = GlobalKey();
+
+  // Unit services
+  late FlowValueFormatter _flowValueFormatter;
+  late FlowUnitsService _flowUnitsService;
+
+  // Source unit - assume CFS for API data
+  final FlowUnit _sourceUnit = FlowUnit.cfs;
 
   @override
   void initState() {
     super.initState();
     _currentMonth = widget.initialMonth ?? DateTime.now();
+
+    // Initialize formatters
+    _flowValueFormatter = Provider.of<FlowValueFormatter>(
+      context,
+      listen: false,
+    );
+    _flowUnitsService = Provider.of<FlowUnitsService>(context, listen: false);
+
+    // Listen for unit changes
+    _flowUnitsService.addListener(_onUnitChanged);
+
     _processForecasts();
   }
 
@@ -52,10 +73,21 @@ class _LongRangeCalendarState extends State<LongRangeCalendar> {
   @override
   void dispose() {
     _removeTooltip();
+    _flowUnitsService.removeListener(_onUnitChanged);
     super.dispose();
   }
 
-  // Map to store aggregated daily flow values
+  // Handle unit changes
+  void _onUnitChanged() {
+    if (mounted) {
+      // Reprocess forecasts when units change
+      setState(() {
+        _processForecasts();
+      });
+    }
+  }
+
+  // Map to store aggregated daily flow values - already in the correct unit
   final Map<DateTime, double> _dailyFlows = {};
 
   void _processForecasts() {
@@ -69,11 +101,17 @@ class _LongRangeCalendarState extends State<LongRangeCalendar> {
         forecast.validDateTime.day,
       );
 
+      // Convert flow to preferred unit
+      final convertedFlow = _flowUnitsService.convertToPreferredUnit(
+        forecast.flow,
+        _sourceUnit,
+      );
+
       // If we already have a value for this day, average them
       if (_dailyFlows.containsKey(date)) {
-        _dailyFlows[date] = (_dailyFlows[date]! + forecast.flow) / 2;
+        _dailyFlows[date] = (_dailyFlows[date]! + convertedFlow) / 2;
       } else {
-        _dailyFlows[date] = forecast.flow;
+        _dailyFlows[date] = convertedFlow;
       }
     }
 
@@ -84,9 +122,15 @@ class _LongRangeCalendarState extends State<LongRangeCalendar> {
           // Use 'mean' or 'avg' flow value if available
           final flow = flowData['mean'] ?? flowData['avg'] ?? flowData['flow'];
           if (flow != null) {
+            // Convert flow to preferred unit
+            final convertedFlow = _flowUnitsService.convertToPreferredUnit(
+              flow,
+              _sourceUnit,
+            );
+
             // Normalize to start of day to ensure proper matching
             final normalizedDate = DateTime(date.year, date.month, date.day);
-            _dailyFlows[normalizedDate] = flow;
+            _dailyFlows[normalizedDate] = convertedFlow;
           }
         } catch (e) {
           // Skip entries that can't be processed
@@ -164,6 +208,9 @@ class _LongRangeCalendarState extends State<LongRangeCalendar> {
                   date: date,
                   flowValue: flowValue,
                   returnPeriod: widget.returnPeriod,
+                  flowValueFormatter: _flowValueFormatter,
+                  // Flow values are already in the preferred unit
+                  fromUnit: _flowUnitsService.preferredUnit,
                 ),
               ),
             ),
@@ -282,7 +329,9 @@ class _LongRangeCalendarState extends State<LongRangeCalendar> {
                         isCurrentMonth: isCurrentMonth,
                         isToday: isToday,
                         isSelected: _selectedDate == date,
-                        flowFormatter: _flowFormatter,
+                        flowValueFormatter: _flowValueFormatter,
+                        // Flow values in _dailyFlows are already converted
+                        fromUnit: _flowUnitsService.preferredUnit,
                       ),
                     );
                   },

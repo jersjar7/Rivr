@@ -1,7 +1,9 @@
-// lib/features/forecast/presentation/widgets/medium_range/daily_flow_forecast/daily_flow_forecast_widget_with_hourly.dart
+// lib/features/forecast/presentation/widgets/medium_range/9_day_flow_forecast_widget/daily_flow_forecast_widget.dart
 
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
+import 'package:rivr/core/services/flow_units_service.dart';
 import 'package:rivr/features/forecast/domain/entities/forecast.dart';
 import 'package:rivr/features/forecast/domain/entities/return_period.dart';
 import 'package:rivr/features/forecast/presentation/widgets/medium_range/9_day_flow_forecast_widget/daily_forecast_row.dart';
@@ -12,7 +14,7 @@ class DailyFlowForecastWidgetWithHourly extends StatefulWidget {
   final ForecastCollection? forecastCollection;
   final ReturnPeriod? returnPeriod;
   final VoidCallback? onRefresh;
-  final NumberFormat? flowFormatter;
+  final NumberFormat? flowFormatter; // Keep for backward compatibility
 
   const DailyFlowForecastWidgetWithHourly({
     super.key,
@@ -35,10 +37,35 @@ class _DailyFlowForecastWidgetWithHourlyState
   bool _isProcessing = false;
   String? _errorMessage;
 
+  // Services for flow unit handling
+  late FlowUnitsService _flowUnitsService;
+
   @override
   void initState() {
     super.initState();
+
+    // Initialize services
+    _flowUnitsService = Provider.of<FlowUnitsService>(context, listen: false);
+
+    // Listen for unit changes
+    _flowUnitsService.addListener(_onUnitChanged);
+
     _processData();
+  }
+
+  @override
+  void dispose() {
+    // Remove listener when disposed
+    _flowUnitsService.removeListener(_onUnitChanged);
+    super.dispose();
+  }
+
+  // Handle unit changes
+  void _onUnitChanged() {
+    // When unit changes, reprocess the data to reflect the new unit
+    if (mounted) {
+      _processData();
+    }
   }
 
   @override
@@ -66,13 +93,17 @@ class _DailyFlowForecastWidgetWithHourlyState
     });
 
     try {
-      // Process the forecast data into daily forecasts
+      // Process the forecast data into daily forecasts with proper unit handling
       final dailyForecasts = ForecastDataProcessor.processMediumRangeForecast(
         widget.forecastCollection!,
         widget.returnPeriod,
+        // Pass the current unit as the target unit to ensure consistent handling
+        targetUnit: _flowUnitsService.preferredUnit,
+        flowUnitsService: _flowUnitsService,
       );
 
       // Calculate overall min/max flow bounds for consistent bar scaling
+      // This already accounts for the current unit since dailyForecasts is already converted
       final flowBounds = ForecastDataProcessor.getFlowBounds(dailyForecasts);
 
       // Update state with processed data
@@ -175,7 +206,7 @@ class _DailyFlowForecastWidgetWithHourlyState
             width: double.infinity,
             padding: const EdgeInsets.all(16),
             child: Text(
-              '${_dailyForecasts.length}-Day Flow Forecast',
+              '${_dailyForecasts.length}-Day Flow Forecast (${_flowUnitsService.unitLabel})',
               style: textTheme.titleMedium,
             ),
           ),
@@ -196,6 +227,8 @@ class _DailyFlowForecastWidgetWithHourlyState
               minFlowBound: _flowBounds['min']!,
               maxFlowBound: _flowBounds['max']!,
               isToday: isToday,
+              // Use FlowValueFormatter instead of NumberFormat
+              // but keep flowFormatter for backward compatibility
               flowFormatter: widget.flowFormatter,
               returnPeriod: widget.returnPeriod,
               isExpanded: _expandedIndex == index,
@@ -203,7 +236,8 @@ class _DailyFlowForecastWidgetWithHourlyState
               isLastRow: isLastRow,
             );
           }),
-          SizedBox(height: 5),
+
+          const SizedBox(height: 5),
         ],
       ),
     );

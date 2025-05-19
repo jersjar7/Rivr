@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:rivr/core/formatters/flow_value_formatter.dart';
+import 'package:rivr/core/models/flow_unit.dart';
 import 'package:rivr/core/services/flow_units_service.dart';
 import 'package:rivr/features/forecast/domain/entities/forecast.dart';
 import 'package:rivr/features/forecast/domain/entities/return_period.dart';
@@ -19,6 +20,7 @@ class HorizontalFlowTimeline extends StatefulWidget {
   final ReturnPeriod? returnPeriod;
   final TimelineViewType initialViewType;
   final int hoursToShow;
+  final FlowUnit sourceUnit; // Add source unit parameter
 
   const HorizontalFlowTimeline({
     super.key,
@@ -26,6 +28,7 @@ class HorizontalFlowTimeline extends StatefulWidget {
     this.returnPeriod,
     this.initialViewType = TimelineViewType.hourCards,
     this.hoursToShow = 18,
+    this.sourceUnit = FlowUnit.cfs, // Default to CFS as source unit
   });
 
   @override
@@ -141,11 +144,25 @@ class _HorizontalFlowTimelineState extends State<HorizontalFlowTimeline> {
       final time = DateFormat(
         'MMM d, h:mm a',
       ).format(forecast.validDateTimeLocal);
-      final flow = _flowValueFormatter.formatNumberOnly(forecast.flow);
+
+      // Convert flow to preferred unit if needed
+      double flowValue = forecast.flow;
+      if (widget.sourceUnit != _flowUnitsService.preferredUnit) {
+        flowValue = _flowUnitsService.convertToPreferredUnit(
+          flowValue,
+          widget.sourceUnit,
+        );
+      }
+
+      final flow = _flowValueFormatter.formatNumberOnly(flowValue);
 
       String category = 'Unknown';
       if (widget.returnPeriod != null) {
-        category = widget.returnPeriod!.getFlowCategory(forecast.flow);
+        // Pass the source unit for accurate category determination
+        category = widget.returnPeriod!.getFlowCategory(
+          forecast.flow,
+          fromUnit: widget.sourceUnit,
+        );
         if (category == 'Catastrophic') {
           category = 'Exceptional';
         }
@@ -154,8 +171,22 @@ class _HorizontalFlowTimelineState extends State<HorizontalFlowTimeline> {
       // Calculate trend (if not first forecast)
       String trend = '';
       if (i > 0) {
-        final prevFlow = _sortedForecasts[i - 1].flow;
-        final diff = forecast.flow - prevFlow;
+        // Get converted flow values for both forecasts
+        double currentFlow = forecast.flow;
+        double prevFlow = _sortedForecasts[i - 1].flow;
+
+        if (widget.sourceUnit != _flowUnitsService.preferredUnit) {
+          currentFlow = _flowUnitsService.convertToPreferredUnit(
+            currentFlow,
+            widget.sourceUnit,
+          );
+          prevFlow = _flowUnitsService.convertToPreferredUnit(
+            prevFlow,
+            widget.sourceUnit,
+          );
+        }
+
+        final diff = currentFlow - prevFlow;
         final percentChange =
             prevFlow > 0 ? (diff / prevFlow * 100).toStringAsFixed(1) : 'N/A';
         trend =
@@ -183,8 +214,11 @@ class _HorizontalFlowTimelineState extends State<HorizontalFlowTimeline> {
   String _getFlowCategory(double flow) {
     if (widget.returnPeriod == null) return 'Unknown';
 
-    // Simply return the category without any replacement
-    return widget.returnPeriod!.getFlowCategory(flow);
+    // Pass the source unit for accurate category determination
+    return widget.returnPeriod!.getFlowCategory(
+      flow,
+      fromUnit: widget.sourceUnit,
+    );
   }
 
   Color _getCategoryColor(double flow) {
@@ -195,8 +229,20 @@ class _HorizontalFlowTimelineState extends State<HorizontalFlowTimeline> {
   IconData _getTrendIcon(int index) {
     if (index <= 0 || index >= _sortedForecasts.length) return Icons.remove;
 
-    final currentFlow = _sortedForecasts[index].flow;
-    final prevFlow = _sortedForecasts[index - 1].flow;
+    // Get converted flow values
+    double currentFlow = _sortedForecasts[index].flow;
+    double prevFlow = _sortedForecasts[index - 1].flow;
+
+    if (widget.sourceUnit != _flowUnitsService.preferredUnit) {
+      currentFlow = _flowUnitsService.convertToPreferredUnit(
+        currentFlow,
+        widget.sourceUnit,
+      );
+      prevFlow = _flowUnitsService.convertToPreferredUnit(
+        prevFlow,
+        widget.sourceUnit,
+      );
+    }
 
     if (currentFlow > prevFlow) {
       return Icons.arrow_upward;
@@ -214,8 +260,20 @@ class _HorizontalFlowTimelineState extends State<HorizontalFlowTimeline> {
       ).colorScheme.onSurfaceVariant; // Use theme-appropriate grey
     }
 
-    final currentFlow = _sortedForecasts[index].flow;
-    final prevFlow = _sortedForecasts[index - 1].flow;
+    // Get converted flow values
+    double currentFlow = _sortedForecasts[index].flow;
+    double prevFlow = _sortedForecasts[index - 1].flow;
+
+    if (widget.sourceUnit != _flowUnitsService.preferredUnit) {
+      currentFlow = _flowUnitsService.convertToPreferredUnit(
+        currentFlow,
+        widget.sourceUnit,
+      );
+      prevFlow = _flowUnitsService.convertToPreferredUnit(
+        prevFlow,
+        widget.sourceUnit,
+      );
+    }
 
     if (currentFlow > prevFlow) {
       return Theme.of(
@@ -234,8 +292,20 @@ class _HorizontalFlowTimelineState extends State<HorizontalFlowTimeline> {
   double _getTrendPercentage(int index) {
     if (index <= 0 || index >= _sortedForecasts.length) return 0.0;
 
-    final currentFlow = _sortedForecasts[index].flow;
-    final prevFlow = _sortedForecasts[index - 1].flow;
+    // Get converted flow values
+    double currentFlow = _sortedForecasts[index].flow;
+    double prevFlow = _sortedForecasts[index - 1].flow;
+
+    if (widget.sourceUnit != _flowUnitsService.preferredUnit) {
+      currentFlow = _flowUnitsService.convertToPreferredUnit(
+        currentFlow,
+        widget.sourceUnit,
+      );
+      prevFlow = _flowUnitsService.convertToPreferredUnit(
+        prevFlow,
+        widget.sourceUnit,
+      );
+    }
 
     if (prevFlow == 0) return 0.0;
     return ((currentFlow - prevFlow) / prevFlow) * 100;
@@ -330,7 +400,7 @@ class _HorizontalFlowTimelineState extends State<HorizontalFlowTimeline> {
             margin: const EdgeInsets.only(right: 8.0, bottom: 8.0),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),
-              side: BorderSide(color: color.withOpacity(0.5), width: 2),
+              side: BorderSide(color: color.withValues(alpha: 0.5), width: 2),
             ),
             child: Container(
               width: 100,
@@ -355,6 +425,8 @@ class _HorizontalFlowTimelineState extends State<HorizontalFlowTimeline> {
                     containerHeight: 60,
                     flowUnitsService:
                         _flowUnitsService, // Pass the unit service
+                    flowFormatter: _flowValueFormatter, // Pass the formatter
+                    fromUnit: widget.sourceUnit, // Indicate the source unit
                   ),
 
                   const SizedBox(height: 8),
@@ -420,12 +492,18 @@ class _HorizontalFlowTimelineState extends State<HorizontalFlowTimeline> {
               // Flow wave (in its own ClipPath, but not clipping the whole Stack)
               Positioned.fill(
                 child: ClipPath(
-                  clipper: FlowWaveClipper(_sortedForecasts),
+                  clipper: FlowWaveClipper(
+                    _sortedForecasts,
+                    widget.sourceUnit,
+                    _flowUnitsService,
+                  ),
                   child: CustomPaint(
                     painter: FlowWavePainter(
                       forecasts: _sortedForecasts,
                       returnPeriod: widget.returnPeriod,
                       isDarkMode: isDark,
+                      sourceUnit: widget.sourceUnit, // Pass source unit
+                      flowUnitsService: _flowUnitsService, // Pass unit service
                     ),
                   ),
                 ),
@@ -494,13 +572,34 @@ class _HorizontalFlowTimelineState extends State<HorizontalFlowTimeline> {
     final double maxHeight = 160.0; // Max height for the wave
 
     // Calculate min and max flow for normalization
-    final minFlow = _sortedForecasts.map((f) => f.flow).reduce(min);
-    final maxFlow = _sortedForecasts.map((f) => f.flow).reduce(max);
+    // Convert to preferred unit if needed
+    List<double> flowValues =
+        _sortedForecasts.map((f) {
+          double flow = f.flow;
+          if (widget.sourceUnit != _flowUnitsService.preferredUnit) {
+            flow = _flowUnitsService.convertToPreferredUnit(
+              flow,
+              widget.sourceUnit,
+            );
+          }
+          return flow;
+        }).toList();
+
+    final minFlow = flowValues.reduce(min);
+    final maxFlow = flowValues.reduce(max);
     final flowRange = maxFlow - minFlow;
 
     for (int i = 0; i < _sortedForecasts.length; i++) {
       final forecast = _sortedForecasts[i];
-      final flow = forecast.flow;
+      // Get flow in preferred unit
+      double flow = forecast.flow;
+      if (widget.sourceUnit != _flowUnitsService.preferredUnit) {
+        flow = _flowUnitsService.convertToPreferredUnit(
+          flow,
+          widget.sourceUnit,
+        );
+      }
+
       final normalizedHeight =
           flowRange > 0 ? ((flow - minFlow) / flowRange) * maxHeight : 0.0;
       final y = maxHeight - normalizedHeight;
@@ -519,15 +618,15 @@ class _HorizontalFlowTimelineState extends State<HorizontalFlowTimeline> {
                 BoxShadow(
                   color:
                       isDark
-                          ? Colors.black.withOpacity(0.3)
-                          : Colors.black.withOpacity(0.1),
+                          ? Colors.black.withValues(alpha: 0.3)
+                          : Colors.black.withValues(alpha: 0.1),
                   blurRadius: 2,
                   offset: const Offset(0, 1),
                 ),
               ],
             ),
             child: Text(
-              // Format flow value using FlowValueFormatter but just the number
+              // Format flow value using FlowValueFormatter for proper unit formatting
               _flowValueFormatter.formatNumberOnly(flow),
               style: theme.textTheme.bodySmall?.copyWith(
                 fontWeight: FontWeight.bold,
@@ -544,8 +643,10 @@ class _HorizontalFlowTimelineState extends State<HorizontalFlowTimeline> {
 
 class FlowWaveClipper extends CustomClipper<Path> {
   final List<Forecast> forecasts;
+  final FlowUnit sourceUnit; // Add source unit
+  final FlowUnitsService? flowUnitsService; // Add unit service
 
-  FlowWaveClipper(this.forecasts);
+  FlowWaveClipper(this.forecasts, this.sourceUnit, this.flowUnitsService);
 
   @override
   Path getClip(Size size) {
@@ -555,9 +656,19 @@ class FlowWaveClipper extends CustomClipper<Path> {
     final double hourWidth = size.width / forecasts.length;
     final double maxHeight = size.height - 40; // Reserve space for time markers
 
-    // Calculate min and max flow for normalization
-    final minFlow = forecasts.map((f) => f.flow).reduce(min);
-    final maxFlow = forecasts.map((f) => f.flow).reduce(max);
+    // Calculate min and max flow with unit conversion if needed
+    List<double> flowValues =
+        forecasts.map((f) {
+          double flow = f.flow;
+          if (sourceUnit != flowUnitsService?.preferredUnit &&
+              flowUnitsService != null) {
+            flow = flowUnitsService!.convertToPreferredUnit(flow, sourceUnit);
+          }
+          return flow;
+        }).toList();
+
+    final minFlow = flowValues.reduce(min);
+    final maxFlow = flowValues.reduce(max);
     final flowRange = maxFlow - minFlow;
 
     // Start path at the bottom-left corner
@@ -565,7 +676,13 @@ class FlowWaveClipper extends CustomClipper<Path> {
 
     // Create points for the wave
     for (int i = 0; i < forecasts.length; i++) {
-      final flow = forecasts[i].flow;
+      // Get flow in preferred unit
+      double flow = forecasts[i].flow;
+      if (sourceUnit != flowUnitsService?.preferredUnit &&
+          flowUnitsService != null) {
+        flow = flowUnitsService!.convertToPreferredUnit(flow, sourceUnit);
+      }
+
       final normalizedHeight =
           flowRange > 0 ? ((flow - minFlow) / flowRange) * maxHeight : 0.0;
       final y = maxHeight - normalizedHeight;
@@ -598,11 +715,15 @@ class FlowWavePainter extends CustomPainter {
   final List<Forecast> forecasts;
   final ReturnPeriod? returnPeriod;
   final bool isDarkMode;
+  final FlowUnit sourceUnit; // Add source unit
+  final FlowUnitsService? flowUnitsService; // Add unit service
 
   FlowWavePainter({
     required this.forecasts,
     this.returnPeriod,
     this.isDarkMode = false,
+    required this.sourceUnit, // Required source unit
+    this.flowUnitsService, // Optional unit service
   });
 
   @override
@@ -611,9 +732,19 @@ class FlowWavePainter extends CustomPainter {
 
     final double maxHeight = size.height - 40; // Reserve space for time markers
 
-    // Calculate min and max flow for normalization
-    final minFlow = forecasts.map((f) => f.flow).reduce(min);
-    final maxFlow = forecasts.map((f) => f.flow).reduce(max);
+    // Calculate min and max flow with unit conversion if needed
+    List<double> flowValues =
+        forecasts.map((f) {
+          double flow = f.flow;
+          if (sourceUnit != flowUnitsService?.preferredUnit &&
+              flowUnitsService != null) {
+            flow = flowUnitsService!.convertToPreferredUnit(flow, sourceUnit);
+          }
+          return flow;
+        }).toList();
+
+    final minFlow = flowValues.reduce(min);
+    final maxFlow = flowValues.reduce(max);
     final flowRange = maxFlow - minFlow;
 
     // Create gradient based on flow categories
@@ -676,7 +807,13 @@ class FlowWavePainter extends CustomPainter {
 
     // Create points for the wave
     for (int i = 0; i < forecasts.length; i++) {
-      final flow = forecasts[i].flow;
+      // Get flow in preferred unit
+      double flow = forecasts[i].flow;
+      if (sourceUnit != flowUnitsService?.preferredUnit &&
+          flowUnitsService != null) {
+        flow = flowUnitsService!.convertToPreferredUnit(flow, sourceUnit);
+      }
+
       final normalizedHeight =
           flowRange > 0 ? ((flow - minFlow) / flowRange) * maxHeight : 0.0;
       final y = maxHeight - normalizedHeight;
@@ -704,8 +841,8 @@ class FlowWavePainter extends CustomPainter {
     // Draw the wave line on top - adapt to dark mode
     final lineColor =
         isDarkMode
-            ? Colors.white.withOpacity(0.5)
-            : Colors.white.withOpacity(0.7);
+            ? Colors.white.withValues(alpha: 0.5)
+            : Colors.white.withValues(alpha: 0.7);
 
     final linePaint =
         Paint()
@@ -716,7 +853,13 @@ class FlowWavePainter extends CustomPainter {
     final linePath = Path();
 
     for (int i = 0; i < forecasts.length; i++) {
-      final flow = forecasts[i].flow;
+      // Get flow in preferred unit
+      double flow = forecasts[i].flow;
+      if (sourceUnit != flowUnitsService?.preferredUnit &&
+          flowUnitsService != null) {
+        flow = flowUnitsService!.convertToPreferredUnit(flow, sourceUnit);
+      }
+
       final normalizedHeight =
           flowRange > 0 ? ((flow - minFlow) / flowRange) * maxHeight : 0.0;
       final y = maxHeight - normalizedHeight;
@@ -758,6 +901,7 @@ class FlowWavePainter extends CustomPainter {
   ) {
     // Draw reference lines for return periods
     for (final year in [2, 5, 10, 25]) {
+      // Get threshold in preferred unit (returnPeriod is already in the correct unit)
       final threshold = returnPeriod!.getFlowForYear(year);
       if (threshold == null) continue;
 
@@ -772,8 +916,8 @@ class FlowWavePainter extends CustomPainter {
         // Theme-aware colors
         final lineColor =
             isDarkMode
-                ? Colors.white.withOpacity(0.4)
-                : Colors.white.withOpacity(0.6);
+                ? Colors.white.withValues(alpha: 0.4)
+                : Colors.white.withValues(alpha: 0.6);
 
         final paint =
             Paint()

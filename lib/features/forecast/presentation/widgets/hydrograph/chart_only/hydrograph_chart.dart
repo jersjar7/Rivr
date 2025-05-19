@@ -3,6 +3,10 @@
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
+import 'package:rivr/core/formatters/flow_value_formatter.dart';
+import 'package:rivr/core/models/flow_unit.dart';
+import 'package:rivr/core/services/flow_units_service.dart';
 import 'package:rivr/features/forecast/domain/entities/forecast.dart';
 import 'package:rivr/features/forecast/domain/entities/forecast_types.dart';
 import 'package:rivr/features/forecast/domain/entities/return_period.dart';
@@ -14,6 +18,7 @@ class HydrographChart extends StatefulWidget {
   final ReturnPeriod? returnPeriod;
   final Map<DateTime, Map<String, double>>? dailyStats;
   final Map<String, Map<String, double>>? longRangeFlows;
+  final FlowUnit sourceUnit; // Add source unit parameter
 
   const HydrographChart({
     super.key,
@@ -22,6 +27,7 @@ class HydrographChart extends StatefulWidget {
     this.returnPeriod,
     this.dailyStats,
     this.longRangeFlows,
+    this.sourceUnit = FlowUnit.cfs, // Default to CFS as source unit
   });
 
   @override
@@ -43,14 +49,42 @@ class _HydrographChartState extends State<HydrographChart> {
   late double _minY;
   late double _maxY;
 
-  // Formatters
-  final NumberFormat flowFormatter = NumberFormat('#,##0.0');
+  // Flow unit services
+  late final FlowUnitsService _flowUnitsService;
+  late final FlowValueFormatter _flowValueFormatter;
 
   @override
   void initState() {
     super.initState();
     _zoomStartLevel = _currentZoomLevel;
+
+    // Initialize flow unit services
+    _flowUnitsService = Provider.of<FlowUnitsService>(context, listen: false);
+    _flowValueFormatter = Provider.of<FlowValueFormatter>(
+      context,
+      listen: false,
+    );
+
+    // Listen for unit changes
+    _flowUnitsService.addListener(_onUnitChanged);
+
     _generateChartData();
+  }
+
+  @override
+  void dispose() {
+    // Remove listener when widget is disposed
+    _flowUnitsService.removeListener(_onUnitChanged);
+    super.dispose();
+  }
+
+  // Handle unit changes
+  void _onUnitChanged() {
+    if (mounted) {
+      // Regenerate chart data with the new unit
+      _generateChartData();
+      setState(() {}); // Trigger rebuild
+    }
   }
 
   void _generateChartData() {
@@ -92,26 +126,187 @@ class _HydrographChartState extends State<HydrographChart> {
           x = forecast.validDateTime.difference(baseTime).inDays / 7;
           break;
       }
-      spots.add(FlSpot(x, forecast.flow));
+
+      // Convert flow from source unit to preferred unit if needed
+      double flowValue = forecast.flow;
+      if (widget.sourceUnit != _flowUnitsService.preferredUnit) {
+        flowValue = _flowUnitsService.convertToPreferredUnit(
+          flowValue,
+          widget.sourceUnit,
+        );
+      }
+
+      spots.add(FlSpot(x, flowValue));
     }
 
-    // Add additional data points if available
-    // (code to handle dailyStats or longRangeFlows)
+    // Add additional data points from dailyStats if available
+    if (widget.forecastType == ForecastType.mediumRange &&
+        widget.dailyStats != null) {
+      _addDailyStatsSpots(spots, baseTime);
+    }
+
+    // Add additional data points from longRangeFlows if available
+    if (widget.forecastType == ForecastType.longRange &&
+        widget.longRangeFlows != null) {
+      _addLongRangeSpots(spots, baseTime);
+    }
 
     return spots;
   }
 
-  // Calculate chart bounds
-  double _calculateMinY() => 0.0; // Start from zero
+  // Add spots from daily stats with proper unit conversion
+  void _addDailyStatsSpots(List<FlSpot> spots, DateTime baseTime) {
+    for (var entry in widget.dailyStats!.entries) {
+      final date = entry.key;
+      final stats = entry.value;
+
+      // Use 'mean' or 'avg' flow value if available
+      final flow = stats['mean'] ?? stats['avg'] ?? stats['flow'];
+
+      if (flow != null) {
+        // Calculate x based on days difference
+        final days = date.difference(baseTime).inHours / 24;
+
+        // Convert flow if needed
+        double convertedFlow = flow;
+        if (widget.sourceUnit != _flowUnitsService.preferredUnit) {
+          convertedFlow = _flowUnitsService.convertToPreferredUnit(
+            flow,
+            widget.sourceUnit,
+          );
+        }
+
+        spots.add(FlSpot(days, convertedFlow));
+      }
+    }
+  }
+
+  // Add spots from long range flows with proper unit conversion
+  void _addLongRangeSpots(List<FlSpot> spots, DateTime baseTime) {
+    for (var entry in widget.longRangeFlows!.entries) {
+      try {
+        final dateStr = entry.key;
+        final flowData = entry.value;
+
+        // Parse the date string
+        final parts = dateStr.split('-');
+        if (parts.length >= 3) {
+          final date = DateTime(
+            int.parse(parts[0]),
+            int.parse(parts[1]),
+            int.parse(parts[2]),
+          );
+
+          // Use 'mean' or 'avg' flow value if available
+          final flow = flowData['mean'] ?? flowData['avg'] ?? flowData['flow'];
+
+          if (flow != null) {
+            // Calculate x in weeks
+            final weeks = date.difference(baseTime).inDays / 7;
+
+            // Convert flow if needed
+            double convertedFlow = flow;
+            if (widget.sourceUnit != _flowUnitsService.preferredUnit) {
+              convertedFlow = _flowUnitsService.convertToPreferredUnit(
+                flow,
+                widget.sourceUnit,
+              );
+            }
+
+            spots.add(FlSpot(weeks, convertedFlow));
+          }
+        }
+      } catch (e) {
+        // Skip entries that can't be parsed
+        continue;
+      }
+    }
+  }
+
+  // Find forecast at specific normalized time (x-value)
+  Forecast? _getForecastAtX(double x) {
+    // Find closest forecast to the given x value
+    Forecast? closest;
+    double minDifference = double.infinity;
+
+    for (var forecast in widget.forecasts) {
+      double normalizedTime;
+      final baseTime = widget.forecasts.first.validDateTime;
+
+      switch (widget.forecastType) {
+        case ForecastType.shortRange:
+          normalizedTime =
+              forecast.validDateTime.difference(baseTime).inHours.toDouble();
+          break;
+        case ForecastType.mediumRange:
+          normalizedTime =
+              forecast.validDateTime.difference(baseTime).inHours / 24;
+          break;
+        case ForecastType.longRange:
+          normalizedTime =
+              forecast.validDateTime.difference(baseTime).inDays / 7;
+          break;
+      }
+
+      final difference = (normalizedTime - x).abs();
+
+      if (difference < minDifference) {
+        minDifference = difference;
+        closest = forecast;
+      }
+    }
+
+    return closest;
+  }
+
+  double _calculateMinY() {
+    // Start from zero for a clearer representation
+    return 0.0;
+  }
 
   double _calculateMaxY() {
     if (widget.forecasts.isEmpty) return 100.0;
 
-    double maxFlow = widget.forecasts
-        .map((f) => f.flow)
-        .reduce((a, b) => a > b ? a : b);
+    // Find max flow and add 20% for padding - convert to preferred unit first
+    double maxFlow = 0;
 
-    // Consider return period thresholds
+    for (var forecast in widget.forecasts) {
+      double flowValue = forecast.flow;
+      if (widget.sourceUnit != _flowUnitsService.preferredUnit) {
+        flowValue = _flowUnitsService.convertToPreferredUnit(
+          flowValue,
+          widget.sourceUnit,
+        );
+      }
+
+      if (flowValue > maxFlow) {
+        maxFlow = flowValue;
+      }
+    }
+
+    // Also check dailyStats max values
+    if (widget.dailyStats != null) {
+      for (var entry in widget.dailyStats!.entries) {
+        final stats = entry.value;
+        final maxDaily = stats['max'] ?? stats['maxFlow'];
+
+        if (maxDaily != null) {
+          double convertedMaxDaily = maxDaily;
+          if (widget.sourceUnit != _flowUnitsService.preferredUnit) {
+            convertedMaxDaily = _flowUnitsService.convertToPreferredUnit(
+              maxDaily,
+              widget.sourceUnit,
+            );
+          }
+
+          if (convertedMaxDaily > maxFlow) {
+            maxFlow = convertedMaxDaily;
+          }
+        }
+      }
+    }
+
+    // Also consider return period thresholds if available
     if (widget.returnPeriod != null) {
       for (final year in [2, 5, 10, 25, 50, 100]) {
         final threshold = widget.returnPeriod!.getFlowForYear(year);
@@ -121,10 +316,12 @@ class _HydrographChartState extends State<HydrographChart> {
       }
     }
 
-    return maxFlow * 1.2; // Add 20% padding
+    return maxFlow * 1.2;
   }
 
-  double _calculateMinX() => 0.0;
+  double _calculateMinX() {
+    return 0.0;
+  }
 
   double _calculateMaxX() {
     if (widget.forecasts.isEmpty) {
@@ -397,14 +594,13 @@ class _HydrographChartState extends State<HydrographChart> {
           reservedSize: 40,
           getTitlesWidget: (value, meta) {
             // Custom title widgets based on forecast type
-            // ...
-            return const SizedBox.shrink(); // Placeholder
+            return _getBottomTitleWidget(value, isDark);
           },
         ),
       ),
       leftTitles: AxisTitles(
         axisNameWidget: Text(
-          'ft³/s',
+          _flowUnitsService.unitLabel, // Use current unit label from service
           style: TextStyle(
             fontSize: 15,
             fontWeight: FontWeight.bold,
@@ -435,6 +631,84 @@ class _HydrographChartState extends State<HydrographChart> {
     );
   }
 
+  // Generate bottom title widget based on forecast type
+  Widget _getBottomTitleWidget(double value, bool isDark) {
+    if (widget.forecasts.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    final textColor = isDark ? Colors.white : Colors.black87;
+    final baseTime = widget.forecasts.first.validDateTime;
+
+    switch (widget.forecastType) {
+      case ForecastType.shortRange:
+        // For hourly data
+        final time = baseTime.add(Duration(hours: value.toInt()));
+
+        // Format based on hour
+        if (value == 0) {
+          return _buildTitleText('Now', textColor);
+        } else if (time.hour == 0) {
+          // At midnight, show the date
+          return _buildTitleText(DateFormat('MMM d').format(time), textColor);
+        } else {
+          // Show the hour
+          return _buildTitleText(
+            DateFormat('ha').format(time).toLowerCase(),
+            textColor,
+          );
+        }
+
+      case ForecastType.mediumRange:
+        // For daily data
+        final time = baseTime.add(Duration(hours: (value * 24).toInt()));
+
+        // Format based on day
+        if (value == 0) {
+          return _buildTitleText('Today', textColor);
+        } else if (value == 1) {
+          return _buildTitleText('Tmrw', textColor);
+        } else {
+          // Show day of week and date
+          return _buildTitleText(DateFormat('E\nM/d').format(time), textColor);
+        }
+
+      case ForecastType.longRange:
+        // For weekly data
+        final time = baseTime.add(Duration(days: (value * 7).toInt()));
+
+        // Format based on week
+        if (value == 0) {
+          return _buildTitleText('This\nWeek', textColor);
+        } else if (value == 1) {
+          return _buildTitleText('Next\nWeek', textColor);
+        } else {
+          // Show month and week of month
+          final weekOfMonth = (time.day / 7).ceil();
+          return _buildTitleText(
+            '${DateFormat('MMM').format(time)}\nWk $weekOfMonth',
+            textColor,
+          );
+        }
+    }
+  }
+
+  // Helper to build the title text widget
+  Widget _buildTitleText(String text, Color color) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 8.0),
+      child: Text(
+        text,
+        style: TextStyle(
+          fontSize: 12,
+          color: color,
+          fontWeight: FontWeight.bold,
+        ),
+        textAlign: TextAlign.center,
+      ),
+    );
+  }
+
   // Build touch data for tooltips
   LineTouchData _buildTouchData(bool isDark) {
     final theme = Theme.of(context);
@@ -449,14 +723,23 @@ class _HydrographChartState extends State<HydrographChart> {
                     ? colorScheme.surfaceContainerHighest.withValues(alpha: 0.8)
                     : Colors.blueGrey.withValues(alpha: 0.8),
         tooltipRoundedRadius: 8,
-        getTooltipItems: (spots) {
-          return spots.map((spot) {
+        getTooltipItems: (List<LineBarSpot> lineBarsSpot) {
+          return lineBarsSpot.map((spot) {
+            // Get the forecast that corresponds to this spot
+            final forecast = _getForecastAtX(spot.x);
+
+            // Format the flow value using the formatter (automatically uses correct units)
+            final flowText = _flowValueFormatter.format(spot.y);
+
+            // Get date/time information
+            String timeInfo = _getTimeInfoText(spot, forecast);
+
             return LineTooltipItem(
-              '${flowFormatter.format(spot.y)} ft³/s',
+              flowText, // Flow with proper unit
               const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
               children: [
                 TextSpan(
-                  text: '\nDate/time info would go here',
+                  text: '\n$timeInfo',
                   style: const TextStyle(
                     color: Colors.white70,
                     fontWeight: FontWeight.normal,
@@ -487,5 +770,83 @@ class _HydrographChartState extends State<HydrographChart> {
         }).toList();
       },
     );
+  }
+
+  // Helper to format time information for tooltips
+  String _getTimeInfoText(LineBarSpot spot, Forecast? forecast) {
+    if (forecast == null) {
+      // Fallback if forecast not found - estimate time based on x value
+      final baseTime = widget.forecasts.first.validDateTime;
+
+      switch (widget.forecastType) {
+        case ForecastType.shortRange:
+          final time = baseTime.add(Duration(hours: spot.x.toInt()));
+          return DateFormat('MMM d, h:mm a').format(time);
+
+        case ForecastType.mediumRange:
+          final time = baseTime.add(Duration(hours: (spot.x * 24).toInt()));
+          return DateFormat('EEE, MMM d').format(time);
+
+        case ForecastType.longRange:
+          final time = baseTime.add(Duration(days: (spot.x * 7).toInt()));
+          final weekEnd = time.add(const Duration(days: 6));
+          return '${DateFormat('MMM d').format(time)} - ${DateFormat('MMM d').format(weekEnd)}';
+      }
+    }
+
+    // Use actual forecast time
+    final forecastTime = forecast.validDateTime;
+    final now = DateTime.now();
+
+    switch (widget.forecastType) {
+      case ForecastType.shortRange:
+        final timeStr = DateFormat('MMM d, h:mm a').format(forecastTime);
+        // Add relative time
+        final difference = forecastTime.difference(now);
+
+        if (difference.inHours > 0) {
+          return '$timeStr (in ${difference.inHours}h)';
+        } else if (difference.inHours < 0) {
+          return '$timeStr (${-difference.inHours}h ago)';
+        } else {
+          return '$timeStr (now)';
+        }
+
+      case ForecastType.mediumRange:
+        final timeStr = DateFormat('EEE, MMM d').format(forecastTime);
+        // Add relative time
+        final difference = forecastTime.difference(now);
+
+        if (difference.inDays > 0) {
+          return '$timeStr (in ${difference.inDays}d)';
+        } else if (difference.inDays < 0) {
+          return '$timeStr (${-difference.inDays}d ago)';
+        } else {
+          return '$timeStr (today)';
+        }
+
+      case ForecastType.longRange:
+        // Calculate week start/end
+        final weekStart = DateTime(
+          forecastTime.year,
+          forecastTime.month,
+          forecastTime.day,
+        ).subtract(Duration(days: forecastTime.weekday % 7));
+        final weekEnd = weekStart.add(const Duration(days: 6));
+        final timeStr =
+            '${DateFormat('MMM d').format(weekStart)} - ${DateFormat('MMM d').format(weekEnd)}';
+
+        // Add relative weeks
+        final difference = weekStart.difference(now);
+        final weeks = (difference.inDays / 7).round();
+
+        if (weeks > 0) {
+          return '$timeStr (in $weeks weeks)';
+        } else if (weeks < 0) {
+          return '$timeStr (${-weeks} weeks ago)';
+        } else {
+          return '$timeStr (this week)';
+        }
+    }
   }
 }

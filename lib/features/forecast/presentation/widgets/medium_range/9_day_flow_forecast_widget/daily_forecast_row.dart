@@ -1,4 +1,4 @@
-// lib/features/forecast/presentation/widgets/medium_range/daily_flow_forecast/daily_forecast_row_with_hourly.dart
+// lib/features/forecast/presentation/widgets/medium_range/9_day_flow_forecast_widget/daily_forecast_row.dart
 
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -51,6 +51,7 @@ class _ExpandableDailyForecastRowWithHourlyState
   void initState() {
     super.initState();
     _isExpanded = widget.isExpanded;
+    // Get the formatters from the provider
     _flowValueFormatter = Provider.of<FlowValueFormatter>(
       context,
       listen: false,
@@ -137,7 +138,7 @@ class _ExpandableDailyForecastRowWithHourlyState
           decoration: BoxDecoration(
             color:
                 _isExpanded
-                    ? colorScheme.surfaceContainerHighest.withOpacity(0.5)
+                    ? colorScheme.surfaceContainerHighest.withValues(alpha: 0.5)
                     : null,
           ),
           child: Row(
@@ -171,7 +172,7 @@ class _ExpandableDailyForecastRowWithHourlyState
               Expanded(
                 child: Row(
                   children: [
-                    // Minimum flow value - Updated to use FlowValueFormatter
+                    // Minimum flow value - Now using FlowValueFormatter
                     Text(
                       _flowValueFormatter.formatNumberOnly(
                         widget.forecast.minFlow,
@@ -181,7 +182,7 @@ class _ExpandableDailyForecastRowWithHourlyState
                         color:
                             widget.isToday
                                 ? colorScheme.primary
-                                : colorScheme.onSurface.withOpacity(0.8),
+                                : colorScheme.onSurface.withValues(alpha: 0.8),
                       ),
                     ),
 
@@ -200,7 +201,7 @@ class _ExpandableDailyForecastRowWithHourlyState
 
                     const SizedBox(width: 8),
 
-                    // Maximum flow value - Updated to use FlowValueFormatter
+                    // Maximum flow value - Now using FlowValueFormatter
                     Text(
                       _flowValueFormatter.formatNumberOnly(
                         widget.forecast.maxFlow,
@@ -210,7 +211,7 @@ class _ExpandableDailyForecastRowWithHourlyState
                         color:
                             widget.isToday
                                 ? colorScheme.primary
-                                : colorScheme.onSurface.withOpacity(0.8),
+                                : colorScheme.onSurface.withValues(alpha: 0.8),
                       ),
                     ),
                   ],
@@ -227,7 +228,7 @@ class _ExpandableDailyForecastRowWithHourlyState
             child: Divider(
               height: 1,
               thickness: 1.5,
-              color: colorScheme.outline.withOpacity(0.3),
+              color: colorScheme.outline.withValues(alpha: 0.3),
             ),
           ),
       ],
@@ -246,7 +247,7 @@ class _ExpandableDailyForecastRowWithHourlyState
 
     return Container(
       width: double.infinity,
-      color: colorScheme.surfaceContainerHighest.withOpacity(0.3),
+      color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -272,7 +273,7 @@ class _ExpandableDailyForecastRowWithHourlyState
 
                 const SizedBox(height: 12),
 
-                // Flow statistics - already using FlowValueFormatter
+                // Flow statistics - Using FlowValueFormatter
                 _buildStatRow(
                   'Min Flow',
                   _flowValueFormatter.format(widget.forecast.minFlow),

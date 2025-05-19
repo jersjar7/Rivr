@@ -3,6 +3,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:rivr/core/formatters/flow_value_formatter.dart';
+import 'package:rivr/core/models/flow_unit.dart';
 import 'package:rivr/core/services/flow_units_service.dart';
 import 'package:rivr/features/forecast/domain/entities/forecast.dart';
 import 'package:rivr/features/forecast/domain/entities/return_period.dart';
@@ -15,6 +16,7 @@ class FlowStatusCard extends StatefulWidget {
   final double? historicalAverage; // Optional historical average flow
   final VoidCallback? onTap;
   final bool expanded;
+  final FlowUnit sourceUnit; // Source unit for flow values
 
   const FlowStatusCard({
     super.key,
@@ -23,6 +25,7 @@ class FlowStatusCard extends StatefulWidget {
     this.historicalAverage,
     this.onTap,
     this.expanded = false,
+    this.sourceUnit = FlowUnit.cfs, // Default source unit is CFS
   });
 
   @override
@@ -35,11 +38,35 @@ class _FlowStatusCardState extends State<FlowStatusCard> {
   bool _returnPeriodExpanded = false;
 
   @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    // only run once
+  void initState() {
+    super.initState();
+    // Initialize unit services
     _flowUnitsService = Provider.of<FlowUnitsService>(context, listen: false);
     _flowFormatter = Provider.of<FlowValueFormatter>(context, listen: false);
+
+    // Listen for unit changes
+    _flowUnitsService.addListener(_onUnitChanged);
+  }
+
+  @override
+  void dispose() {
+    // Remove listener when disposed
+    _flowUnitsService.removeListener(_onUnitChanged);
+    super.dispose();
+  }
+
+  // Handle unit changes
+  void _onUnitChanged() {
+    if (mounted) {
+      setState(() {
+        // Just rebuild the UI with new units
+      });
+    }
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
   }
 
   @override
@@ -54,7 +81,12 @@ class _FlowStatusCardState extends State<FlowStatusCard> {
       return _buildLoadingCard(context);
     }
 
-    final flow = widget.currentFlow!.flow;
+    // Convert flow to preferred unit if needed
+    final flow = _flowUnitsService.convertToPreferredUnit(
+      widget.currentFlow!.flow,
+      widget.sourceUnit,
+    );
+
     final String category =
         widget.returnPeriod?.getFlowCategory(flow) ?? 'Unknown';
     final Color statusColor = FlowThresholds.getColorForCategory(category);
@@ -66,9 +98,14 @@ class _FlowStatusCardState extends State<FlowStatusCard> {
     // Calculate percentage comparison with historical average
     String comparisonText = '';
     if (widget.historicalAverage != null && widget.historicalAverage! > 0) {
+      // Convert historical average to preferred unit if needed
+      final convertedHistAvg = _flowUnitsService.convertToPreferredUnit(
+        widget.historicalAverage!,
+        widget.sourceUnit,
+      );
+
       final percentDiff =
-          ((flow - widget.historicalAverage!) / widget.historicalAverage! * 100)
-              .round();
+          ((flow - convertedHistAvg) / convertedHistAvg * 100).round();
       if (percentDiff > 0) {
         comparisonText = '$percentDiff% above normal';
       } else if (percentDiff < 0) {
@@ -167,7 +204,12 @@ class _FlowStatusCardState extends State<FlowStatusCard> {
                           comparisonText,
                           style: theme.textTheme.bodyMedium!.copyWith(
                             color:
-                                flow > widget.historicalAverage!
+                                flow >
+                                        _flowUnitsService
+                                            .convertToPreferredUnit(
+                                              widget.historicalAverage!,
+                                              widget.sourceUnit,
+                                            )
                                     ? (isDark
                                         ? Colors.amber
                                         : Colors
@@ -194,7 +236,7 @@ class _FlowStatusCardState extends State<FlowStatusCard> {
 
                 const SizedBox(height: 8),
 
-                // Historical comparison
+                // Historical comparison with proper unit handling
                 if (widget.historicalAverage != null)
                   Row(
                     children: [
@@ -205,7 +247,7 @@ class _FlowStatusCardState extends State<FlowStatusCard> {
                       ),
                       const SizedBox(width: 8),
                       Text(
-                        'Historical Average: ${_flowFormatter.formatNumberOnly(widget.historicalAverage!)} ${_flowUnitsService.unitLabel}',
+                        'Historical Average: ${_flowFormatter.formatNumberOnly(_flowUnitsService.convertToPreferredUnit(widget.historicalAverage!, widget.sourceUnit))} ${_flowUnitsService.unitLabel}',
                         style: theme.textTheme.bodyMedium!.copyWith(
                           color: textColor.withValues(alpha: 0.9),
                         ),
@@ -309,7 +351,7 @@ class _FlowStatusCardState extends State<FlowStatusCard> {
     );
   }
 
-  // Build a table showing return period flows - FIXED to handle unit conversions properly
+  // Build a table showing return period flows with proper unit handling
   Widget _buildReturnPeriodTable(ReturnPeriod returnPeriod, Color textColor) {
     final theme = Theme.of(context);
     final rows = <TableRow>[];

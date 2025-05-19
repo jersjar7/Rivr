@@ -50,9 +50,10 @@ class CalendarDayCell extends StatelessWidget {
 
     // Determine flow category and color if we have data
     if (hasData && returnPeriod != null) {
+      // Get flow category - with proper unit handling
       flowCategory = returnPeriod!.getFlowCategory(
         flowValue!,
-        fromUnit: fromUnit,
+        fromUnit: fromUnit, // Explicitly specify the source unit
       );
       cellColor = _getBackgroundColor(flowCategory);
 
@@ -108,7 +109,7 @@ class CalendarDayCell extends StatelessWidget {
               ),
             ),
 
-            // Flow indicator - Now uses FlowValueFormatter
+            // Flow indicator - using FlowValueFormatter
             if (hasData)
               Positioned(
                 bottom: 0,
@@ -125,10 +126,11 @@ class CalendarDayCell extends StatelessWidget {
                   ),
                   child: Center(
                     child: Text(
-                      // Format flow using the formatter or fallback to NumberFormat
-                      flowFormatter != null
-                          ? flowFormatter!.format(flowValue!)
-                          : effectiveFlowFormatter.formatNumberOnly(flowValue!),
+                      // Format flow using the formatter with proper unit handling
+                      effectiveFlowFormatter.formatNumberOnlyWithConversion(
+                        flowValue!,
+                        fromUnit,
+                      ),
                       style: TextStyle(
                         fontSize: 10,
                         fontWeight: FontWeight.bold,
@@ -221,16 +223,19 @@ class CalendarDayCellTooltip extends StatelessWidget {
       listen: false,
     );
 
-    // Use the proper formatter for the flow value
-    final flowStr = effectiveFlowFormatter.formatNumberOnly(flowValue);
-    final unitLabel = flowUnitsService.unitLabel;
+    // Format flow value with proper unit handling
+    final flowStr = effectiveFlowFormatter.formatWithUnit(flowValue, fromUnit);
 
     String? category;
     String description = 'Flow information not available';
 
     if (returnPeriod != null) {
+      // Get category with proper unit handling
       category = returnPeriod!.getFlowCategory(flowValue, fromUnit: fromUnit);
-      description = FlowThresholds.getFlowSummary(flowValue, returnPeriod!);
+      description = FlowThresholds.getFlowSummary(
+        flowUnitsService.convertToPreferredUnit(flowValue, fromUnit),
+        returnPeriod!,
+      );
     }
 
     final categoryColor =
@@ -267,7 +272,7 @@ class CalendarDayCellTooltip extends StatelessWidget {
                 'Flow: ',
                 style: TextStyle(fontWeight: FontWeight.bold),
               ),
-              Text('$flowStr $unitLabel'),
+              Text(flowStr),
             ],
           ),
           if (category != null) ...[

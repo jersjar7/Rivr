@@ -3,6 +3,10 @@
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
+import 'package:rivr/core/formatters/flow_value_formatter.dart';
+import 'package:rivr/core/models/flow_unit.dart';
+import 'package:rivr/core/services/flow_units_service.dart';
 import 'package:rivr/features/forecast/domain/entities/forecast.dart';
 import 'package:rivr/features/forecast/domain/entities/forecast_types.dart';
 import 'package:rivr/features/forecast/domain/entities/return_period.dart';
@@ -16,6 +20,7 @@ class CustomZoomableChart extends StatefulWidget {
   final ReturnPeriod? returnPeriod;
   final Map<DateTime, Map<String, double>>? dailyStats;
   final Map<String, Map<String, double>>? longRangeFlows;
+  final FlowUnit sourceUnit; // Add source unit parameter
 
   const CustomZoomableChart({
     super.key,
@@ -25,6 +30,7 @@ class CustomZoomableChart extends StatefulWidget {
     this.returnPeriod,
     this.dailyStats,
     this.longRangeFlows,
+    this.sourceUnit = FlowUnit.cfs, // Default to CFS as source unit
   });
 
   @override
@@ -52,8 +58,11 @@ class _CustomZoomableChartState extends State<CustomZoomableChart> {
   late List<FlSpot> _spots;
   late final DateFormat dateFormatter = DateFormat('MMM d');
   late final DateFormat timeFormatter = DateFormat('h:mm a');
-  late final NumberFormat flowFormatter = NumberFormat('#,##0.0');
   late DateTime _currentLocalTime;
+
+  // Flow unit services
+  late final FlowUnitsService _flowUnitsService;
+  late final FlowValueFormatter _flowValueFormatter;
 
   // Transformations based on zoom/pan
   double get _transformedMinX => _baseMinX + _xOffset;
@@ -64,7 +73,34 @@ class _CustomZoomableChartState extends State<CustomZoomableChart> {
   void initState() {
     super.initState();
     _currentLocalTime = DateTime.now();
+
+    // Initialize flow unit services
+    _flowUnitsService = Provider.of<FlowUnitsService>(context, listen: false);
+    _flowValueFormatter = Provider.of<FlowValueFormatter>(
+      context,
+      listen: false,
+    );
+
+    // Listen for unit changes
+    _flowUnitsService.addListener(_onUnitChanged);
+
     _initializeChartData();
+  }
+
+  @override
+  void dispose() {
+    // Remove listener when widget is disposed
+    _flowUnitsService.removeListener(_onUnitChanged);
+    super.dispose();
+  }
+
+  // Handle unit changes
+  void _onUnitChanged() {
+    if (mounted) {
+      // Reinitialize chart data with the new unit
+      _initializeChartData();
+      setState(() {}); // Trigger rebuild
+    }
   }
 
   void _initializeChartData() {
@@ -98,7 +134,7 @@ class _CustomZoomableChartState extends State<CustomZoomableChart> {
     }
   }
 
-  // Short range spots (hourly)
+  // Short range spots (hourly) with unit conversion
   List<FlSpot> _generateShortRangeSpots() {
     if (widget.forecasts.isEmpty) return [];
 
@@ -128,13 +164,23 @@ class _CustomZoomableChartState extends State<CustomZoomableChart> {
       // Get normalized hours from base time
       final hours =
           forecast.validDateTimeLocal.difference(baseTime).inMinutes / 60;
-      spots.add(FlSpot(hours, forecast.flow));
+
+      // Convert flow to preferred unit if needed
+      double flowValue = forecast.flow;
+      if (widget.sourceUnit != _flowUnitsService.preferredUnit) {
+        flowValue = _flowUnitsService.convertToPreferredUnit(
+          flowValue,
+          widget.sourceUnit,
+        );
+      }
+
+      spots.add(FlSpot(hours, flowValue));
     }
 
     return spots;
   }
 
-  // Medium range spots (daily)
+  // Medium range spots (daily) with unit conversion
   List<FlSpot> _generateMediumRangeSpots() {
     if (widget.forecasts.isEmpty) return [];
 
@@ -165,15 +211,25 @@ class _CustomZoomableChartState extends State<CustomZoomableChart> {
 
     final List<FlSpot> spots = [];
 
-    // Add regular forecast spots
+    // Add regular forecast spots with unit conversion
     for (var forecast in sortedForecasts) {
       // Get normalized days from base time (in hours / 24)
       final days =
           forecast.validDateTimeLocal.difference(baseTime).inHours / 24;
-      spots.add(FlSpot(days, forecast.flow));
+
+      // Convert flow to preferred unit if needed
+      double flowValue = forecast.flow;
+      if (widget.sourceUnit != _flowUnitsService.preferredUnit) {
+        flowValue = _flowUnitsService.convertToPreferredUnit(
+          flowValue,
+          widget.sourceUnit,
+        );
+      }
+
+      spots.add(FlSpot(days, flowValue));
     }
 
-    // Add spots from dailyStats if available
+    // Add spots from dailyStats if available - with unit conversion
     if (widget.dailyStats != null && widget.dailyStats!.isNotEmpty) {
       for (var entry in widget.dailyStats!.entries) {
         final date = entry.key;
@@ -184,7 +240,17 @@ class _CustomZoomableChartState extends State<CustomZoomableChart> {
 
         if (flow != null) {
           final days = date.difference(baseTime).inHours / 24;
-          spots.add(FlSpot(days, flow));
+
+          // Convert flow to preferred unit if needed
+          double convertedFlow = flow;
+          if (widget.sourceUnit != _flowUnitsService.preferredUnit) {
+            convertedFlow = _flowUnitsService.convertToPreferredUnit(
+              flow,
+              widget.sourceUnit,
+            );
+          }
+
+          spots.add(FlSpot(days, convertedFlow));
         }
       }
     }
@@ -195,7 +261,7 @@ class _CustomZoomableChartState extends State<CustomZoomableChart> {
     return spots;
   }
 
-  // Long range spots (weekly)
+  // Long range spots (weekly) with unit conversion
   List<FlSpot> _generateLongRangeSpots() {
     if (widget.forecasts.isEmpty) return [];
 
@@ -229,14 +295,24 @@ class _CustomZoomableChartState extends State<CustomZoomableChart> {
 
     final List<FlSpot> spots = [];
 
-    // Add regular forecast spots
+    // Add regular forecast spots with unit conversion
     for (var forecast in sortedForecasts) {
       // Get normalized weeks from base time (in days / 7)
       final weeks = forecast.validDateTimeLocal.difference(baseTime).inDays / 7;
-      spots.add(FlSpot(weeks, forecast.flow));
+
+      // Convert flow to preferred unit if needed
+      double flowValue = forecast.flow;
+      if (widget.sourceUnit != _flowUnitsService.preferredUnit) {
+        flowValue = _flowUnitsService.convertToPreferredUnit(
+          flowValue,
+          widget.sourceUnit,
+        );
+      }
+
+      spots.add(FlSpot(weeks, flowValue));
     }
 
-    // Add spots from longRangeFlows if available
+    // Add spots from longRangeFlows if available - with unit conversion
     if (widget.longRangeFlows != null && widget.longRangeFlows!.isNotEmpty) {
       for (var entry in widget.longRangeFlows!.entries) {
         try {
@@ -258,7 +334,17 @@ class _CustomZoomableChartState extends State<CustomZoomableChart> {
 
             if (flow != null) {
               final weeks = date.difference(baseTime).inDays / 7;
-              spots.add(FlSpot(weeks, flow));
+
+              // Convert flow to preferred unit if needed
+              double convertedFlow = flow;
+              if (widget.sourceUnit != _flowUnitsService.preferredUnit) {
+                convertedFlow = _flowUnitsService.convertToPreferredUnit(
+                  flow,
+                  widget.sourceUnit,
+                );
+              }
+
+              spots.add(FlSpot(weeks, convertedFlow));
             }
           }
         } catch (e) {
@@ -282,10 +368,71 @@ class _CustomZoomableChartState extends State<CustomZoomableChart> {
   double _getMaxY() {
     if (widget.forecasts.isEmpty) return 100.0;
 
-    // Find max flow and add 20% for padding
-    double maxFlow = widget.forecasts
-        .map((f) => f.flow)
-        .reduce((a, b) => a > b ? a : b);
+    // Find max flow from all sources and add 20% for padding
+    double maxFlow = 0;
+
+    // Check forecast data
+    for (var forecast in widget.forecasts) {
+      // Convert flow to preferred unit if needed
+      double flowValue = forecast.flow;
+      if (widget.sourceUnit != _flowUnitsService.preferredUnit) {
+        flowValue = _flowUnitsService.convertToPreferredUnit(
+          flowValue,
+          widget.sourceUnit,
+        );
+      }
+
+      if (flowValue > maxFlow) {
+        maxFlow = flowValue;
+      }
+    }
+
+    // Check daily stats if available
+    if (widget.dailyStats != null) {
+      for (var entry in widget.dailyStats!.entries) {
+        final stats = entry.value;
+        final maxValue = stats['max'] ?? stats['maxFlow'] ?? stats['mean'];
+
+        if (maxValue != null) {
+          // Convert to preferred unit if needed
+          double convertedValue = maxValue;
+          if (widget.sourceUnit != _flowUnitsService.preferredUnit) {
+            convertedValue = _flowUnitsService.convertToPreferredUnit(
+              maxValue,
+              widget.sourceUnit,
+            );
+          }
+
+          if (convertedValue > maxFlow) {
+            maxFlow = convertedValue;
+          }
+        }
+      }
+    }
+
+    // Check long range flows if available
+    if (widget.longRangeFlows != null) {
+      for (var entry in widget.longRangeFlows!.entries) {
+        final flowData = entry.value;
+        final maxValue =
+            flowData['max'] ?? flowData['maxFlow'] ?? flowData['mean'];
+
+        if (maxValue != null) {
+          // Convert to preferred unit if needed
+          double convertedValue = maxValue;
+          if (widget.sourceUnit != _flowUnitsService.preferredUnit) {
+            convertedValue = _flowUnitsService.convertToPreferredUnit(
+              maxValue,
+              widget.sourceUnit,
+            );
+          }
+
+          if (convertedValue > maxFlow) {
+            maxFlow = convertedValue;
+          }
+        }
+      }
+    }
 
     // Also consider return period thresholds if available
     if (widget.returnPeriod != null) {
@@ -554,7 +701,7 @@ class _CustomZoomableChartState extends State<CustomZoomableChart> {
       rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
       leftTitles: AxisTitles(
         axisNameWidget: Text(
-          'ft³/s',
+          _flowUnitsService.unitLabel, // Use current unit label from service
           style: TextStyle(
             fontSize: 15,
             fontWeight: FontWeight.bold,
@@ -650,8 +797,9 @@ class _CustomZoomableChartState extends State<CustomZoomableChart> {
               );
             } else if (widget.forecastType == ForecastType.mediumRange) {
               // Only show whole days
-              if (value % 1 > 0.1 && value % 1 < 0.9)
+              if (value % 1 > 0.1 && value % 1 < 0.9) {
                 return const SizedBox.shrink();
+              }
 
               // For day-based x-axis
               final baseTime = DateTime(
@@ -687,8 +835,9 @@ class _CustomZoomableChartState extends State<CustomZoomableChart> {
             } else {
               // Long range (weekly) implementation
               // Only show whole weeks
-              if (value % 1 > 0.1 && value % 1 < 0.9)
+              if (value % 1 > 0.1 && value % 1 < 0.9) {
                 return const SizedBox.shrink();
+              }
 
               // For week-based x-axis
               final firstForecastTime =
@@ -751,8 +900,11 @@ class _CustomZoomableChartState extends State<CustomZoomableChart> {
             final dateText = _getTooltipDateText(spot);
             final relativeText = _getRelativeTimeText(spot);
 
+            // Use the flow formatter for proper unit format
+            final flowFormatted = _flowValueFormatter.format(spot.y);
+
             return LineTooltipItem(
-              '${flowFormatter.format(spot.y)} ft³/s',
+              flowFormatted, // Flow with unit
               const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
               children: [
                 TextSpan(
@@ -808,7 +960,7 @@ class _CustomZoomableChartState extends State<CustomZoomableChart> {
     return [
       VerticalLine(
         x: _nowX!,
-        color: lineColor.withOpacity(0.7),
+        color: lineColor.withValues(alpha: 0.7),
         strokeWidth: 2,
         dashArray: [5, 3],
         label: VerticalLineLabel(

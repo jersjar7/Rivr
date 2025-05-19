@@ -17,7 +17,7 @@ class HourlyFlowDisplay extends StatefulWidget {
   final ReturnPeriod? returnPeriod;
   final NumberFormat? flowFormatter; // Keep for backward compatibility
   final FlowValueFormatter?
-  flowValueFormatter; // Add support for FlowValueFormatter
+  flowValueFormatter; // Support for FlowValueFormatter
 
   const HourlyFlowDisplay({
     super.key,
@@ -75,9 +75,12 @@ class _HourlyFlowDisplayState extends State<HourlyFlowDisplay> {
 
   // Handle unit changes
   void _onUnitChanged() {
-    // Force a rebuild when units change
+    // Force a rebuild and reprocess data when units change
     if (mounted) {
-      setState(() {});
+      setState(() {
+        // Reprocess with new units
+        _processHourlyData();
+      });
     }
   }
 
@@ -103,7 +106,8 @@ class _HourlyFlowDisplayState extends State<HourlyFlowDisplay> {
         widget.forecast.hourlyData.entries.toList()
           ..sort((a, b) => a.key.compareTo(b.key));
 
-    // Calculate min and max flow values for the chart
+    // Calculate min and max flow values for the chart - values are already in correct unit
+    // from DailyFlowForecast (which handles units at creation)
     if (_sortedHourlyData.isNotEmpty) {
       _minFlow = _sortedHourlyData
           .map((e) => e.value)
@@ -187,6 +191,9 @@ class _HourlyFlowDisplayState extends State<HourlyFlowDisplay> {
     _selectedFlow = _sortedHourlyData[_selectedHourIndex].value;
 
     if (widget.returnPeriod != null && _selectedFlow != null) {
+      // Get category based on the selected flow
+      // Note: No need to convert units here since the flow values in _sortedHourlyData
+      // are already in the correct unit (from DailyFlowForecast)
       _selectedCategory = widget.returnPeriod!.getFlowCategory(_selectedFlow!);
     } else {
       _selectedCategory = null;

@@ -3,6 +3,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:rivr/core/formatters/flow_value_formatter.dart';
+import 'package:rivr/core/models/flow_unit.dart'; // Import for FlowUnit
 import 'package:rivr/features/forecast/domain/entities/return_period.dart';
 import 'package:rivr/features/forecast/utils/flow_thresholds.dart';
 
@@ -14,6 +15,7 @@ class FlowIndicatorBar extends StatefulWidget {
   final bool showLabels;
   final bool showMarkers;
   final bool showTooltips;
+  final FlowUnit fromUnit; // Add parameter for source unit
 
   const FlowIndicatorBar({
     super.key,
@@ -24,6 +26,7 @@ class FlowIndicatorBar extends StatefulWidget {
     this.showLabels = true,
     this.showMarkers = true,
     this.showTooltips = false,
+    this.fromUnit = FlowUnit.cfs, // Default to CFS as source unit
   });
 
   @override
@@ -104,15 +107,18 @@ class _FlowIndicatorBarState extends State<FlowIndicatorBar>
   }
 
   // Calculate the position of the flow marker based on return periods
+  // Updated to properly handle unit conversions
   double _calculateMarkerPosition() {
     if (widget.returnPeriod == null) {
       // Default linear position if no return period data
       return widget.width * 0.5;
     }
 
+    // Use the proper method that handles unit conversion
     final percentage = FlowThresholds.calculateFlowPercentage(
       widget.currentFlow,
       widget.returnPeriod!,
+      fromUnit: widget.fromUnit, // Pass the source unit for proper conversion
     );
 
     // Position based on percentage (clamped to be within the bar)
@@ -123,6 +129,7 @@ class _FlowIndicatorBarState extends State<FlowIndicatorBar>
   }
 
   // Get marker positions for return period lines
+  // Updated to ensure proper unit handling
   Map<int, double> _getReturnPeriodPositions() {
     if (widget.returnPeriod == null) {
       return {};
@@ -131,11 +138,14 @@ class _FlowIndicatorBarState extends State<FlowIndicatorBar>
     final Map<int, double> positions = {};
 
     for (final year in _returnPeriodYears) {
+      // Get threshold in the current unit
       final flow = widget.returnPeriod!.getFlowForYear(year);
       if (flow != null) {
+        // Calculate percentage - no need to convert as the return period is already in the right unit
         final percentage = FlowThresholds.calculateFlowPercentage(
           flow,
           widget.returnPeriod!,
+          // No fromUnit needed here since we're using a value directly from returnPeriod
         );
 
         positions[year] = (percentage / 100.0 * widget.width).clamp(
@@ -188,7 +198,8 @@ class _FlowIndicatorBarState extends State<FlowIndicatorBar>
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      _flowValueFormatter.format(flow),
+                      // Use the formatter that handles units correctly
+                      _flowValueFormatter.formatWithUnit(flow, widget.fromUnit),
                       style: Theme.of(context).textTheme.bodyMedium,
                     ),
                   ],
@@ -211,8 +222,15 @@ class _FlowIndicatorBarState extends State<FlowIndicatorBar>
   Widget build(BuildContext context) {
     final markerPosition = _calculateMarkerPosition();
     final returnPeriodPositions = _getReturnPeriodPositions();
+
+    // Get category - passing fromUnit to ensure proper conversion
     final category =
-        widget.returnPeriod?.getFlowCategory(widget.currentFlow) ?? 'Unknown';
+        widget.returnPeriod?.getFlowCategory(
+          widget.currentFlow,
+          fromUnit: widget.fromUnit,
+        ) ??
+        'Unknown';
+
     final markerColor = FlowThresholds.getColorForCategory(category);
 
     return Column(

@@ -1,6 +1,8 @@
-// lib/features/forecast/presentation/widgets/medium_range/daily_flow_forecast/hourly_daily_flows_widget/micro_bar_chart.dart
+// lib/features/forecast/presentation/widgets/medium_range/9_day_flow_forecast_widget/hourly_slider_widget/micro_bar_chart.dart
 
 import 'package:flutter/material.dart';
+import 'package:rivr/core/models/flow_unit.dart'; // Import for FlowUnit
+import 'package:rivr/core/services/flow_units_service.dart'; // Import the service
 import 'package:rivr/features/forecast/domain/entities/return_period.dart';
 import 'package:rivr/features/forecast/utils/flow_thresholds.dart';
 
@@ -11,6 +13,8 @@ class MicroBarChart extends StatelessWidget {
   final double minValue;
   final double maxValue;
   final ReturnPeriod? returnPeriod;
+  final FlowUnit fromUnit; // Add parameter for source unit
+  final FlowUnitsService? flowUnitsService; // Optional service for conversions
 
   const MicroBarChart({
     super.key,
@@ -19,11 +23,13 @@ class MicroBarChart extends StatelessWidget {
     required this.minValue,
     required this.maxValue,
     this.returnPeriod,
+    this.fromUnit = FlowUnit.cfs, // Default to CFS as source unit
+    this.flowUnitsService, // Optional service for unit conversions
   });
 
   /// Gets the appropriate color for a flow value
   Color _getColorForFlow(double flow, ReturnPeriod returnPeriod) {
-    final category = returnPeriod.getFlowCategory(flow);
+    final category = returnPeriod.getFlowCategory(flow, fromUnit: fromUnit);
     return FlowThresholds.getColorForCategory(category);
   }
 
@@ -50,7 +56,7 @@ class MicroBarChart extends StatelessWidget {
           width: 20, // Single wide bar
           height: 80, // Fixed height
           decoration: BoxDecoration(
-            color: barColor.withOpacity(0.8),
+            color: barColor.withValues(alpha: 0.8),
             borderRadius: BorderRadius.circular(4),
             border: Border.all(color: barColor, width: 1),
           ),
@@ -64,9 +70,7 @@ class MicroBarChart extends StatelessWidget {
 
     // Grid line colors should be theme aware
     final gridLineColor =
-        isDark
-            ? colorScheme.surfaceContainerHighest.withOpacity(0.3)
-            : Colors.grey.withOpacity(0.2);
+        isDark ? colorScheme.surfaceContainerHighest : Colors.grey[400];
 
     return CustomPaint(
       painter: _MicroBarChartPainter(
@@ -75,10 +79,12 @@ class MicroBarChart extends StatelessWidget {
         minValue: minValue,
         maxValue: maxValue,
         returnPeriod: returnPeriod,
-        gridLineColor: gridLineColor,
+        gridLineColor: gridLineColor!,
         primaryColor: colorScheme.primary,
         surfaceColor: colorScheme.surface,
         isDark: isDark,
+        fromUnit: fromUnit, // Pass the source unit
+        flowUnitsService: flowUnitsService, // Pass the service for conversions
       ),
       child: Container(), // Size is controlled by parent
     );
@@ -95,6 +101,8 @@ class _MicroBarChartPainter extends CustomPainter {
   final Color primaryColor;
   final Color surfaceColor;
   final bool isDark;
+  final FlowUnit fromUnit; // Source unit for flow values
+  final FlowUnitsService? flowUnitsService; // Service for unit conversions
 
   _MicroBarChartPainter({
     required this.hourlyData,
@@ -106,6 +114,8 @@ class _MicroBarChartPainter extends CustomPainter {
     required this.primaryColor,
     required this.surfaceColor,
     required this.isDark,
+    this.fromUnit = FlowUnit.cfs, // Default to CFS
+    this.flowUnitsService, // Optional service
   });
 
   @override
@@ -119,6 +129,8 @@ class _MicroBarChartPainter extends CustomPainter {
     // Draw each bar
     for (int i = 0; i < hourlyData.length; i++) {
       final flow = hourlyData[i].value;
+      // No need to convert flow here as min/max values should already be in the correct unit
+      // This is assuming upstream components properly convert min/max values
 
       // Calculate normalized height
       final normValue = (flow - minValue) / (maxValue - minValue);
@@ -149,9 +161,11 @@ class _MicroBarChartPainter extends CustomPainter {
           Paint()
             ..color =
                 isSelected
-                    ? barColor.withOpacity(1.0) // Full opacity for selected
-                    : barColor.withOpacity(
-                      0.6,
+                    ? barColor.withValues(
+                      alpha: 1.0,
+                    ) // Full opacity for selected
+                    : barColor.withValues(
+                      alpha: 0.6,
                     ); // Slightly transparent for others
 
       // Draw the bar
@@ -200,10 +214,11 @@ class _MicroBarChartPainter extends CustomPainter {
     }
   }
 
-  /// Gets the appropriate color for a flow value
+  /// Gets the appropriate color for a flow value - with proper unit handling
   Color _getColorForFlow(double flow) {
     if (returnPeriod != null) {
-      final category = returnPeriod!.getFlowCategory(flow);
+      // Use the proper getFlowCategory method that handles unit conversions
+      final category = returnPeriod!.getFlowCategory(flow, fromUnit: fromUnit);
       return FlowThresholds.getColorForCategory(category);
     } else {
       // Fallback to a gradient if no return period data

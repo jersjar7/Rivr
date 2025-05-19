@@ -14,7 +14,7 @@ class FlowValueDisplay extends StatelessWidget {
   final double containerHeight;
   final FlowUnitsService? flowUnitsService;
   final FlowValueFormatter? flowFormatter;
-  final FlowUnit? fromUnit;
+  final FlowUnit fromUnit; // Clearly named parameter for source unit
 
   const FlowValueDisplay({
     super.key,
@@ -37,17 +37,18 @@ class FlowValueDisplay extends StatelessWidget {
     String unitLabel;
 
     if (flowFormatter != null) {
-      // Use the provided flow formatter (preferred)
-      formattedFlow = flowFormatter!.formatNumberOnly(flow);
+      // Use the provided flow formatter (preferred) with explicit unit conversion
+      formattedFlow = flowFormatter!.formatNumberOnlyWithConversion(
+        flow,
+        fromUnit,
+      );
       unitLabel = flowFormatter!.unitString;
     } else if (flowUnitsService != null) {
-      // Convert and format using flow units service
-      double displayFlow = flow;
-
-      // Convert if needed and fromUnit is provided
-      if (fromUnit != null && fromUnit != flowUnitsService!.preferredUnit) {
-        displayFlow = flowUnitsService!.convertToPreferredUnit(flow, fromUnit!);
-      }
+      // Convert if needed using the flow units service
+      double displayFlow = flowUnitsService!.convertToPreferredUnit(
+        flow,
+        fromUnit,
+      );
 
       // Format number without units
       formattedFlow = formatLargeNumber(displayFlow);

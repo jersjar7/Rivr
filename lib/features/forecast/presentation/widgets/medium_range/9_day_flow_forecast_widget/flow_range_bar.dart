@@ -1,6 +1,8 @@
-// lib/features/forecast/presentation/widgets/medium_range/daily_flow_forecast/flow_range_bar.dart
+// lib/features/forecast/presentation/widgets/medium_range/9_day_flow_forecast_widget/flow_range_bar.dart
 
 import 'package:flutter/material.dart';
+import 'package:rivr/core/models/flow_unit.dart'; // Import for FlowUnit
+import 'package:rivr/core/services/flow_units_service.dart'; // Import the service
 import 'package:rivr/features/forecast/domain/entities/return_period.dart';
 import 'package:rivr/features/forecast/presentation/widgets/medium_range/9_day_flow_forecast_widget/forecast_data_processor.dart';
 import 'package:rivr/features/forecast/utils/flow_thresholds.dart';
@@ -12,6 +14,9 @@ class FlowRangeBar extends StatelessWidget {
   final double maxFlowBound;
   final double height;
   final ReturnPeriod? returnPeriod;
+  final FlowUnit fromUnit; // Add parameter for source unit
+  final FlowUnitsService?
+  flowUnitsService; // Optional service for unit conversions
 
   const FlowRangeBar({
     super.key,
@@ -20,6 +25,8 @@ class FlowRangeBar extends StatelessWidget {
     required this.maxFlowBound,
     this.height = 6.0,
     this.returnPeriod,
+    this.fromUnit = FlowUnit.cfs, // Default to CFS
+    this.flowUnitsService, // Optional flow units service
   });
 
   @override
@@ -35,14 +42,14 @@ class FlowRangeBar extends StatelessWidget {
       );
     }
 
-    final normalizedMin = ((forecast.minFlow - minFlowBound) / range).clamp(
-      0.0,
-      1.0,
-    );
-    final normalizedMax = ((forecast.maxFlow - minFlowBound) / range).clamp(
-      0.0,
-      1.0,
-    );
+    // Get flow values - no need to convert if the DailyFlowForecast already has the correct unit
+    // or if minFlowBound/maxFlowBound are already in the correct unit (they should be)
+    double minFlow = forecast.minFlow;
+    double maxFlow = forecast.maxFlow;
+
+    // Calculate normalized positions (0-1) for min and max flow
+    final normalizedMin = ((minFlow - minFlowBound) / range).clamp(0.0, 1.0);
+    final normalizedMax = ((maxFlow - minFlowBound) / range).clamp(0.0, 1.0);
 
     return Container(
       height: height,
@@ -83,13 +90,21 @@ class FlowRangeBar extends StatelessWidget {
 
   /// Build the colored range bar with gradient
   Widget _buildRangeBar() {
-    // Get colors for min and max flow
+    // Get colors for min and max flow - being explicit about unit conversion
     Color minColor = Colors.blue;
     Color maxColor = Colors.blue;
 
     if (returnPeriod != null) {
-      final minCategory = returnPeriod!.getFlowCategory(forecast.minFlow);
-      final maxCategory = returnPeriod!.getFlowCategory(forecast.maxFlow);
+      // Pass the source unit for proper category determination
+      final minCategory = returnPeriod!.getFlowCategory(
+        forecast.minFlow,
+        fromUnit: fromUnit, // Be explicit about the source unit
+      );
+      final maxCategory = returnPeriod!.getFlowCategory(
+        forecast.maxFlow,
+        fromUnit: fromUnit, // Be explicit about the source unit
+      );
+
       minColor = FlowThresholds.getColorForCategory(minCategory);
       maxColor = FlowThresholds.getColorForCategory(maxCategory);
     } else {
@@ -118,6 +133,7 @@ class FlowRangeBar extends StatelessWidget {
 
     // Only show threshold markers within our min/max range
     for (final year in [2, 5, 10, 25, 50, 100]) {
+      // Get threshold in correct unit
       final threshold = returnPeriod!.getFlowForYear(year);
       if (threshold == null) continue;
 

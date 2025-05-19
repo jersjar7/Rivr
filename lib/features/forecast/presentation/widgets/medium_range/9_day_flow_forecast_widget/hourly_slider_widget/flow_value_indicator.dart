@@ -1,7 +1,10 @@
-// lib/features/forecast/presentation/widgets/medium_range/daily_flow_forecast/hourly_daily_flows_widget/flow_value_indicator.dart
+// lib/features/forecast/presentation/widgets/medium_range/9_day_flow_forecast_widget/hourly_slider_widget/flow_value_indicator.dart
 
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
+import 'package:rivr/core/formatters/flow_value_formatter.dart';
+import 'package:rivr/core/services/flow_units_service.dart';
 import 'package:rivr/features/forecast/domain/entities/return_period.dart';
 import 'package:rivr/features/forecast/utils/flow_thresholds.dart';
 
@@ -11,22 +14,32 @@ class FlowValueIndicator extends StatelessWidget {
   final DateTime? time;
   final String? flowCategory;
   final ReturnPeriod? returnPeriod;
-  final NumberFormat flowFormatter;
+  final NumberFormat? flowFormatter; // Keep for backward compatibility
+  final FlowValueFormatter?
+  flowValueFormatter; // Add support for FlowValueFormatter
 
-  FlowValueIndicator({
+  const FlowValueIndicator({
     super.key,
     this.flowValue,
     this.time,
     this.flowCategory,
     this.returnPeriod,
-    NumberFormat? flowFormatter,
-  }) : flowFormatter = flowFormatter ?? NumberFormat('#,##0.0');
+    this.flowFormatter,
+    this.flowValueFormatter,
+  });
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final textTheme = theme.textTheme;
+
+    // Get formatters - either from props or from context
+    final FlowValueFormatter valueFormatter =
+        flowValueFormatter ?? Provider.of<FlowValueFormatter>(context);
+    final FlowUnitsService unitsService = Provider.of<FlowUnitsService>(
+      context,
+    );
 
     // If no flow value, show placeholder
     if (flowValue == null || time == null) {
@@ -62,9 +75,9 @@ class FlowValueIndicator extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            // Flow value
+            // Flow value - use FlowValueFormatter for formatting
             Text(
-              flowFormatter.format(flowValue),
+              valueFormatter.formatNumberOnly(flowValue!),
               style: textTheme.titleMedium?.copyWith(
                 fontWeight: FontWeight.bold,
               ),
@@ -73,7 +86,7 @@ class FlowValueIndicator extends StatelessWidget {
 
             // Unit
             Text(
-              'ft³/s',
+              unitsService.unitLabel,
               style: textTheme.bodySmall?.copyWith(
                 color: colorScheme.onSurfaceVariant,
               ),

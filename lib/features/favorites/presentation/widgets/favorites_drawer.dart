@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:rivr/core/services/flow_units_service.dart';
+import 'package:rivr/features/forecast/presentation/widgets/unit_selector_widget.dart';
 import '../../../../features/auth/presentation/providers/auth_provider.dart';
 
 class FavoritesDrawer extends StatefulWidget {
@@ -85,15 +87,32 @@ class _FavoritesDrawerState extends State<FavoritesDrawer> {
                         left: 72,
                         right: 16,
                       ),
-                      title: Text('Units (cfs/cms)'),
-                      trailing: Icon(Icons.arrow_forward_ios, size: 16),
-                      onTap: () {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Units setting coming soon'),
+                      title: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text('Units (flow measurement)'),
+                          Consumer<FlowUnitsService>(
+                            builder:
+                                (
+                                  context,
+                                  unitsService,
+                                  _,
+                                ) => UnitSelectorWidget(
+                                  useDropdown: false,
+                                  onUnitChanged: (unit) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text(
+                                          'Flow units changed to ${unit.shortName}',
+                                        ),
+                                        duration: const Duration(seconds: 2),
+                                      ),
+                                    );
+                                  },
+                                ),
                           ),
-                        );
-                      },
+                        ],
+                      ),
                     ),
                     ListTile(
                       contentPadding: const EdgeInsets.only(

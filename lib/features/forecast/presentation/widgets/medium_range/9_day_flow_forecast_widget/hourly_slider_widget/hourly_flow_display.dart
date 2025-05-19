@@ -1,7 +1,10 @@
-// lib/features/forecast/presentation/widgets/medium_range/daily_flow_forecast/hourly_daily_flows_widget/hourly_flow_display.dart
+// lib/features/forecast/presentation/widgets/medium_range/9_day_flow_forecast_widget/hourly_slider_widget/hourly_flow_display.dart
 
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
+import 'package:rivr/core/formatters/flow_value_formatter.dart';
+import 'package:rivr/core/services/flow_units_service.dart';
 import 'package:rivr/features/forecast/domain/entities/return_period.dart';
 import 'package:rivr/features/forecast/presentation/widgets/medium_range/9_day_flow_forecast_widget/forecast_data_processor.dart';
 import 'package:rivr/features/forecast/presentation/widgets/medium_range/9_day_flow_forecast_widget/hourly_slider_widget/flow_value_indicator.dart';
@@ -12,13 +15,16 @@ import 'package:rivr/features/forecast/presentation/widgets/medium_range/9_day_f
 class HourlyFlowDisplay extends StatefulWidget {
   final DailyFlowForecast forecast;
   final ReturnPeriod? returnPeriod;
-  final NumberFormat? flowFormatter;
+  final NumberFormat? flowFormatter; // Keep for backward compatibility
+  final FlowValueFormatter?
+  flowValueFormatter; // Add support for FlowValueFormatter
 
   const HourlyFlowDisplay({
     super.key,
     required this.forecast,
     this.returnPeriod,
     this.flowFormatter,
+    this.flowValueFormatter,
   });
 
   @override
@@ -26,7 +32,8 @@ class HourlyFlowDisplay extends StatefulWidget {
 }
 
 class _HourlyFlowDisplayState extends State<HourlyFlowDisplay> {
-  late NumberFormat _flowFormatter;
+  late FlowValueFormatter _flowValueFormatter;
+  late FlowUnitsService _flowUnitsService;
   late int _selectedHourIndex;
   late List<MapEntry<DateTime, double>> _sortedHourlyData;
 
@@ -42,7 +49,15 @@ class _HourlyFlowDisplayState extends State<HourlyFlowDisplay> {
   @override
   void initState() {
     super.initState();
-    _flowFormatter = widget.flowFormatter ?? NumberFormat('#,##0.0');
+
+    // Initialize flow services
+    _flowValueFormatter =
+        widget.flowValueFormatter ??
+        Provider.of<FlowValueFormatter>(context, listen: false);
+    _flowUnitsService = Provider.of<FlowUnitsService>(context, listen: false);
+
+    // Listen for unit changes
+    _flowUnitsService.addListener(_onUnitChanged);
 
     // Process the hourly data
     _processHourlyData();
@@ -52,11 +67,32 @@ class _HourlyFlowDisplayState extends State<HourlyFlowDisplay> {
   }
 
   @override
+  void dispose() {
+    // Remove listener when disposed
+    _flowUnitsService.removeListener(_onUnitChanged);
+    super.dispose();
+  }
+
+  // Handle unit changes
+  void _onUnitChanged() {
+    // Force a rebuild when units change
+    if (mounted) {
+      setState(() {});
+    }
+  }
+
+  @override
   void didUpdateWidget(HourlyFlowDisplay oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.forecast != widget.forecast) {
       _processHourlyData();
       _setInitialPosition();
+    }
+
+    // Update formatters if they changed
+    if (widget.flowValueFormatter != null &&
+        widget.flowValueFormatter != _flowValueFormatter) {
+      _flowValueFormatter = widget.flowValueFormatter!;
     }
   }
 
@@ -209,7 +245,7 @@ class _HourlyFlowDisplayState extends State<HourlyFlowDisplay> {
                 time: time,
                 flowCategory: category,
                 returnPeriod: widget.returnPeriod,
-                flowFormatter: _flowFormatter,
+                flowValueFormatter: _flowValueFormatter, // Pass the formatter
               ),
             ),
             const SizedBox(height: 16),
@@ -260,7 +296,8 @@ class _HourlyFlowDisplayState extends State<HourlyFlowDisplay> {
                     time: _selectedTime,
                     flowCategory: _selectedCategory,
                     returnPeriod: widget.returnPeriod,
-                    flowFormatter: _flowFormatter,
+                    flowValueFormatter:
+                        _flowValueFormatter, // Pass the formatter
                   ),
                 ),
               ],

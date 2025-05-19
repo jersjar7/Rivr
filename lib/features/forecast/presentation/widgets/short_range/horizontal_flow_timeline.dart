@@ -1,9 +1,12 @@
-// lib/features/forecast/presentation/widgets/horizontal_flow_timeline.dart
+// lib/features/forecast/presentation/widgets/short_range/horizontal_flow_timeline.dart
 
 import 'dart:math';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
+import 'package:rivr/core/formatters/flow_value_formatter.dart';
+import 'package:rivr/core/services/flow_units_service.dart';
 import 'package:rivr/features/forecast/domain/entities/forecast.dart';
 import 'package:rivr/features/forecast/domain/entities/return_period.dart';
 import 'package:rivr/features/forecast/presentation/widgets/card_flow_value.dart';
@@ -33,14 +36,36 @@ class _HorizontalFlowTimelineState extends State<HorizontalFlowTimeline> {
   late TimelineViewType _currentViewType;
   late List<Forecast> _sortedForecasts;
   late ScrollController _scrollController;
-  final NumberFormat _flowFormatter = NumberFormat('#,##0.0');
+
+  // Flow unit services
+  late final FlowUnitsService _flowUnitsService;
+  late final FlowValueFormatter _flowValueFormatter;
 
   @override
   void initState() {
     super.initState();
     _currentViewType = widget.initialViewType;
     _scrollController = ScrollController();
+
+    // Initialize flow services
+    _flowUnitsService = Provider.of<FlowUnitsService>(context, listen: false);
+    _flowValueFormatter = Provider.of<FlowValueFormatter>(
+      context,
+      listen: false,
+    );
+
+    // Listen for unit changes
+    _flowUnitsService.addListener(_onUnitChanged);
+
     _processForecasts();
+  }
+
+  // Handle unit changes
+  void _onUnitChanged() {
+    // Force a rebuild when units change
+    if (mounted) {
+      setState(() {});
+    }
   }
 
   @override
@@ -53,6 +78,8 @@ class _HorizontalFlowTimelineState extends State<HorizontalFlowTimeline> {
 
   @override
   void dispose() {
+    // Remove listener when disposed
+    _flowUnitsService.removeListener(_onUnitChanged);
     _scrollController.dispose();
     super.dispose();
   }
@@ -100,7 +127,7 @@ class _HorizontalFlowTimelineState extends State<HorizontalFlowTimeline> {
         final threshold = widget.returnPeriod!.getFlowForYear(year);
         if (threshold != null) {
           print(
-            '$year-year return period: ${_flowFormatter.format(threshold)} ft³/s',
+            '$year-year return period: ${_flowValueFormatter.formatNumberOnly(threshold)} ${_flowUnitsService.unitLabel}',
           );
         }
       }
@@ -114,7 +141,7 @@ class _HorizontalFlowTimelineState extends State<HorizontalFlowTimeline> {
       final time = DateFormat(
         'MMM d, h:mm a',
       ).format(forecast.validDateTimeLocal);
-      final flow = _flowFormatter.format(forecast.flow);
+      final flow = _flowValueFormatter.formatNumberOnly(forecast.flow);
 
       String category = 'Unknown';
       if (widget.returnPeriod != null) {
@@ -137,7 +164,9 @@ class _HorizontalFlowTimelineState extends State<HorizontalFlowTimeline> {
                 : (diff < 0 ? "↓ $percentChange%" : "→ 0%");
       }
 
-      print('$time: $flow ft³/s | Category: $category | Trend: $trend');
+      print(
+        '$time: $flow ${_flowUnitsService.unitLabel} | Category: $category | Trend: $trend',
+      );
     }
     print('============================================\n');
   }
@@ -301,7 +330,7 @@ class _HorizontalFlowTimelineState extends State<HorizontalFlowTimeline> {
             margin: const EdgeInsets.only(right: 8.0, bottom: 8.0),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),
-              side: BorderSide(color: color.withValues(alpha: 0.5), width: 2),
+              side: BorderSide(color: color.withOpacity(0.5), width: 2),
             ),
             child: Container(
               width: 100,
@@ -324,6 +353,8 @@ class _HorizontalFlowTimelineState extends State<HorizontalFlowTimeline> {
                     color: color, // Pass the category color here
                     containerWidth: 60,
                     containerHeight: 60,
+                    flowUnitsService:
+                        _flowUnitsService, // Pass the unit service
                   ),
 
                   const SizedBox(height: 8),
@@ -488,15 +519,16 @@ class _HorizontalFlowTimelineState extends State<HorizontalFlowTimeline> {
                 BoxShadow(
                   color:
                       isDark
-                          ? Colors.black.withValues(alpha: 0.3)
-                          : Colors.black.withValues(alpha: 0.1),
+                          ? Colors.black.withOpacity(0.3)
+                          : Colors.black.withOpacity(0.1),
                   blurRadius: 2,
                   offset: const Offset(0, 1),
                 ),
               ],
             ),
             child: Text(
-              flow.toInt().toString(),
+              // Format flow value using FlowValueFormatter but just the number
+              _flowValueFormatter.formatNumberOnly(flow),
               style: theme.textTheme.bodySmall?.copyWith(
                 fontWeight: FontWeight.bold,
               ),

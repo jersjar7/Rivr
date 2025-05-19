@@ -1,6 +1,8 @@
-// lib/features/forecast/presentation/widgets/FlowIndicatorBar.dart
+// lib/features/forecast/presentation/widgets/flow_indicator_bar.dart
 
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:rivr/core/formatters/flow_value_formatter.dart';
 import 'package:rivr/features/forecast/domain/entities/return_period.dart';
 import 'package:rivr/features/forecast/utils/flow_thresholds.dart';
 
@@ -11,6 +13,7 @@ class FlowIndicatorBar extends StatefulWidget {
   final double width;
   final bool showLabels;
   final bool showMarkers;
+  final bool showTooltips;
 
   const FlowIndicatorBar({
     super.key,
@@ -20,6 +23,7 @@ class FlowIndicatorBar extends StatefulWidget {
     this.width = 300.0,
     this.showLabels = true,
     this.showMarkers = true,
+    this.showTooltips = false,
   });
 
   @override
@@ -36,6 +40,12 @@ class _FlowIndicatorBarState extends State<FlowIndicatorBar>
 
   final double _markerSize = 20.0;
   final List<int> _returnPeriodYears = [2, 5, 10, 25, 50, 100];
+
+  // Flow units services
+  late final FlowValueFormatter _flowValueFormatter;
+
+  // Tooltip overlay entry
+  OverlayEntry? _tooltipOverlay;
 
   @override
   void initState() {
@@ -62,6 +72,12 @@ class _FlowIndicatorBarState extends State<FlowIndicatorBar>
       CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
     );
 
+    // Initialize flow services
+    _flowValueFormatter = Provider.of<FlowValueFormatter>(
+      context,
+      listen: false,
+    );
+
     // Start the animation after the widget is built
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _animationController.forward();
@@ -70,6 +86,7 @@ class _FlowIndicatorBarState extends State<FlowIndicatorBar>
 
   @override
   void dispose() {
+    _removeTooltip();
     _animationController.dispose();
     super.dispose();
   }
@@ -131,6 +148,65 @@ class _FlowIndicatorBarState extends State<FlowIndicatorBar>
     return positions;
   }
 
+  // Show tooltip with flow information
+  void _showTooltip(BuildContext context, double flow, Offset position) {
+    _removeTooltip();
+
+    final overlay = Overlay.of(context);
+
+    _tooltipOverlay = OverlayEntry(
+      builder:
+          (context) => Positioned(
+            left: position.dx,
+            top: position.dy,
+            child: Material(
+              elevation: 4.0,
+              borderRadius: BorderRadius.circular(8),
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 8,
+                ),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.surface,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.outline.withOpacity(0.5),
+                  ),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'Current Flow',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      _flowValueFormatter.format(flow),
+                      style: Theme.of(context).textTheme.bodyMedium,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+    );
+
+    overlay.insert(_tooltipOverlay!);
+  }
+
+  // Remove tooltip if showing
+  void _removeTooltip() {
+    _tooltipOverlay?.remove();
+    _tooltipOverlay = null;
+  }
+
   @override
   Widget build(BuildContext context) {
     final markerPosition = _calculateMarkerPosition();
@@ -171,14 +247,39 @@ class _FlowIndicatorBarState extends State<FlowIndicatorBar>
               // Return period markers
               if (widget.showMarkers && widget.returnPeriod != null)
                 ...returnPeriodPositions.entries.map((entry) {
+                  final flowValue = widget.returnPeriod!.getFlowForYear(
+                    entry.key,
+                  );
+
                   return Positioned(
                     left: entry.value,
                     top: 0,
                     bottom: 0,
-                    child: Container(
-                      width: 2,
-                      color: Colors.white.withValues(alpha: 0.7),
-                      child: widget.showLabels ? null : const SizedBox(),
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.translucent,
+                      onTap:
+                          widget.showTooltips && flowValue != null
+                              ? () {
+                                final RenderBox box =
+                                    context.findRenderObject() as RenderBox;
+                                final Offset position = box.localToGlobal(
+                                  Offset(entry.value, 0),
+                                );
+                                _showTooltip(
+                                  context,
+                                  flowValue,
+                                  Offset(
+                                    position.dx,
+                                    position.dy + widget.height + 5,
+                                  ),
+                                );
+                              }
+                              : null,
+                      child: Container(
+                        width: 2,
+                        color: Colors.white.withValues(alpha: 0.7),
+                        child: widget.showLabels ? null : const SizedBox(),
+                      ),
                     ),
                   );
                 }),
@@ -190,22 +291,42 @@ class _FlowIndicatorBarState extends State<FlowIndicatorBar>
                   return Positioned(
                     left: _markerPositionAnimation.value * markerPosition,
                     top: (widget.height - _markerSize) / 2,
-                    child: Transform.scale(
-                      scale: _pulseAnimation.value,
-                      child: Container(
-                        width: _markerSize,
-                        height: _markerSize,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: markerColor,
-                          border: Border.all(color: Colors.white, width: 2),
-                          boxShadow: [
-                            BoxShadow(
-                              color: markerColor.withValues(alpha: 0.7),
-                              blurRadius: 10,
-                              spreadRadius: 2,
-                            ),
-                          ],
+                    child: GestureDetector(
+                      onTap:
+                          widget.showTooltips
+                              ? () {
+                                final RenderBox box =
+                                    context.findRenderObject() as RenderBox;
+                                final Offset position = box.localToGlobal(
+                                  Offset(markerPosition, 0),
+                                );
+                                _showTooltip(
+                                  context,
+                                  widget.currentFlow,
+                                  Offset(
+                                    position.dx,
+                                    position.dy + widget.height + 5,
+                                  ),
+                                );
+                              }
+                              : null,
+                      child: Transform.scale(
+                        scale: _pulseAnimation.value,
+                        child: Container(
+                          width: _markerSize,
+                          height: _markerSize,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: markerColor,
+                            border: Border.all(color: Colors.white, width: 2),
+                            boxShadow: [
+                              BoxShadow(
+                                color: markerColor.withValues(alpha: 0.7),
+                                blurRadius: 10,
+                                spreadRadius: 2,
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     ),
@@ -219,7 +340,7 @@ class _FlowIndicatorBarState extends State<FlowIndicatorBar>
         // Return period labels
         if (widget.showLabels && widget.returnPeriod != null)
           Padding(
-            padding: const EdgeInsets.only(top: 8.0), // Add right padding
+            padding: const EdgeInsets.only(top: 8.0),
             child: SizedBox(
               width: widget.width,
               height: 14,
@@ -227,18 +348,16 @@ class _FlowIndicatorBarState extends State<FlowIndicatorBar>
                 children:
                     returnPeriodPositions.entries.map((entry) {
                       final labelText = '${entry.key}y';
-                      // Estimate the width of the text (adjust multiplier as needed)
-                      final textWidth =
-                          labelText.length *
-                          7.0; // Example: assuming ~7 pixels per character
+                      // Estimate the width of the text
+                      final textWidth = labelText.length * 7.0;
 
                       // Ensure the label doesn't overflow
                       double calculatedLeft = entry.value;
                       if (calculatedLeft + textWidth > widget.width) {
                         calculatedLeft = widget.width - textWidth + 2;
-                      } // Adjust by a small margin
+                      }
                       if (calculatedLeft < 0) {
-                        calculatedLeft = 0; // Ensure it's not negative
+                        calculatedLeft = 0;
                       }
 
                       return Positioned(

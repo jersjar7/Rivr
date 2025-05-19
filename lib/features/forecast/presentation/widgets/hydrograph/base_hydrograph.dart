@@ -3,6 +3,9 @@
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
+import 'package:rivr/core/formatters/flow_value_formatter.dart';
+import 'package:rivr/core/services/flow_units_service.dart';
 import 'package:rivr/features/forecast/domain/entities/return_period.dart';
 import 'package:rivr/features/forecast/utils/format_large_number.dart';
 
@@ -53,6 +56,9 @@ abstract class BaseHydrographState<T extends BaseHydrograph> extends State<T> {
   double get _transformedMaxX =>
       _baseMinX + (_baseMaxX - _baseMinX) / _currentZoomLevel + _xOffset;
 
+  late final FlowUnitsService _flowUnitsService;
+  late final FlowValueFormatter _flowFormatter;
+
   // Gradient colors defined based on current theme
   List<Color> get gradientColors {
     final theme = Theme.of(context);
@@ -91,8 +97,11 @@ abstract class BaseHydrographState<T extends BaseHydrograph> extends State<T> {
   @override
   void initState() {
     super.initState();
-    // initialize it to the default zoom
     _zoomStartLevel = _currentZoomLevel;
+
+    // Initialize formatter and units service
+    _flowUnitsService = Provider.of<FlowUnitsService>(context, listen: false);
+    _flowFormatter = Provider.of<FlowValueFormatter>(context, listen: false);
   }
 
   // Reset zoom to original values
@@ -380,13 +389,13 @@ abstract class BaseHydrographState<T extends BaseHydrograph> extends State<T> {
         getTooltipColor:
             (spot) =>
                 isDark
-                    ? colorScheme.surfaceContainerHighest.withValues(alpha: 0.8)
-                    : Colors.blueGrey.withValues(alpha: 0.8),
+                    ? colorScheme.surfaceContainerHighest.withOpacity(0.8)
+                    : Colors.blueGrey.withOpacity(0.8),
         tooltipRoundedRadius: 8,
         getTooltipItems: (List<LineBarSpot> lineBarsSpot) {
           return lineBarsSpot.map((spot) {
             return LineTooltipItem(
-              '${flowFormatter.format(spot.y)} ft³/s',
+              _flowFormatter.format(spot.y), // Use formatter here
               const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
               children: [
                 TextSpan(
@@ -432,7 +441,7 @@ abstract class BaseHydrographState<T extends BaseHydrograph> extends State<T> {
       bottomTitles: buildBottomTitles(),
       leftTitles: AxisTitles(
         axisNameWidget: Text(
-          'ft³/s',
+          _flowUnitsService.unitLabel, // Use unit label from service
           style: TextStyle(
             fontSize: 15,
             fontWeight: FontWeight.bold,

@@ -2,6 +2,9 @@
 
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
+import 'package:rivr/core/formatters/flow_value_formatter.dart';
+import 'package:rivr/core/services/flow_units_service.dart';
 import 'package:rivr/features/forecast/domain/entities/return_period.dart';
 import 'package:rivr/features/forecast/presentation/widgets/medium_range/9_day_flow_forecast_widget/flow_condition_icon.dart';
 import 'package:rivr/features/forecast/presentation/widgets/medium_range/9_day_flow_forecast_widget/flow_range_bar.dart';
@@ -41,13 +44,36 @@ class ExpandableDailyForecastRowWithHourly extends StatefulWidget {
 class _ExpandableDailyForecastRowWithHourlyState
     extends State<ExpandableDailyForecastRowWithHourly> {
   late bool _isExpanded;
-  late NumberFormat _flowFormatter;
+  late FlowValueFormatter _flowValueFormatter;
+  late FlowUnitsService _flowUnitsService;
 
   @override
   void initState() {
     super.initState();
     _isExpanded = widget.isExpanded;
-    _flowFormatter = widget.flowFormatter ?? NumberFormat('#,##0');
+    _flowValueFormatter = Provider.of<FlowValueFormatter>(
+      context,
+      listen: false,
+    );
+    _flowUnitsService = Provider.of<FlowUnitsService>(context, listen: false);
+
+    // Listen for unit changes
+    _flowUnitsService.addListener(_onUnitChanged);
+  }
+
+  @override
+  void dispose() {
+    // Remove listener when disposed
+    _flowUnitsService.removeListener(_onUnitChanged);
+    super.dispose();
+  }
+
+  // Handle unit changes
+  void _onUnitChanged() {
+    // Force a rebuild when units change
+    if (mounted) {
+      setState(() {});
+    }
   }
 
   @override
@@ -111,7 +137,7 @@ class _ExpandableDailyForecastRowWithHourlyState
           decoration: BoxDecoration(
             color:
                 _isExpanded
-                    ? colorScheme.surfaceContainerHighest.withValues(alpha: 0.5)
+                    ? colorScheme.surfaceContainerHighest.withOpacity(0.5)
                     : null,
           ),
           child: Row(
@@ -145,15 +171,17 @@ class _ExpandableDailyForecastRowWithHourlyState
               Expanded(
                 child: Row(
                   children: [
-                    // Minimum flow value
+                    // Minimum flow value - Updated to use FlowValueFormatter
                     Text(
-                      _flowFormatter.format(widget.forecast.minFlow),
+                      _flowValueFormatter.formatNumberOnly(
+                        widget.forecast.minFlow,
+                      ),
                       style: textTheme.bodyMedium?.copyWith(
                         fontSize: 16,
                         color:
                             widget.isToday
                                 ? colorScheme.primary
-                                : colorScheme.onSurface.withValues(alpha: 0.8),
+                                : colorScheme.onSurface.withOpacity(0.8),
                       ),
                     ),
 
@@ -172,15 +200,17 @@ class _ExpandableDailyForecastRowWithHourlyState
 
                     const SizedBox(width: 8),
 
-                    // Maximum flow value
+                    // Maximum flow value - Updated to use FlowValueFormatter
                     Text(
-                      _flowFormatter.format(widget.forecast.maxFlow),
+                      _flowValueFormatter.formatNumberOnly(
+                        widget.forecast.maxFlow,
+                      ),
                       style: textTheme.bodyMedium?.copyWith(
                         fontSize: 16,
                         color:
                             widget.isToday
                                 ? colorScheme.primary
-                                : colorScheme.onSurface.withValues(alpha: 0.8),
+                                : colorScheme.onSurface.withOpacity(0.8),
                       ),
                     ),
                   ],
@@ -197,7 +227,7 @@ class _ExpandableDailyForecastRowWithHourlyState
             child: Divider(
               height: 1,
               thickness: 1.5,
-              color: colorScheme.outline.withValues(alpha: 0.3),
+              color: colorScheme.outline.withOpacity(0.3),
             ),
           ),
       ],
@@ -216,7 +246,7 @@ class _ExpandableDailyForecastRowWithHourlyState
 
     return Container(
       width: double.infinity,
-      color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+      color: colorScheme.surfaceContainerHighest.withOpacity(0.3),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -242,32 +272,33 @@ class _ExpandableDailyForecastRowWithHourlyState
 
                 const SizedBox(height: 12),
 
-                // Flow statistics
+                // Flow statistics - already using FlowValueFormatter
                 _buildStatRow(
                   'Min Flow',
-                  _flowFormatter.format(widget.forecast.minFlow),
+                  _flowValueFormatter.format(widget.forecast.minFlow),
                   Colors.blue,
                 ),
                 _buildStatRow(
                   'Max Flow',
-                  _flowFormatter.format(widget.forecast.maxFlow),
+                  _flowValueFormatter.format(widget.forecast.maxFlow),
                   Colors.red,
                 ),
                 _buildStatRow(
                   'Avg Flow',
-                  _flowFormatter.format(widget.forecast.avgFlow),
+                  _flowValueFormatter.format(widget.forecast.avgFlow),
                   Colors.purple,
                 ),
               ],
             ),
           ),
 
-          // Hourly flow display widget - the new component we're adding
+          // Hourly flow display widget - pass FlowValueFormatter instead of NumberFormat
           if (widget.forecast.hourlyData.isNotEmpty)
             HourlyFlowDisplay(
               forecast: widget.forecast,
               returnPeriod: widget.returnPeriod,
-              flowFormatter: _flowFormatter,
+              flowValueFormatter:
+                  _flowValueFormatter, // Pass the formatter here
             ),
 
           // Data source info
@@ -306,10 +337,7 @@ class _ExpandableDailyForecastRowWithHourlyState
               Text(label),
             ],
           ),
-          Text(
-            '$value ft³/s',
-            style: const TextStyle(fontWeight: FontWeight.bold),
-          ),
+          Text(value, style: const TextStyle(fontWeight: FontWeight.bold)),
         ],
       ),
     );

@@ -1,10 +1,12 @@
 // lib/features/forecast/presentation/widgets/flow_status_card.dart
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:rivr/core/formatters/flow_value_formatter.dart';
+import 'package:rivr/core/services/flow_units_service.dart';
 import 'package:rivr/features/forecast/domain/entities/forecast.dart';
 import 'package:rivr/features/forecast/domain/entities/return_period.dart';
 import 'package:rivr/features/forecast/presentation/widgets/flow_indicator_bar.dart';
 import 'package:rivr/features/forecast/utils/flow_thresholds.dart';
-import 'package:intl/intl.dart';
 
 class FlowStatusCard extends StatefulWidget {
   final Forecast? currentFlow;
@@ -27,7 +29,17 @@ class FlowStatusCard extends StatefulWidget {
 }
 
 class _FlowStatusCardState extends State<FlowStatusCard> {
+  late final FlowUnitsService _flowUnitsService;
+  late final FlowValueFormatter _flowFormatter;
   bool _returnPeriodExpanded = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // only run once
+    _flowUnitsService = Provider.of<FlowUnitsService>(context, listen: false);
+    _flowFormatter = Provider.of<FlowValueFormatter>(context, listen: false);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -49,14 +61,6 @@ class _FlowStatusCardState extends State<FlowStatusCard> {
         widget.returnPeriod != null
             ? FlowThresholds.getFlowSummary(flow, widget.returnPeriod!)
             : 'Flow information unavailable';
-
-    // Format flow values with NumberFormat
-    final NumberFormat flowFormat = NumberFormat('#,##0.0');
-    final String formattedFlow = flowFormat.format(flow);
-    final String formattedHistorical =
-        widget.historicalAverage != null
-            ? flowFormat.format(widget.historicalAverage!)
-            : 'N/A';
 
     // Calculate percentage comparison with historical average
     String comparisonText = '';
@@ -140,17 +144,16 @@ class _FlowStatusCardState extends State<FlowStatusCard> {
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
                     Text(
-                      formattedFlow,
+                      _flowFormatter.format(flow),
                       style: theme.textTheme.displaySmall!.copyWith(
                         color: textColor,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
-                    const SizedBox(width: 8),
                     Padding(
                       padding: const EdgeInsets.only(bottom: 6.0),
                       child: Text(
-                        'ft³/s',
+                        _flowUnitsService.unitLabel,
                         style: theme.textTheme.bodyMedium!.copyWith(
                           color: textColor.withValues(alpha: 0.8),
                         ),
@@ -209,7 +212,7 @@ class _FlowStatusCardState extends State<FlowStatusCard> {
                       ),
                       const SizedBox(width: 8),
                       Text(
-                        'Historical Average: $formattedHistorical ft³/s',
+                        'Historical Average: ${_flowFormatter.formatNumberOnly(widget.historicalAverage!)} ${_flowUnitsService.unitLabel}',
                         style: theme.textTheme.bodyMedium!.copyWith(
                           color: textColor.withValues(alpha: 0.9),
                         ),
@@ -322,7 +325,9 @@ class _FlowStatusCardState extends State<FlowStatusCard> {
     rows.add(
       TableRow(
         decoration: BoxDecoration(
-          border: Border(bottom: BorderSide(color: textColor.withOpacity(0.3))),
+          border: Border(
+            bottom: BorderSide(color: textColor.withValues(alpha: 0.3)),
+          ),
         ),
         children: [
           Padding(
@@ -338,7 +343,7 @@ class _FlowStatusCardState extends State<FlowStatusCard> {
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 4.0),
             child: Text(
-              'Flow (ft³/s)',
+              'Flow (${_flowUnitsService.unitLabel})',
               style: theme.textTheme.bodyMedium!.copyWith(
                 color: textColor,
                 fontWeight: FontWeight.bold,
@@ -362,16 +367,16 @@ class _FlowStatusCardState extends State<FlowStatusCard> {
                 child: Text(
                   '$year-year',
                   style: theme.textTheme.bodyMedium!.copyWith(
-                    color: textColor.withOpacity(0.9),
+                    color: textColor.withValues(alpha: 0.9),
                   ),
                 ),
               ),
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 4.0),
                 child: Text(
-                  NumberFormat('#,##0.0').format(flow),
+                  _flowFormatter.formatNumberOnly(flow),
                   style: theme.textTheme.bodyMedium!.copyWith(
-                    color: textColor.withOpacity(0.9),
+                    color: textColor.withValues(alpha: 0.9),
                   ),
                   textAlign: TextAlign.right,
                 ),
@@ -399,8 +404,8 @@ class _FlowStatusCardState extends State<FlowStatusCard> {
         isDark ? colorScheme.secondary : colorScheme.secondary;
     final Color cardColorLight =
         isDark
-            ? colorScheme.secondary.withOpacity(0.7)
-            : colorScheme.secondary.withOpacity(0.8);
+            ? colorScheme.secondary.withValues(alpha: 0.7)
+            : colorScheme.secondary.withValues(alpha: 0.8);
 
     return Card(
       elevation: 4,

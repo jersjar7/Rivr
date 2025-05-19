@@ -50,8 +50,8 @@ class ForecastProvider extends ChangeNotifier {
     StreamNameService? streamNameService,
     MapStationLocalDataSource? mapStationDataSource,
     DatabaseHelper? databaseHelper,
-    required FlowUnitsService flowUnitsService, // Add this parameter
-    required FlowValueFormatter flowFormatter, // Add this parameter
+    required FlowUnitsService flowUnitsService,
+    required FlowValueFormatter flowFormatter,
   }) : _getForecast = getForecast,
        _getShortRangeForecast = getShortRangeForecast,
        _getMediumRangeForecast = getMediumRangeForecast,
@@ -92,8 +92,12 @@ class ForecastProvider extends ChangeNotifier {
 
   // Handler for when flow unit changes
   void _onUnitChanged() {
-    // Just notify listeners so UI components can update
-    // The actual conversion happens when the values are used
+    // Reprocess the daily data with the new unit
+    for (final reachId in _cachedForecasts.keys) {
+      _processDailyData(reachId);
+    }
+
+    // Notify listeners so UI components can update
     notifyListeners();
   }
 
@@ -103,7 +107,7 @@ class ForecastProvider extends ChangeNotifier {
   // Get the flow formatter for consistent formatting
   FlowValueFormatter get flowFormatter => _flowFormatter;
 
-  // Mthod to format flow values
+  // Method to format flow values
   String formatFlow(double flow, {FlowUnit? fromUnit}) {
     if (fromUnit != null && fromUnit != _flowUnitsService.preferredUnit) {
       // Convert before formatting
@@ -117,13 +121,63 @@ class ForecastProvider extends ChangeNotifier {
     return _flowFormatter.format(flow);
   }
 
-  // New helper method to convert flow values if needed
+  // Helper method to convert flow values if needed
   double convertFlowIfNeeded(double flow, FlowUnit fromUnit) {
     if (fromUnit == _flowUnitsService.preferredUnit) {
       return flow; // No conversion needed
     }
 
     return _flowUnitsService.convertToPreferredUnit(flow, fromUnit);
+  }
+
+  // Convert a forecast's flow value to the preferred unit
+  Forecast convertForecastFlow(
+    Forecast forecast, {
+    FlowUnit fromUnit = FlowUnit.cfs,
+  }) {
+    if (fromUnit == _flowUnitsService.preferredUnit) {
+      return forecast; // No conversion needed
+    }
+
+    // Create a new forecast with converted flow
+    final convertedFlow = _flowUnitsService.convertToPreferredUnit(
+      forecast.flow,
+      fromUnit,
+    );
+
+    // Return a new forecast with the same data but converted flow
+    return Forecast(
+      reachId: forecast.reachId,
+      validTime: forecast.validTime,
+      flow: convertedFlow,
+      member: forecast.member,
+      forecastType: forecast.forecastType,
+    );
+  }
+
+  // Convert a collection of forecasts' flow values to the preferred unit
+  ForecastCollection convertForecastCollectionFlows(
+    ForecastCollection collection, {
+    FlowUnit fromUnit = FlowUnit.cfs,
+  }) {
+    if (fromUnit == _flowUnitsService.preferredUnit) {
+      return collection; // No conversion needed
+    }
+
+    // Convert each forecast's flow
+    final convertedForecasts =
+        collection.forecasts
+            .map(
+              (forecast) => convertForecastFlow(forecast, fromUnit: fromUnit),
+            )
+            .toList();
+
+    // Return a new collection with converted forecasts
+    return ForecastCollection(
+      reachId: collection.reachId,
+      forecasts: convertedForecasts,
+      forecastType: collection.forecastType,
+    );
   }
 
   // Get the unit string for display
@@ -169,6 +223,18 @@ class ForecastProvider extends ChangeNotifier {
     return null;
   }
 
+  // Get a specific forecast type with flow values converted to the preferred unit
+  ForecastCollection? getConvertedForecastCollection(
+    String reachId,
+    ForecastType forecastType, {
+    FlowUnit fromUnit = FlowUnit.cfs,
+  }) {
+    final collection = getForecastCollection(reachId, forecastType);
+    if (collection == null) return null;
+
+    return convertForecastCollectionFlows(collection, fromUnit: fromUnit);
+  }
+
   // Check if we have forecasts for a reach
   bool hasForecastsFor(String reachId) {
     return _cachedForecasts.containsKey(reachId) &&
@@ -180,6 +246,17 @@ class ForecastProvider extends ChangeNotifier {
     return _latestFlows[reachId];
   }
 
+  // Get the latest flow with value converted to the preferred unit
+  Forecast? getConvertedLatestFlowFor(
+    String reachId, {
+    FlowUnit fromUnit = FlowUnit.cfs,
+  }) {
+    final latestFlow = _latestFlows[reachId];
+    if (latestFlow == null) return null;
+
+    return convertForecastFlow(latestFlow, fromUnit: fromUnit);
+  }
+
   // Get return period for a reach
   ReturnPeriod? getReturnPeriodFor(String reachId) {
     return _returnPeriods[reachId];
@@ -188,6 +265,37 @@ class ForecastProvider extends ChangeNotifier {
   // Get aggregated daily data for calendar view
   Map<DateTime, Map<String, double>>? getDailyDataFor(String reachId) {
     return _aggregatedDailyData[reachId];
+  }
+
+  // Get aggregated daily data with flow values converted to preferred unit
+  Map<DateTime, Map<String, double>>? getConvertedDailyDataFor(
+    String reachId, {
+    FlowUnit fromUnit = FlowUnit.cfs,
+  }) {
+    final dailyData = _aggregatedDailyData[reachId];
+    if (dailyData == null) return null;
+
+    if (fromUnit == _flowUnitsService.preferredUnit) {
+      return dailyData; // No conversion needed
+    }
+
+    // Convert each flow value in the daily data
+    final convertedData = <DateTime, Map<String, double>>{};
+
+    dailyData.forEach((date, stats) {
+      final convertedStats = <String, double>{};
+
+      stats.forEach((key, value) {
+        convertedStats[key] = _flowUnitsService.convertToPreferredUnit(
+          value,
+          fromUnit,
+        );
+      });
+
+      convertedData[date] = convertedStats;
+    });
+
+    return convertedData;
   }
 
   // Get location for a reach/river
@@ -341,7 +449,7 @@ class ForecastProvider extends ChangeNotifier {
         _loadReturnPeriod(reachId);
         _processDailyData(reachId);
 
-        // Try to extract location information - now uses real data!
+        // Try to extract location information
         _tryExtractLocationInfo(reachId);
 
         // Prefetch the station name if we don't have it
@@ -354,7 +462,7 @@ class ForecastProvider extends ChangeNotifier {
     );
   }
 
-  // UPDATED: Extract real location info from database instead of dummy data
+  // Extract real location info from database
   Future<void> _tryExtractLocationInfo(String reachId) async {
     // Skip if we already have location data for this reach
     if (_reachLocations.containsKey(reachId)) {
@@ -365,7 +473,6 @@ class ForecastProvider extends ChangeNotifier {
       print("Attempting to find location data for reach ID: $reachId");
 
       // Method 1: Try direct lookup by station ID
-      // This approach assumes the reachId might match a station ID in the database
       bool found = await _tryDirectLookup(reachId);
       if (found) return;
 
@@ -787,11 +894,14 @@ class ForecastProvider extends ChangeNotifier {
     );
   }
 
-  // Process forecasts into daily data for calendar view - with unit handling
+  // Process forecasts into daily data for calendar view - with enhanced unit handling
   void _processDailyData(String reachId) {
     if (!_cachedForecasts.containsKey(reachId)) return;
 
     final Map<DateTime, List<double>> dailyFlowValues = {};
+
+    // Assume all forecast data from API is in CFS (API standard)
+    final FlowUnit sourceUnit = FlowUnit.cfs;
 
     // Process all forecast types
     for (var entry in _cachedForecasts[reachId]!.entries) {
@@ -810,11 +920,13 @@ class ForecastProvider extends ChangeNotifier {
           dailyFlowValues[date] = [];
         }
 
-        // Assume forecast flow values are in CFS (API standard)
-        // and convert if needed
+        // Convert flow value if needed (assuming API values are in CFS)
         double flowValue = forecast.flow;
-        if (_flowUnitsService.preferredUnit == FlowUnit.cms) {
-          flowValue = _flowUnitsService.cfsToCms(flowValue);
+        if (_flowUnitsService.preferredUnit != sourceUnit) {
+          flowValue = _flowUnitsService.convertToPreferredUnit(
+            flowValue,
+            sourceUnit,
+          );
         }
 
         dailyFlowValues[date]!.add(flowValue);
@@ -916,5 +1028,23 @@ class ForecastProvider extends ChangeNotifier {
       final localTime = forecast.validDateTime.toLocal();
       return localTime.isAfter(now);
     }).toList();
+  }
+
+  // Get converted forecasts for display with proper unit handling
+  List<Forecast> getConvertedForecastsForDisplay(
+    List<Forecast> forecasts, {
+    FlowUnit fromUnit = FlowUnit.cfs,
+  }) {
+    final filtered = getFilteredForecastsForDisplay(forecasts);
+
+    // No conversion needed if units match
+    if (fromUnit == _flowUnitsService.preferredUnit) {
+      return filtered;
+    }
+
+    // Convert each forecast's flow value
+    return filtered
+        .map((forecast) => convertForecastFlow(forecast, fromUnit: fromUnit))
+        .toList();
   }
 }

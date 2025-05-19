@@ -295,7 +295,7 @@ class _FavoritesPageState extends State<FavoritesPage>
                     crossAxisSpacing: 8,
                     mainAxisSpacing: 8,
                   ),
-                  itemCount: 30,
+                  itemCount: 62,
                   itemBuilder: (ctx, idx) {
                     final imgNumber = idx + 1;
                     final isSelected = favorite.imgNumber == imgNumber;
@@ -317,7 +317,7 @@ class _FavoritesPageState extends State<FavoritesPage>
                         child: ClipRRect(
                           borderRadius: BorderRadius.circular(7),
                           child: Image.asset(
-                            'assets/img/river_images/$imgNumber.jpeg',
+                            'assets/img/river_images/$imgNumber.png',
                             fit: BoxFit.cover,
                             errorBuilder: (c, e, st) {
                               return Container(
@@ -352,7 +352,7 @@ class _FavoritesPageState extends State<FavoritesPage>
                     ElevatedButton(
                       onPressed: () {
                         final random = math.Random();
-                        final randomImg = random.nextInt(30) + 1;
+                        final randomImg = random.nextInt(62) + 1;
                         Navigator.pop(context, randomImg);
                       },
                       style: ElevatedButton.styleFrom(

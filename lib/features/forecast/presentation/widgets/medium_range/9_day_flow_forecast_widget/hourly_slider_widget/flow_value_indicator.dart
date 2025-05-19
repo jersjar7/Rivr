@@ -53,7 +53,7 @@ class FlowValueIndicator extends StatelessWidget {
     final String timeStr = DateFormat('h:mm a').format(time!);
 
     // Container size
-    const double containerSize = 80.0;
+    const double containerSize = 90.0;
 
     return Container(
       width: containerSize,
@@ -64,7 +64,7 @@ class FlowValueIndicator extends StatelessWidget {
         border: Border.all(color: borderColor, width: 3.0),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.1),
+            color: Colors.black.withValues(alpha: 0.1),
             blurRadius: 4,
             offset: const Offset(0, 2),
           ),
@@ -78,7 +78,7 @@ class FlowValueIndicator extends StatelessWidget {
             // Flow value - use FlowValueFormatter for formatting
             Text(
               valueFormatter.formatNumberOnly(flowValue!),
-              style: textTheme.titleMedium?.copyWith(
+              style: textTheme.titleSmall?.copyWith(
                 fontWeight: FontWeight.bold,
               ),
               textAlign: TextAlign.center,

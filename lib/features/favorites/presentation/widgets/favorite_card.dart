@@ -3,15 +3,12 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 import 'package:rivr/core/models/location_info.dart';
 import 'package:rivr/core/services/geocoding_service.dart';
 import 'package:rivr/features/favorites/services/favorite_image_service.dart';
 import '../../domain/entities/favorite.dart';
 import '../../../../core/services/stream_name_service.dart';
 import '../../../../core/di/service_locator.dart';
-import '../providers/favorites_provider.dart';
-import '../widgets/edit_favorite_name_dialog.dart';
 
 class FavoriteCard extends StatefulWidget {
   final Favorite favorite;
@@ -265,7 +262,7 @@ class _FavoriteCardState extends State<FavoriteCard> {
 
                   // Station name at the bottom of the image
                   Positioned(
-                    bottom: 20,
+                    bottom: 30,
                     left: 16,
                     right: 16,
                     child: Row(
@@ -305,18 +302,6 @@ class _FavoriteCardState extends State<FavoriteCard> {
                                   maxLines: 2,
                                   overflow: TextOverflow.ellipsis,
                                 ),
-                              ),
-                              // Edit button next to the title
-                              IconButton(
-                                icon: Icon(
-                                  Icons.edit,
-                                  size: 18,
-                                  color: colors.onPrimary,
-                                ),
-                                onPressed: () => _showEditNameDialog(context),
-                                padding: EdgeInsets.zero,
-                                constraints: const BoxConstraints(),
-                                tooltip: 'Edit Name',
                               ),
                             ],
                           ),
@@ -374,12 +359,12 @@ class _FavoriteCardState extends State<FavoriteCard> {
                     child: Container(
                       padding: const EdgeInsets.all(4),
                       decoration: BoxDecoration(
-                        color: colors.onSurface.withValues(alpha: 0.3),
+                        color: colors.onSurface.withValues(alpha: 0.9),
                         borderRadius: BorderRadius.circular(4),
                       ),
                       child: Icon(
                         Icons.drag_handle,
-                        size: 16,
+                        size: 18,
                         color: colors.onSurfaceVariant,
                       ),
                     ),
@@ -477,16 +462,6 @@ class _FavoriteCardState extends State<FavoriteCard> {
                         ),
 
                         const SizedBox(width: 8),
-
-                        // Delete button
-                        IconButton(
-                          onPressed: () {
-                            _showDeleteConfirmation(context);
-                          },
-                          icon: Icon(Icons.delete_outline, color: colors.error),
-                          tooltip: 'Remove from favorites',
-                          splashRadius: 24,
-                        ),
                       ],
                     ),
                   ],
@@ -501,7 +476,7 @@ class _FavoriteCardState extends State<FavoriteCard> {
 
   Widget _buildDefaultImage(int imgNumber, Color cardColor) {
     return Image.asset(
-      'assets/img/river_images/$imgNumber.jpeg',
+      'assets/img/river_images/$imgNumber.png',
       height: 160,
       width: double.infinity,
       fit: BoxFit.cover,
@@ -515,142 +490,5 @@ class _FavoriteCardState extends State<FavoriteCard> {
         );
       },
     );
-  }
-
-  // Confirmation dialog for deletion
-  void _showDeleteConfirmation(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-    showDialog(
-      context: context,
-      builder:
-          (context) => AlertDialog(
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-            title: Text(
-              'Remove Favorite',
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
-            content: Text(
-              _displayName == null || _displayName!.isEmpty
-                  ? 'Are you sure you want to remove this river from your favorites?'
-                  : 'Remove $_displayName from your favorites?',
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: Text(
-                  'Cancel',
-                  style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                    color: colors.onSurfaceVariant,
-                  ),
-                ),
-              ),
-              ElevatedButton(
-                onPressed: () {
-                  Navigator.pop(context);
-                  widget.onDelete();
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: colors.error,
-                  foregroundColor: colors.onError,
-                  elevation: 0,
-                ),
-                child: const Text('Remove'),
-              ),
-            ],
-          ),
-    );
-  }
-
-  // Dialog to edit the river name
-  void _showEditNameDialog(BuildContext context) async {
-    final currentContext = context;
-    final favoritesProvider = Provider.of<FavoritesProvider>(
-      currentContext,
-      listen: false,
-    );
-
-    // Get the original API name from StreamNameService if possible
-    String? originalApiName;
-    try {
-      final nameInfo = await _streamNameService.getNameInfo(
-        widget.favorite.stationId,
-      );
-      originalApiName = nameInfo.originalApiName;
-    } catch (e) {
-      print("Error getting original API name from service: $e");
-      // Fall back to the favorite's originalApiName
-      originalApiName =
-          widget.favorite.originalApiName == "null"
-              ? null
-              : widget.favorite.originalApiName;
-    }
-
-    final currentName = _displayName ?? widget.favorite.name;
-
-    final result = await showDialog<String>(
-      context: currentContext,
-      builder:
-          (dialogContext) => EditFavoriteNameDialog(
-            currentName: currentName,
-            stationId: widget.favorite.stationId,
-            originalApiName: originalApiName,
-          ),
-    );
-
-    // Proceed with update if we got a result and it's different
-    if (result != null && result != currentName) {
-      try {
-        // Update name in both the FavoritesProvider and StreamNameService
-        final success = await favoritesProvider.updateFavoriteName(
-          widget.favorite.userId,
-          widget.favorite.stationId,
-          result,
-        );
-
-        // Also try to update directly in StreamNameService for immediate effect
-        try {
-          await _streamNameService.updateDisplayName(
-            widget.favorite.stationId,
-            result,
-          );
-
-          // Update local state immediately
-          if (mounted) {
-            setState(() {
-              _displayName = result;
-              _isCustomName =
-                  originalApiName != null &&
-                  result != originalApiName &&
-                  originalApiName.isNotEmpty;
-            });
-          }
-        } catch (e) {
-          print("Error updating StreamNameService directly: $e");
-          // We'll eventually get the update when the FavoritesProvider refreshes
-        }
-
-        // Show feedback to user
-        if (currentContext.mounted) {
-          ScaffoldMessenger.of(currentContext).showSnackBar(
-            SnackBar(
-              content: Text(
-                success
-                    ? 'River name updated successfully'
-                    : 'Failed to update river name',
-              ),
-            ),
-          );
-        }
-      } catch (e) {
-        print('Error updating favorite name: $e');
-        if (currentContext.mounted) {
-          ScaffoldMessenger.of(currentContext).showSnackBar(
-            SnackBar(content: Text('Error updating river name: $e')),
-          );
-        }
-      }
-    }
   }
 }

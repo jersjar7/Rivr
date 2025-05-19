@@ -22,6 +22,18 @@ class FlowValueFormatter {
        _compactFormatter = compactFormatter ?? NumberFormat('#,##0'),
        _largeFormatter = largeFormatter ?? NumberFormat.compact();
 
+  String formatRawNumber(double value) {
+    if (value.isNaN || value.isInfinite) return 'Invalid';
+    return _formatter.format(
+      value,
+    ); // Always use regular formatter, never compact
+  }
+
+  String formatIntegerOnly(double value) {
+    if (value.isNaN || value.isInfinite) return 'Invalid';
+    return NumberFormat('#,##0').format(value.ceil());
+  }
+
   /// Format a flow value assuming it's in the current preferred unit
   String format(double value) {
     if (value.isNaN || value.isInfinite) return 'Invalid';

@@ -412,7 +412,7 @@ class _FlowStatusCardState extends State<FlowStatusCard> {
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 4.0),
                 child: Text(
-                  _flowFormatter.formatNumberOnly(flow),
+                  _flowFormatter.formatIntegerOnly(flow),
                   style: theme.textTheme.bodyMedium!.copyWith(
                     color: textColor.withValues(alpha: 0.9),
                   ),

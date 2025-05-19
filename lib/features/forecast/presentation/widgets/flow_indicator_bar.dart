@@ -137,18 +137,29 @@ class _FlowIndicatorBarState extends State<FlowIndicatorBar>
 
     final Map<int, double> positions = {};
 
+    // First get all threshold flows to determine proper scaling
+    final List<double> allThresholds = [];
     for (final year in _returnPeriodYears) {
-      // Get threshold in the current unit
       final flow = widget.returnPeriod!.getFlowForYear(year);
       if (flow != null) {
-        // Calculate percentage - no need to convert as the return period is already in the right unit
-        final percentage = FlowThresholds.calculateFlowPercentage(
-          flow,
-          widget.returnPeriod!,
-          // No fromUnit needed here since we're using a value directly from returnPeriod
-        );
+        allThresholds.add(flow);
+      }
+    }
 
-        positions[year] = (percentage / 100.0 * widget.width).clamp(
+    if (allThresholds.isEmpty) return positions;
+
+    // Calculate min and max for proper scaling
+    final minThreshold = allThresholds.reduce((a, b) => a < b ? a : b);
+    final maxThreshold = allThresholds.reduce((a, b) => a > b ? a : b);
+    final range = maxThreshold - minThreshold;
+
+    // Now calculate positions with proper scaling
+    for (final year in _returnPeriodYears) {
+      final flow = widget.returnPeriod!.getFlowForYear(year);
+      if (flow != null) {
+        // Linear scaling between thresholds regardless of unit
+        final normalizedPosition = (flow - minThreshold) / range;
+        positions[year] = (normalizedPosition * widget.width).clamp(
           0.0,
           widget.width,
         );

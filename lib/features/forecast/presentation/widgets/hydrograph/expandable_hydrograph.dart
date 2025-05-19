@@ -1,13 +1,17 @@
-// lib/features/forecast/presentation/widgets/expandable_hydrograph.dart
+// lib/features/forecast/presentation/widgets/hydrograph/expandable_hydrograph.dart
 
-import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:rivr/core/formatters/flow_value_formatter.dart';
+import 'package:rivr/core/models/flow_unit.dart';
+import 'package:rivr/core/services/flow_units_service.dart';
 import 'package:rivr/features/forecast/domain/entities/forecast.dart';
 import 'package:rivr/features/forecast/domain/entities/forecast_types.dart';
 import 'package:rivr/features/forecast/domain/entities/return_period.dart';
 import 'package:rivr/features/forecast/presentation/widgets/hydrograph/custom_zoomable_chart.dart';
 
-/// An expandable hydrograph that shows a compact preview and expands to a full interactive chart
+/// An expandable hydrograph widget that shows a preview and expands to full view
 class ExpandableHydrograph extends StatefulWidget {
   final String reachId;
   final ForecastType forecastType;
@@ -15,9 +19,8 @@ class ExpandableHydrograph extends StatefulWidget {
   final ReturnPeriod? returnPeriod;
   final Map<DateTime, Map<String, double>>? dailyStats;
   final Map<String, Map<String, double>>? longRangeFlows;
-
-  // Size when in preview mode
   final double previewHeight;
+  final FlowUnit sourceUnit; // Add source unit parameter
 
   const ExpandableHydrograph({
     super.key,
@@ -28,6 +31,7 @@ class ExpandableHydrograph extends StatefulWidget {
     this.dailyStats,
     this.longRangeFlows,
     this.previewHeight = 180,
+    this.sourceUnit = FlowUnit.cfs, // Default to CFS as source unit
   });
 
   @override
@@ -46,6 +50,10 @@ class _ExpandableHydrographState extends State<ExpandableHydrograph>
 
   // Global overlay entry
   OverlayEntry? _overlayEntry;
+
+  // Flow unit services
+  late final FlowUnitsService _flowUnitsService;
+  late final FlowValueFormatter _flowFormatter;
 
   @override
   void initState() {
@@ -69,13 +77,28 @@ class _ExpandableHydrographState extends State<ExpandableHydrograph>
         curve: const Interval(0.5, 1.0),
       ),
     );
+
+    // Initialize flow unit services
+    _flowUnitsService = Provider.of<FlowUnitsService>(context, listen: false);
+    _flowFormatter = Provider.of<FlowValueFormatter>(context, listen: false);
+
+    // Listen for unit changes
+    _flowUnitsService.addListener(_onUnitChanged);
   }
 
   @override
   void dispose() {
     _removeOverlay();
     _animationController.dispose();
+    _flowUnitsService.removeListener(_onUnitChanged);
     super.dispose();
+  }
+
+  // Handle unit changes
+  void _onUnitChanged() {
+    if (mounted) {
+      setState(() {}); // Trigger a rebuild when unit changes
+    }
   }
 
   // Toggle between expanded and collapsed states
@@ -272,7 +295,7 @@ class _ExpandableHydrographState extends State<ExpandableHydrograph>
     );
   }
 
-  // Simplified chart for preview mode
+  // Simplified chart for preview mode with proper unit conversion
   Widget _buildSimplifiedChart() {
     if (widget.forecasts.isEmpty) {
       return const Center(child: Text('No forecast data available'));
@@ -288,8 +311,10 @@ class _ExpandableHydrographState extends State<ExpandableHydrograph>
     // Base time for x-axis normalization
     final baseTime = sortedForecasts.first.validDateTime;
 
-    // Create spots based on forecast type
+    // Create spots with proper unit conversion
     final spots = <FlSpot>[];
+    List<double> flowValues = [];
+
     for (var forecast in sortedForecasts) {
       double x;
       switch (widget.forecastType) {
@@ -303,21 +328,32 @@ class _ExpandableHydrographState extends State<ExpandableHydrograph>
           x = forecast.validDateTime.difference(baseTime).inDays / 7;
           break;
       }
-      spots.add(FlSpot(x, forecast.flow));
+
+      // Convert flow to preferred unit if needed
+      double flowValue = forecast.flow;
+      if (widget.sourceUnit != _flowUnitsService.preferredUnit) {
+        flowValue = _flowUnitsService.convertToPreferredUnit(
+          flowValue,
+          widget.sourceUnit,
+        );
+      }
+
+      spots.add(FlSpot(x, flowValue));
+      flowValues.add(flowValue);
     }
 
-    // Get min/max flow for y-axis scaling
-    final minFlow = sortedForecasts
-        .map((f) => f.flow)
-        .reduce((a, b) => a < b ? a : b);
-    final maxFlow = sortedForecasts
-        .map((f) => f.flow)
-        .reduce((a, b) => a > b ? a : b);
+    // Get min/max flow for y-axis scaling with converted values
+    final minFlow =
+        flowValues.isEmpty ? 0 : flowValues.reduce((a, b) => a < b ? a : b);
+    final maxFlow =
+        flowValues.isEmpty ? 100 : flowValues.reduce((a, b) => a > b ? a : b);
 
-    // Calculate basic stats for labels
+    // Calculate average in the correct unit
     final avgFlow =
-        sortedForecasts.map((f) => f.flow).reduce((a, b) => a + b) /
-        sortedForecasts.length;
+        flowValues.isEmpty
+            ? 0.0 // Use 0.0 explicitly for double
+            : (flowValues.reduce((a, b) => a + b) / flowValues.length)
+                .toDouble();
 
     return Stack(
       children: [
@@ -356,7 +392,7 @@ class _ExpandableHydrographState extends State<ExpandableHydrograph>
           ),
         ),
 
-        // Current flow value overlay
+        // Current flow value overlay with proper unit display
         Positioned(
           top: 0,
           right: 0,
@@ -374,7 +410,7 @@ class _ExpandableHydrographState extends State<ExpandableHydrograph>
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
-                  '${avgFlow.toStringAsFixed(1)} ft³/s',
+                  '${_flowFormatter.formatNumberOnly(avgFlow)} ${_flowUnitsService.unitShortName}',
                   style: theme.textTheme.titleSmall?.copyWith(
                     fontWeight: FontWeight.bold,
                     color: colorScheme.onPrimaryContainer,
@@ -397,15 +433,12 @@ class _ExpandableHydrographState extends State<ExpandableHydrograph>
   }
 
   // Build the full hydrograph for the expanded view
-
   Widget _buildFullHydrograph() {
-    // Use our custom zoomable chart instead of the standard hydrograph
+    // Use custom zoomable chart with proper source unit parameter
     return Container(
       color: Theme.of(context).scaffoldBackgroundColor,
       child: Padding(
-        padding: const EdgeInsets.all(
-          8.0,
-        ), // Slightly less padding to give more space to the chart
+        padding: const EdgeInsets.all(8.0),
         child: CustomZoomableChart(
           reachId: widget.reachId,
           forecastType: widget.forecastType,
@@ -413,6 +446,7 @@ class _ExpandableHydrographState extends State<ExpandableHydrograph>
           returnPeriod: widget.returnPeriod,
           dailyStats: widget.dailyStats,
           longRangeFlows: widget.longRangeFlows,
+          sourceUnit: widget.sourceUnit, // Pass the source unit
         ),
       ),
     );

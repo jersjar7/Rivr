@@ -236,6 +236,7 @@ void _registerForecastDependencies() {
       remoteDataSource: sl<ForecastRemoteDataSource>(),
       localDataSource: sl<ForecastLocalDataSource>(),
       networkInfo: sl<NetworkInfo>(),
+      flowUnitsService: sl<FlowUnitsService>(),
     ),
   );
 

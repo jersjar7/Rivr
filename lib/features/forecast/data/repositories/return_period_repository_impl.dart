@@ -3,7 +3,9 @@
 import 'package:dartz/dartz.dart';
 import 'package:rivr/core/error/exceptions.dart';
 import 'package:rivr/core/error/failures.dart';
+import 'package:rivr/core/models/flow_unit.dart';
 import 'package:rivr/core/network/network_info.dart';
+import 'package:rivr/core/services/flow_units_service.dart';
 import 'package:rivr/features/forecast/data/datasources/forecast_local_datasource.dart';
 import 'package:rivr/features/forecast/data/datasources/forecast_remote_datasource.dart';
 import 'package:rivr/features/forecast/domain/entities/return_period.dart';
@@ -13,11 +15,13 @@ class ReturnPeriodRepositoryImpl implements ReturnPeriodRepository {
   final ForecastRemoteDataSource remoteDataSource;
   final ForecastLocalDataSource localDataSource;
   final NetworkInfo networkInfo;
+  final FlowUnitsService? flowUnitsService; // Add FlowUnitsService
 
   ReturnPeriodRepositoryImpl({
     required this.remoteDataSource,
     required this.localDataSource,
     required this.networkInfo,
+    this.flowUnitsService, // Flow units service for conversion
   });
 
   @override
@@ -32,7 +36,17 @@ class ReturnPeriodRepositoryImpl implements ReturnPeriodRepository {
           reachId,
         );
         if (cachedData != null) {
-          final returnPeriod = ReturnPeriodModel.fromJson(cachedData, reachId);
+          // Get the current preferred unit (default to CFS if service not available)
+          final preferredUnit = flowUnitsService?.preferredUnit ?? FlowUnit.cfs;
+
+          // Create ReturnPeriod model, specifying source and target units
+          final returnPeriod = ReturnPeriodModel.fromJson(
+            cachedData,
+            reachId,
+            sourceUnit: FlowUnit.cms, // API values are stored in CMS
+            targetUnit: preferredUnit, // Convert to user preferred unit
+            flowUnitsService: flowUnitsService, // Pass service for conversion
+          );
 
           // Check if cache is still fresh
           if (!returnPeriod.isStale()) {
@@ -54,10 +68,18 @@ class ReturnPeriodRepositoryImpl implements ReturnPeriodRepository {
         // Cache the data
         await localDataSource.cacheReturnPeriods(reachId, returnPeriodData);
 
+        // Get the current preferred unit (default to CFS if service not available)
+        final preferredUnit = flowUnitsService?.preferredUnit ?? FlowUnit.cfs;
+
+        // Create ReturnPeriod model, specifying source and target units
         final returnPeriod = ReturnPeriodModel.fromJson(
           returnPeriodData,
           reachId,
+          sourceUnit: FlowUnit.cms, // API values are in CMS
+          targetUnit: preferredUnit, // Convert to user preferred unit
+          flowUnitsService: flowUnitsService, // Pass service for conversion
         );
+
         return Right(returnPeriod);
       } on ServerException catch (e) {
         return Left(ServerFailure(message: e.message));
@@ -71,7 +93,18 @@ class ReturnPeriodRepositoryImpl implements ReturnPeriodRepository {
           reachId,
         );
         if (cachedData != null) {
-          final returnPeriod = ReturnPeriodModel.fromJson(cachedData, reachId);
+          // Get the current preferred unit (default to CFS if service not available)
+          final preferredUnit = flowUnitsService?.preferredUnit ?? FlowUnit.cfs;
+
+          // Create ReturnPeriod model with explicit unit conversion
+          final returnPeriod = ReturnPeriodModel.fromJson(
+            cachedData,
+            reachId,
+            sourceUnit: FlowUnit.cms, // Cached values are in CMS
+            targetUnit: preferredUnit, // Convert to preferred unit
+            flowUnitsService: flowUnitsService, // Service for conversion
+          );
+
           return Right(returnPeriod);
         } else {
           return Left(
@@ -100,7 +133,10 @@ class ReturnPeriodRepositoryImpl implements ReturnPeriodRepository {
     final returnPeriodResult = await getReturnPeriods(reachId);
 
     return returnPeriodResult.fold((failure) => Left(failure), (returnPeriod) {
-      final category = returnPeriod.getFlowCategory(flow);
+      // Pass the current preferred unit for proper comparison
+      final fromUnit = flowUnitsService?.preferredUnit ?? FlowUnit.cfs;
+
+      final category = returnPeriod.getFlowCategory(flow, fromUnit: fromUnit);
       return Right(category);
     });
   }
@@ -114,7 +150,15 @@ class ReturnPeriodRepositoryImpl implements ReturnPeriodRepository {
     final returnPeriodResult = await getReturnPeriods(reachId);
 
     return returnPeriodResult.fold((failure) => Left(failure), (returnPeriod) {
-      final threshold = returnPeriod.getFlowForYear(returnPeriodYear);
+      // Get the current preferred unit for conversion
+      final preferredUnit = flowUnitsService?.preferredUnit ?? FlowUnit.cfs;
+
+      // Get threshold with explicit unit conversion
+      final threshold = returnPeriod.getFlowForYear(
+        returnPeriodYear,
+        toUnit: preferredUnit,
+      );
+
       if (threshold == null) {
         return Left(
           ServerFailure(
@@ -124,6 +168,7 @@ class ReturnPeriodRepositoryImpl implements ReturnPeriodRepository {
         );
       }
 
+      // Compare flow with threshold in the same unit
       return Right(flow >= threshold);
     });
   }

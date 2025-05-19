@@ -10,6 +10,7 @@ import 'package:rivr/core/widgets/empty_state.dart';
 import 'package:rivr/features/forecast/domain/entities/forecast_types.dart';
 import 'package:rivr/features/forecast/presentation/providers/forecast_provider.dart';
 import 'package:rivr/features/forecast/presentation/providers/return_period_provider.dart';
+import 'package:rivr/features/forecast/presentation/widgets/app_bar_unit_selector.dart';
 import 'package:rivr/features/forecast/presentation/widgets/flow_status_card.dart';
 import 'package:rivr/features/forecast/presentation/widgets/location_info_row.dart';
 import 'package:rivr/features/forecast/presentation/widgets/medium_range/9_day_flow_forecast_widget/daily_flow_forecast_widget.dart';
@@ -254,11 +255,22 @@ class _ForecastPageState extends State<ForecastPage>
     return Scaffold(
       appBar: AppBar(
         title: Text(
-          '${widget.stationName} Flow Forecast',
-          maxLines: 2,
+          widget.stationName,
+          maxLines: 3,
           softWrap: true,
           textAlign: TextAlign.center,
         ),
+        actions: [
+          AppBarUnitSelector(
+            onUnitChanged: (unit) {
+              // Optional: handle unit change, like showing a snackbar or refreshing
+              // For example:
+              setState(() {}); // To refresh the UI with new units
+            },
+          ),
+          // Add a small padding at the end
+          const SizedBox(width: 8),
+        ],
         bottom: TabBar(
           controller: _tabController,
           labelColor:

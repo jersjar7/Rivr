@@ -1,6 +1,7 @@
 // lib/features/forecast/utils/flow_thresholds.dart
 
 import 'package:flutter/material.dart';
+import 'package:rivr/core/models/flow_unit.dart';
 import 'package:rivr/features/forecast/domain/entities/return_period.dart';
 
 /// Utility class for handling flow thresholds and categories based on return periods
@@ -39,20 +40,30 @@ class FlowThresholds {
   }
 
   /// Get color directly from flow and return period
-  static Color getColorForFlow(double flow, ReturnPeriod returnPeriod) {
-    return getColorForCategory(returnPeriod.getFlowCategory(flow));
+  static Color getColorForFlow(
+    double flow,
+    ReturnPeriod returnPeriod, {
+    FlowUnit fromUnit = FlowUnit.cfs, // Add flow unit parameter
+  }) {
+    // Pass the flow unit for proper category determination
+    return getColorForCategory(
+      returnPeriod.getFlowCategory(flow, fromUnit: fromUnit),
+    );
   }
 
   /// Get return period range description for a flow value
   static String getReturnPeriodDescription(
     double flow,
-    ReturnPeriod returnPeriod,
-  ) {
-    final category = returnPeriod.getFlowCategory(flow);
+    ReturnPeriod returnPeriod, {
+    FlowUnit fromUnit = FlowUnit.cfs, // Add flow unit parameter
+  }) {
+    // Use the flow unit parameter for correct category determination
+    final category = returnPeriod.getFlowCategory(flow, fromUnit: fromUnit);
     final description = categories[category] ?? 'Flow information unavailable';
 
     String returnPeriodText = '';
-    int? period = returnPeriod.getReturnPeriod(flow);
+    // Pass the flow unit for correct return period determination
+    int? period = returnPeriod.getReturnPeriod(flow, fromUnit: fromUnit);
     if (period != null) {
       returnPeriodText = ' (approaches $period-year flood level)';
     }
@@ -61,8 +72,13 @@ class FlowThresholds {
   }
 
   /// Evaluate if the flow is at concerning levels
-  static bool isFlowConcerning(double flow, ReturnPeriod returnPeriod) {
-    final category = returnPeriod.getFlowCategory(flow);
+  static bool isFlowConcerning(
+    double flow,
+    ReturnPeriod returnPeriod, {
+    FlowUnit fromUnit = FlowUnit.cfs, // Add flow unit parameter
+  }) {
+    // Pass the flow unit for correct category determination
+    final category = returnPeriod.getFlowCategory(flow, fromUnit: fromUnit);
     return category == 'Elevated' ||
         category == 'High' ||
         category == 'Very High' ||
@@ -72,12 +88,18 @@ class FlowThresholds {
   /// Map a flow value to a percentage within the return period scale (0-100%)
   static double calculateFlowPercentage(
     double flow,
-    ReturnPeriod returnPeriod,
-  ) {
-    // Get the lowest and highest return period values
-    final lowestThreshold = returnPeriod.getFlowForYear(2) ?? 0.0;
+    ReturnPeriod returnPeriod, {
+    FlowUnit fromUnit = FlowUnit.cfs, // Add flow unit parameter
+  }) {
+    // Get the preferred unit for comparison (same as input flow's unit)
+    final preferredUnit = fromUnit;
+
+    // Get the lowest and highest return period values converted to the same unit as flow
+    final lowestThreshold =
+        returnPeriod.getFlowForYear(2, toUnit: preferredUnit) ?? 0.0;
     final highestThreshold =
-        returnPeriod.getFlowForYear(100) ?? (lowestThreshold * 10);
+        returnPeriod.getFlowForYear(100, toUnit: preferredUnit) ??
+        (lowestThreshold * 10);
 
     if (flow <= lowestThreshold) {
       return 0.0;
@@ -86,13 +108,19 @@ class FlowThresholds {
     }
 
     // Calculate percentage between lowest and highest threshold
+    // (now all values are in the same unit)
     return ((flow - lowestThreshold) / (highestThreshold - lowestThreshold)) *
         100.0;
   }
 
   /// Get a user-friendly response about current flow conditions
-  static String getFlowSummary(double flow, ReturnPeriod returnPeriod) {
-    final category = returnPeriod.getFlowCategory(flow);
+  static String getFlowSummary(
+    double flow,
+    ReturnPeriod returnPeriod, {
+    FlowUnit fromUnit = FlowUnit.cfs, // Add flow unit parameter
+  }) {
+    // Pass the flow unit for correct category determination
+    final category = returnPeriod.getFlowCategory(flow, fromUnit: fromUnit);
     final description = categories[category] ?? 'Flow information unavailable';
 
     switch (category) {

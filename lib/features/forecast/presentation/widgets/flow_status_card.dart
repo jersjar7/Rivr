@@ -1,4 +1,5 @@
 // lib/features/forecast/presentation/widgets/flow_status_card.dart
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:rivr/core/formatters/flow_value_formatter.dart';
@@ -308,10 +309,11 @@ class _FlowStatusCardState extends State<FlowStatusCard> {
     );
   }
 
-  // Build a table showing return period flows
+  // Build a table showing return period flows - FIXED to handle unit conversions properly
   Widget _buildReturnPeriodTable(ReturnPeriod returnPeriod, Color textColor) {
     final theme = Theme.of(context);
     final rows = <TableRow>[];
+    final currentUnit = _flowUnitsService.preferredUnit;
 
     // Header row
     rows.add(
@@ -349,7 +351,9 @@ class _FlowStatusCardState extends State<FlowStatusCard> {
 
     // Data rows
     for (final year in [2, 5, 10, 25, 50, 100]) {
-      final flow = returnPeriod.getFlowForYear(year);
+      // Get flow value and convert to current display unit if needed
+      final flow = returnPeriod.getFlowForYear(year, toUnit: currentUnit);
+
       if (flow != null) {
         rows.add(
           TableRow(

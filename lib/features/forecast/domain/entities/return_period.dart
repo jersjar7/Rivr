@@ -20,8 +20,24 @@ class ReturnPeriod {
     this.unit = FlowUnit.cfs, // Default to CFS for backward compatibility
   }) : retrievedAt = retrievedAt ?? DateTime.now();
 
-  double? getFlowForYear(int year) {
-    return flowValues[year];
+  // Enhanced getter that supports unit conversion
+  double? getFlowForYear(int year, {FlowUnit? toUnit}) {
+    final value = flowValues[year];
+    if (value == null) return null;
+
+    // If no target unit specified or units match, return the raw value
+    if (toUnit == null || toUnit == unit) return value;
+
+    // Otherwise, perform the appropriate conversion
+    if (unit == FlowUnit.cms && toUnit == FlowUnit.cfs) {
+      return value *
+          FlowUnit.cmsToFcsFactor; // CMS to CFS (multiply by 35.3147)
+    } else if (unit == FlowUnit.cfs && toUnit == FlowUnit.cms) {
+      return value *
+          FlowUnit.cfsToFcmsFactor; // CFS to CMS (multiply by 0.0283168)
+    }
+
+    return value; // Fallback (should never reach here)
   }
 
   bool isStale() {
@@ -39,9 +55,9 @@ class ReturnPeriod {
     // Convert flow to the same unit as stored in this ReturnPeriod object if needed
     double comparableFlow = flow;
     if (fromUnit != unit) {
-      // Simple conversion - in a real implementation, you'd use the FlowUnitsService
+      // Convert the input flow to match the unit of the stored thresholds
       comparableFlow =
-          fromUnit == FlowUnit.cfs
+          fromUnit == FlowUnit.cfs && unit == FlowUnit.cms
               ? flow *
                   FlowUnit
                       .cfsToFcmsFactor // Convert CFS to CMS
@@ -70,9 +86,8 @@ class ReturnPeriod {
     // Convert flow to the same unit as stored in this ReturnPeriod object if needed
     double comparableFlow = flow;
     if (fromUnit != unit) {
-      // Simple conversion - in a real implementation, you'd use the FlowUnitsService
       comparableFlow =
-          fromUnit == FlowUnit.cfs
+          fromUnit == FlowUnit.cfs && unit == FlowUnit.cms
               ? flow *
                   FlowUnit
                       .cfsToFcmsFactor // Convert CFS to CMS
@@ -106,9 +121,9 @@ class ReturnPeriod {
 
     for (final entry in flowValues.entries) {
       final convertedValue =
-          unit == FlowUnit.cfs
-              ? service.cfsToCms(entry.value)
-              : service.cmsToCfs(entry.value);
+          unit == FlowUnit.cms
+              ? service.cmsToCfs(entry.value) // CMS to CFS
+              : service.cfsToCms(entry.value); // CFS to CMS
 
       convertedValues[entry.key] = convertedValue;
     }
@@ -151,21 +166,36 @@ class ReturnPeriodModel extends ReturnPeriod {
         if (sourceUnit != targetUnit && flowUnitsService != null) {
           final convertedValue =
               sourceUnit == FlowUnit.cms
-                  ? flowUnitsService.cmsToCfs(value)
-                  : flowUnitsService.cfsToCms(value);
+                  ? flowUnitsService.cmsToCfs(value) // CMS to CFS
+                  : flowUnitsService.cfsToCms(value); // CFS to CMS
 
           flowValues[year] = convertedValue;
         } else {
+          // Store in original unit if no conversion needed or service missing
           flowValues[year] = value;
+
+          // Note: If conversion is needed but service is missing, we'll store
+          // in sourceUnit but declare the unit as targetUnit, which can cause issues
+          // A warning log could be added here for debugging purposes
         }
       }
+    }
+
+    // If we needed conversion but couldn't do it, keep the original unit
+    FlowUnit resultUnit = targetUnit;
+    if (sourceUnit != targetUnit && flowUnitsService == null) {
+      resultUnit =
+          sourceUnit; // Important: use sourceUnit when conversion failed
+      print(
+        'Warning: ReturnPeriodModel created with values in $sourceUnit but marked as $targetUnit',
+      );
     }
 
     return ReturnPeriodModel(
       reachId: reachId,
       flowValues: flowValues,
       retrievedAt: DateTime.now(),
-      unit: targetUnit, // Store what unit the values are in
+      unit: resultUnit, // Use the actual unit of the stored values
     );
   }
 

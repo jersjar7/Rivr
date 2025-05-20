@@ -6,15 +6,15 @@ import 'package:rivr/features/forecast/domain/entities/return_period.dart';
 
 /// Utility class for handling flow thresholds and categories based on return periods
 class FlowThresholds {
-  /// Flow categories based on return periods
+  /// Flow categories with specific safety and condition details
   static const Map<String, String> categories = {
-    'Low': 'Flow is below normal levels.',
-    'Normal': 'Flow is at normal levels.',
-    'Moderate': 'Flow is above normal but not concerning.',
-    'Elevated': 'Flow is high, use caution when approaching.',
-    'High': 'Flow is very high, consider postponing activities.',
-    'Very High': 'Flow is at dangerous levels, avoid river.',
-    'Extreme': 'Flow is at life-threatening levels, stay away.',
+    'Low': 'Shallow waters and potentially exposed obstacles.',
+    'Normal': 'Ideal conditions for most river activities.',
+    'Moderate': 'Slightly faster current with good visibility.',
+    'Elevated': 'Strong current with potential for submerged hazards.',
+    'High': 'Powerful water flow with difficult navigation conditions.',
+    'Very High': 'Rapid currents with significant danger of capsizing.',
+    'Extreme': 'Severe flooding with destructive potential.',
   };
 
   /// Get color for flow category
@@ -130,23 +130,23 @@ class FlowThresholds {
   }) {
     // Get category using the provided fromUnit
     final category = returnPeriod.getFlowCategory(flow, fromUnit: fromUnit);
-    final description = categories[category] ?? 'Flow information unavailable';
+    final details = categories[category] ?? 'Flow information unavailable';
 
     switch (category) {
       case 'Low':
-        return 'The river is currently running low. $description';
+        return 'The river is running below normal levels. $details Suitable for experienced users who know how to navigate shallow sections.';
       case 'Normal':
-        return 'The river is flowing at normal levels. $description';
+        return 'The river is flowing at normal levels. $details Safe for most recreational activities with standard precautions.';
       case 'Moderate':
-        return 'The river is flowing at moderate levels. $description';
+        return 'The river has moderate flow above normal levels. $details Most users should exercise general caution.';
       case 'Elevated':
-        return 'The river is flowing higher than normal. $description';
+        return 'The river is flowing at elevated levels. $details Recreational users should be experienced and prepared for challenging conditions.';
       case 'High':
-        return 'The river is flowing high. $description';
+        return 'The river is flowing at high levels. $details Not recommended for recreational use except by experts with proper equipment.';
       case 'Very High':
-        return 'Warning: The river is flowing very high. $description';
+        return 'WARNING: The river is at very high levels. $details All recreational activities should be postponed. Stay away from riverbanks.';
       case 'Extreme':
-        return 'Danger: The river is at extreme levels. $description';
+        return 'DANGER: The river is at extreme flood levels. $details Evacuation may be necessary in flood-prone areas. Keep well away from the river.';
       default:
         return 'River flow information unavailable.';
     }
@@ -190,19 +190,19 @@ class FlowThresholds {
   static String getWarningLevelDescription(String category) {
     switch (category) {
       case 'Low':
-        return 'No concerns at current flow level.';
+        return 'No safety concerns, but be aware of possibly restricted passage in some areas.';
       case 'Normal':
-        return 'Safe conditions for most river activities.';
+        return 'Safe conditions for most river activities with standard precautions.';
       case 'Moderate':
-        return 'Use caution, especially for inexperienced paddlers.';
+        return 'Use general caution, appropriate for intermediate skill levels.';
       case 'Elevated':
-        return 'Elevated conditions - recreational paddlers should use caution.';
+        return 'Exercise heightened caution. Suitable for experienced users only.';
       case 'High':
-        return 'High water alert - consider postponing river activities.';
+        return 'Consider postponing river activities. Expert skill level required.';
       case 'Very High':
-        return 'Dangerous conditions - not recommended for recreational use.';
+        return 'Not recommended for any recreational use. Dangerous conditions exist.';
       case 'Extreme':
-        return 'Life-threatening conditions - stay away from the river.';
+        return 'Life-threatening conditions. Emergency situation. Avoid all river access.';
       default:
         return 'Warning level information not available.';
     }

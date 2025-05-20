@@ -148,6 +148,7 @@ class _FavoriteCardState extends State<FavoriteCard> {
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
     final textTheme = theme.textTheme;
+    final brightness = theme.brightness;
 
     // Default image if none specified
     final imgNumber =
@@ -174,14 +175,24 @@ class _FavoriteCardState extends State<FavoriteCard> {
     return Padding(
       padding: const EdgeInsets.only(bottom: 16.0),
       child: Material(
-        elevation: 2,
-        borderRadius: BorderRadius.circular(12),
+        elevation: 4, // Increased elevation for better visibility in dark mode
         clipBehavior: Clip.antiAlias,
         color: colors.surface,
+        // Add a border that's visible in dark mode with borderRadius included in shape
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: BorderSide(
+            color:
+                brightness == Brightness.dark
+                    ? colors.outline.withOpacity(0.3)
+                    : Colors.transparent,
+            width: 1,
+          ),
+        ),
         child: InkWell(
           onTap: widget.onTap,
-          splashColor: cardColor.withValues(alpha: 0.1),
-          highlightColor: cardColor.withValues(alpha: 0.05),
+          splashColor: cardColor.withOpacity(0.1),
+          highlightColor: cardColor.withOpacity(0.05),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -204,7 +215,7 @@ class _FavoriteCardState extends State<FavoriteCard> {
                                   return Container(
                                     height: 160,
                                     width: double.infinity,
-                                    color: cardColor.withValues(alpha: 0.2),
+                                    color: cardColor.withOpacity(0.2),
                                     child: Center(
                                       child: CircularProgressIndicator(
                                         strokeWidth: 2,
@@ -243,7 +254,7 @@ class _FavoriteCardState extends State<FavoriteCard> {
                             : _buildDefaultImage(imgNumber, cardColor),
                   ),
 
-                  // Gradient Overlay
+                  // Gradient Overlay - Enhanced for better visibility in dark mode
                   Container(
                     height: 160,
                     width: double.infinity,
@@ -253,9 +264,11 @@ class _FavoriteCardState extends State<FavoriteCard> {
                         end: Alignment.bottomCenter,
                         colors: [
                           Colors.transparent,
-                          colors.surface.withValues(alpha: 0.7),
+                          Colors.black.withOpacity(
+                            0.6,
+                          ), // Darker overlay for better contrast
                         ],
-                        stops: const [0.6, 1.0],
+                        stops: const [0.5, 1.0],
                       ),
                     ),
                   ),
@@ -289,13 +302,23 @@ class _FavoriteCardState extends State<FavoriteCard> {
                                 child: Text(
                                   displayName,
                                   style: textTheme.titleMedium?.copyWith(
-                                    color: colors.onPrimary,
+                                    color:
+                                        Colors
+                                            .white, // Always white for better visibility
                                     fontWeight: FontWeight.bold,
                                     shadows: [
                                       Shadow(
                                         offset: const Offset(1, 1),
                                         blurRadius: 3,
-                                        color: Colors.black54,
+                                        color: Colors.black.withOpacity(
+                                          0.7,
+                                        ), // Darker shadow
+                                      ),
+                                      Shadow(
+                                        offset: const Offset(1, 1),
+                                        blurRadius: 2,
+                                        color:
+                                            Colors.black, // Additional shadow
                                       ),
                                     ],
                                   ),
@@ -331,7 +354,7 @@ class _FavoriteCardState extends State<FavoriteCard> {
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                Icon(
+                                const Icon(
                                   Icons.location_on,
                                   size: 12,
                                   color: Colors.white,
@@ -339,7 +362,7 @@ class _FavoriteCardState extends State<FavoriteCard> {
                                 const SizedBox(width: 4),
                                 Text(
                                   '${widget.favorite.city}, ${widget.favorite.state}',
-                                  style: TextStyle(
+                                  style: const TextStyle(
                                     color: Colors.white,
                                     fontSize: 10,
                                     fontWeight: FontWeight.w500,
@@ -352,20 +375,27 @@ class _FavoriteCardState extends State<FavoriteCard> {
                       ),
                     ),
 
-                  // Drag Handle Indicator
+                  // Drag Handle Indicator - Enhanced for dark mode
                   Positioned(
                     top: 8,
                     right: 8,
                     child: Container(
                       padding: const EdgeInsets.all(4),
                       decoration: BoxDecoration(
-                        color: colors.onSurface.withValues(alpha: 0.9),
+                        color:
+                            brightness == Brightness.dark
+                                ? Colors.black.withOpacity(0.6)
+                                : colors.onSurface.withOpacity(0.7),
                         borderRadius: BorderRadius.circular(4),
+                        border: Border.all(
+                          color: Colors.white.withOpacity(0.2),
+                          width: 0.5,
+                        ),
                       ),
                       child: Icon(
                         Icons.drag_handle,
                         size: 18,
-                        color: colors.onSurfaceVariant,
+                        color: Colors.white.withOpacity(0.8),
                       ),
                     ),
                   ),
@@ -381,8 +411,15 @@ class _FavoriteCardState extends State<FavoriteCard> {
                           vertical: 4,
                         ),
                         decoration: BoxDecoration(
-                          color: colors.surface.withValues(alpha: 0.7),
+                          color:
+                              brightness == Brightness.dark
+                                  ? Colors.black.withOpacity(0.6)
+                                  : colors.surface.withOpacity(0.7),
                           borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: colors.primary.withOpacity(0.3),
+                            width: 0.5,
+                          ),
                         ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
@@ -396,7 +433,10 @@ class _FavoriteCardState extends State<FavoriteCard> {
                             Text(
                               'Custom Name',
                               style: textTheme.labelSmall?.copyWith(
-                                color: colors.primary,
+                                color:
+                                    brightness == Brightness.dark
+                                        ? Colors.white
+                                        : colors.primary,
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
@@ -440,12 +480,18 @@ class _FavoriteCardState extends State<FavoriteCard> {
                           icon: Icon(
                             Icons.analytics,
                             size: 16,
-                            color: colors.onPrimary,
+                            color:
+                                brightness == Brightness.dark
+                                    ? colors.onPrimary
+                                    : Colors.white,
                           ),
                           label: Text(
                             'View',
                             style: textTheme.bodySmall?.copyWith(
-                              color: colors.onPrimary,
+                              color:
+                                  brightness == Brightness.dark
+                                      ? colors.onPrimary
+                                      : Colors.white,
                             ),
                           ),
                           style: ElevatedButton.styleFrom(

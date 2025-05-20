@@ -43,12 +43,24 @@ class _ManagedAsyncButtonState extends State<ManagedAsyncButton> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
+    final brightness = theme.brightness;
 
     // Use provided colors or theme colors
     final buttonColor = widget.color ?? colors.primary;
     final buttonTextColor = widget.textColor ?? colors.onPrimary;
+
+    // For disabled state, use theme-appropriate colors
     final disabledBackgroundColor = colors.surfaceContainerHighest;
     final disabledForegroundColor = colors.onSurfaceVariant;
+
+    // Define loading indicator color based on theme brightness
+    // In dark mode, use a lighter color for better visibility
+    final loadingIndicatorColor =
+        brightness == Brightness.dark ? Colors.white : buttonTextColor;
+
+    // Text color for loading text - ensure high contrast in dark mode
+    final loadingTextColor =
+        brightness == Brightness.dark ? Colors.white : buttonTextColor;
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 25.0),
@@ -60,26 +72,28 @@ class _ManagedAsyncButtonState extends State<ManagedAsyncButton> {
           style: ElevatedButton.styleFrom(
             backgroundColor: buttonColor,
             foregroundColor: buttonTextColor,
-            disabledBackgroundColor: disabledBackgroundColor,
-            disabledForegroundColor: disabledForegroundColor,
+            disabledBackgroundColor:
+                isLoading
+                    ? buttonColor.withOpacity(
+                      0.7,
+                    ) // Use semi-transparent button color when loading
+                    : disabledBackgroundColor,
+            disabledForegroundColor:
+                isLoading ? buttonTextColor : disabledForegroundColor,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(20),
             ),
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           ),
-          child: _buildButtonContent(buttonTextColor),
+          child: _buildButtonContent(loadingIndicatorColor, loadingTextColor),
         ),
       ),
     );
   }
 
-  Widget _buildButtonContent(Color textColor) {
-    final textStyle = TextStyle(
-      color: textColor,
-      fontWeight: FontWeight.bold,
-      fontSize: 16,
-    );
-
+  Widget _buildButtonContent(
+    Color loadingIndicatorColor,
+    Color loadingTextColor,
+  ) {
     if (isLoading) {
       return Row(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -87,10 +101,20 @@ class _ManagedAsyncButtonState extends State<ManagedAsyncButton> {
           SizedBox(
             width: 20,
             height: 20,
-            child: CircularProgressIndicator(color: textColor, strokeWidth: 2),
+            child: CircularProgressIndicator(
+              color: loadingIndicatorColor,
+              strokeWidth: 2,
+            ),
           ),
           const SizedBox(width: 12),
-          Text(widget.loadingText, style: textStyle),
+          Text(
+            widget.loadingText,
+            style: TextStyle(
+              color: loadingTextColor,
+              fontWeight: FontWeight.bold,
+              fontSize: 16,
+            ),
+          ),
         ],
       );
     }
@@ -101,12 +125,26 @@ class _ManagedAsyncButtonState extends State<ManagedAsyncButton> {
         children: [
           widget.icon!,
           const SizedBox(width: 12),
-          Text(widget.text, style: textStyle),
+          Text(
+            widget.text,
+            style: TextStyle(
+              color: widget.textColor,
+              fontWeight: FontWeight.bold,
+              fontSize: 18,
+            ),
+          ),
         ],
       );
     }
 
-    return Text(widget.text, style: textStyle);
+    return Text(
+      widget.text,
+      style: TextStyle(
+        color: widget.textColor,
+        fontWeight: FontWeight.bold,
+        fontSize: 18,
+      ),
+    );
   }
 
   Future<void> _handlePress() async {

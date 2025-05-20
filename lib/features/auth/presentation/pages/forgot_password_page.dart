@@ -2,9 +2,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
-import '../../../../core/widgets/live_validation_field.dart';
-import '../../../../core/widgets/managed_async_button.dart';
-import '../../../../core/widgets/enhanced_error_display.dart';
+import '../widgets/live_validation_field.dart';
+import '../widgets/managed_async_button.dart';
+import '../widgets/enhanced_error_display.dart';
 import '../../../../core/network/connection_monitor.dart';
 
 class ForgotPasswordPage extends StatefulWidget {
@@ -55,12 +55,17 @@ class ForgotPasswordPageState extends State<ForgotPasswordPage> {
     );
 
     if (!connectionMonitor.isConnected) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('No internet connection. Please check your network.'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      if (mounted) {
+        final theme = Theme.of(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text(
+              'No internet connection. Please check your network.',
+            ),
+            backgroundColor: theme.colorScheme.error,
+          ),
+        );
+      }
       return;
     }
 
@@ -75,24 +80,22 @@ class ForgotPasswordPageState extends State<ForgotPasswordPage> {
       setState(() {
         _emailSent = success;
       });
-
-      // Scroll to top to show success state
-      if (success) {
-        // Optional: Add scroll controller to scroll to the top
-      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    final textTheme = theme.textTheme;
     final authProvider = Provider.of<AuthProvider>(context);
 
     return Scaffold(
-      backgroundColor: Colors.grey[300],
+      backgroundColor: colors.surface,
       appBar: AppBar(
-        backgroundColor: Colors.transparent,
+        backgroundColor: colors.surface,
         elevation: 0,
-        iconTheme: const IconThemeData(color: Colors.black),
+        iconTheme: IconThemeData(color: colors.onSurface),
       ),
       body: ConnectionAwareWidget(
         child: SafeArea(
@@ -106,21 +109,15 @@ class ForgotPasswordPageState extends State<ForgotPasswordPage> {
                     Image.asset('assets/img/rivr.png', height: 180),
                     const SizedBox(height: 20),
 
-                    const Text(
-                      'Reset Password',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 24,
-                      ),
-                    ),
+                    Text('Reset Password', style: textTheme.headlineMedium),
                     const SizedBox(height: 10),
 
-                    const Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 25.0),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 25.0),
                       child: Text(
                         "We'll send you a password reset link to your email",
                         textAlign: TextAlign.center,
-                        style: TextStyle(fontSize: 16),
+                        style: textTheme.bodyLarge,
                       ),
                     ),
                     const SizedBox(height: 25),
@@ -161,24 +158,28 @@ class ForgotPasswordPageState extends State<ForgotPasswordPage> {
                               child: Container(
                                 padding: const EdgeInsets.all(12),
                                 decoration: BoxDecoration(
-                                  color: Colors.green.withOpacity(0.1),
+                                  color: colors.secondary.withValues(
+                                    alpha: 0.1,
+                                  ),
                                   borderRadius: BorderRadius.circular(10),
                                   border: Border.all(
-                                    color: Colors.green.shade200,
+                                    color: colors.secondary.withValues(
+                                      alpha: 0.5,
+                                    ),
                                   ),
                                 ),
                                 child: Row(
                                   children: [
-                                    const Icon(
+                                    Icon(
                                       Icons.check_circle_outline,
-                                      color: Colors.green,
+                                      color: colors.secondary,
                                     ),
                                     const SizedBox(width: 8),
                                     Expanded(
                                       child: Text(
                                         authProvider.successMessage,
-                                        style: const TextStyle(
-                                          color: Colors.green,
+                                        style: TextStyle(
+                                          color: colors.secondary,
                                         ),
                                       ),
                                     ),
@@ -195,10 +196,12 @@ class ForgotPasswordPageState extends State<ForgotPasswordPage> {
                             loadingText: 'Sending...',
                             isLoading: authProvider.isLoading,
                             onPressed: _sendResetLink,
-                            icon: const Icon(
+                            icon: Icon(
                               Icons.email_outlined,
-                              color: Colors.white,
+                              color: colors.onPrimary,
                             ),
+                            color: colors.primary,
+                            textColor: colors.onPrimary,
                           ),
                         ],
                       ),
@@ -213,6 +216,10 @@ class ForgotPasswordPageState extends State<ForgotPasswordPage> {
   }
 
   Widget _buildSuccessState() {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    final textTheme = theme.textTheme;
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 25.0),
       child: Column(
@@ -220,37 +227,37 @@ class ForgotPasswordPageState extends State<ForgotPasswordPage> {
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: Colors.green.withOpacity(0.1),
+              color: colors.secondary.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: Colors.green),
+              border: Border.all(color: colors.secondary),
             ),
             child: Column(
               children: [
-                const Icon(
+                Icon(
                   Icons.check_circle_outline,
-                  color: Colors.green,
+                  color: colors.secondary,
                   size: 64,
                 ),
                 const SizedBox(height: 16),
-                const Text(
+                Text(
                   'Password Reset Email Sent',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.green,
+                  style: textTheme.titleLarge?.copyWith(
+                    color: colors.secondary,
                   ),
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 8),
-                const Text(
+                Text(
                   'We have sent a password reset link to your email address. Please check your inbox (and spam folder) to reset your password.',
-                  style: TextStyle(fontSize: 14, color: Colors.black87),
+                  style: textTheme.bodyMedium,
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 16),
                 Text(
                   'Email: ${_emailController.text}',
-                  style: const TextStyle(fontWeight: FontWeight.bold),
+                  style: textTheme.bodyMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
                   textAlign: TextAlign.center,
                 ),
               ],
@@ -262,7 +269,8 @@ class ForgotPasswordPageState extends State<ForgotPasswordPage> {
               Navigator.pop(context);
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF2B5876),
+              backgroundColor: colors.primary,
+              foregroundColor: colors.onPrimary,
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(10),
@@ -277,8 +285,11 @@ class ForgotPasswordPageState extends State<ForgotPasswordPage> {
                 _emailSent = false;
               });
             },
-            icon: const Icon(Icons.refresh, size: 16),
-            label: const Text('Try another email'),
+            icon: Icon(Icons.refresh, size: 16, color: colors.primary),
+            label: Text(
+              'Try another email',
+              style: TextStyle(color: colors.primary),
+            ),
           ),
         ],
       ),

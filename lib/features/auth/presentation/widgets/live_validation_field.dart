@@ -1,4 +1,4 @@
-// lib/core/widgets/live_validation_field.dart
+// lib/features/auth/presentation/widgets/live_validation_field.dart
 
 import 'package:flutter/material.dart';
 import 'dart:async';
@@ -115,6 +115,17 @@ class _LiveValidationFieldState extends State<LiveValidationField> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+
+    // Use themed colors instead of hardcoded colors
+    final successColor = colors.secondary;
+    final errorColor = colors.error;
+    final primaryColor = colors.primary;
+    final warningColor = colors.tertiary; // For recovery suggestions
+    final surfaceColor = colors.surfaceContainerHighest; // For field background
+    final borderColor = colors.outline; // For normal border
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 25.0, vertical: 8.0),
       child: Column(
@@ -126,34 +137,44 @@ class _LiveValidationFieldState extends State<LiveValidationField> {
             keyboardType: widget.keyboardType,
             focusNode: _focusNode,
             onChanged: _onTextChanged,
+            style: TextStyle(color: colors.onSurface), // Themed text color
             decoration: InputDecoration(
               enabledBorder: OutlineInputBorder(
                 borderSide: BorderSide(
                   color:
-                      _errorText != null ? Colors.red.shade300 : Colors.white,
+                      _errorText != null
+                          ? errorColor.withOpacity(0.5)
+                          : borderColor,
                 ),
                 borderRadius: BorderRadius.circular(12),
               ),
               focusedBorder: OutlineInputBorder(
                 borderSide: BorderSide(
-                  color: _errorText != null ? Colors.red : Colors.deepPurple,
+                  color: _errorText != null ? errorColor : primaryColor,
                   width: 2,
                 ),
                 borderRadius: BorderRadius.circular(12),
               ),
               errorBorder: OutlineInputBorder(
-                borderSide: const BorderSide(color: Colors.red),
+                borderSide: BorderSide(color: errorColor),
                 borderRadius: BorderRadius.circular(12),
               ),
               focusedErrorBorder: OutlineInputBorder(
-                borderSide: const BorderSide(color: Colors.red, width: 2),
+                borderSide: BorderSide(color: errorColor, width: 2),
                 borderRadius: BorderRadius.circular(12),
               ),
               hintText: widget.hintText,
-              fillColor: Colors.grey[200],
+              hintStyle: TextStyle(color: colors.onSurfaceVariant),
+              fillColor: surfaceColor,
               filled: true,
               prefixIcon:
-                  widget.prefixIcon != null ? Icon(widget.prefixIcon) : null,
+                  widget.prefixIcon != null
+                      ? Icon(
+                        widget.prefixIcon,
+                        color:
+                            _isFocused ? primaryColor : colors.onSurfaceVariant,
+                      )
+                      : null,
               suffixIcon:
                   widget.suffixIcon ??
                   (widget.isTouched
@@ -165,24 +186,24 @@ class _LiveValidationFieldState extends State<LiveValidationField> {
                         child: Icon(
                           widget.isValid ? Icons.check_circle : Icons.cancel,
                           key: ValueKey<bool>(widget.isValid),
-                          color: widget.isValid ? Colors.green : Colors.red,
+                          color: widget.isValid ? successColor : errorColor,
                           size: 20,
                         ),
                       )
                       : null),
-
               errorText: _isDirty ? _errorText : null,
+              errorStyle: TextStyle(color: errorColor),
             ),
             validator: widget.validator,
           ),
 
-          // Recovery suggestion for errors
+          // Recovery suggestion for errors with themed color
           if (_isDirty && _errorText != null)
             Padding(
               padding: const EdgeInsets.only(left: 16.0, top: 4.0),
               child: Text(
                 _getRecoverySuggestion(_errorText!),
-                style: TextStyle(color: Colors.orange.shade800, fontSize: 12),
+                style: TextStyle(color: warningColor, fontSize: 12),
               ),
             ),
         ],

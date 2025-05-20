@@ -3,12 +3,12 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
-import '../../../../core/widgets/live_validation_field.dart';
-import '../../../../core/widgets/managed_async_button.dart';
-import '../../../../core/widgets/enhanced_error_display.dart';
+import '../widgets/live_validation_field.dart';
+import '../widgets/managed_async_button.dart';
+import '../widgets/enhanced_error_display.dart';
 import '../../../../core/network/connection_monitor.dart';
 import '../../../../core/validators/password_validator.dart';
-import 'package:lottie/lottie.dart'; // New package for animations
+import 'package:lottie/lottie.dart'; // Package for animations
 
 class RegisterPage extends StatefulWidget {
   final VoidCallback onLoginTap;
@@ -238,12 +238,16 @@ class RegisterPageState extends State<RegisterPage>
     );
     if (!connectionMonitor.isConnected) {
       print("REGISTER: Network connection check failed");
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('No internet connection. Please check your network.'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text(
+              'No internet connection. Please check your network.',
+            ),
+            backgroundColor: Theme.of(context).colorScheme.error,
+          ),
+        );
+      }
       return;
     }
     print("REGISTER: Network connection check passed");
@@ -297,17 +301,22 @@ class RegisterPageState extends State<RegisterPage>
       }
     } catch (e) {
       print("REGISTER: Exception during registration: $e");
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Registration error: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Registration error: $e'),
+            backgroundColor: Theme.of(context).colorScheme.error,
+          ),
+        );
+      }
     }
   }
 
   // Build the success state UI
   Widget _buildSuccessState() {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -321,26 +330,26 @@ class RegisterPageState extends State<RegisterPage>
             repeat: false,
           ),
           const SizedBox(height: 20),
-          const Text(
+          Text(
             'Registration Successful!',
-            style: TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-              color: Colors.green,
-            ),
+            style: theme.textTheme.titleLarge?.copyWith(color: colors.primary),
           ),
           const SizedBox(height: 10),
           Text(
             'Welcome, ${_firstNameController.text}!',
-            style: const TextStyle(fontSize: 18),
+            style: theme.textTheme.titleMedium,
           ),
           const SizedBox(height: 20),
-          const Text(
+          Text(
             'Setting up your account...',
-            style: TextStyle(color: Colors.grey),
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: colors.onSurfaceVariant,
+            ),
           ),
           const SizedBox(height: 20),
-          const CircularProgressIndicator(),
+          CircularProgressIndicator(
+            valueColor: AlwaysStoppedAnimation<Color>(colors.primary),
+          ),
         ],
       ),
     );
@@ -348,18 +357,21 @@ class RegisterPageState extends State<RegisterPage>
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    final textTheme = theme.textTheme;
     final authProvider = Provider.of<AuthProvider>(context);
 
     // Show success state if registration was successful
     if (_registrationSuccess) {
       return Scaffold(
-        backgroundColor: Colors.white,
+        backgroundColor: colors.surface,
         body: _buildSuccessState(),
       );
     }
 
     return Scaffold(
-      backgroundColor: Colors.grey[300],
+      backgroundColor: colors.surface,
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
@@ -371,10 +383,7 @@ class RegisterPageState extends State<RegisterPage>
                   Image.asset('assets/img/rivr.png', height: 150),
                   const SizedBox(height: 10),
 
-                  const Text(
-                    'Register',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 24),
-                  ),
+                  Text('Register', style: textTheme.headlineMedium),
                   const SizedBox(height: 15),
 
                   // Personal information fields with progressive validation
@@ -428,15 +437,13 @@ class RegisterPageState extends State<RegisterPage>
                             vertical: 2,
                           ),
                           decoration: BoxDecoration(
-                            color: Colors.grey.shade200,
+                            color: colors.surfaceContainerHighest,
                             borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: Colors.grey.shade400),
+                            border: Border.all(color: colors.outline),
                           ),
-                          child: const Text(
+                          child: Text(
                             'Optional',
-                            style: TextStyle(
-                              fontSize: 10,
-                              color: Colors.grey,
+                            style: textTheme.bodySmall?.copyWith(
                               fontStyle: FontStyle.italic,
                             ),
                           ),
@@ -481,6 +488,7 @@ class RegisterPageState extends State<RegisterPage>
                     suffixIcon: IconButton(
                       icon: Icon(
                         _obscureText ? Icons.visibility : Icons.visibility_off,
+                        color: colors.onSurface,
                       ),
                       onPressed: () {
                         setState(() {
@@ -540,6 +548,7 @@ class RegisterPageState extends State<RegisterPage>
                         _obscureConfirmText
                             ? Icons.visibility
                             : Icons.visibility_off,
+                        color: colors.onSurface,
                       ),
                       onPressed: () {
                         setState(() {
@@ -575,7 +584,9 @@ class RegisterPageState extends State<RegisterPage>
                     loadingText: 'Creating account...',
                     isLoading: authProvider.isLoading,
                     onPressed: _register,
-                    icon: const Icon(Icons.person_add, color: Colors.white),
+                    icon: Icon(Icons.person_add, color: colors.onPrimary),
+                    color: colors.primary,
+                    textColor: colors.onPrimary,
                   ),
 
                   const SizedBox(height: 20),
@@ -584,14 +595,14 @@ class RegisterPageState extends State<RegisterPage>
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Text('Already a member? '),
+                      Text('Already a member? ', style: textTheme.bodyMedium),
                       GestureDetector(
                         onTap: widget.onLoginTap,
-                        child: const Text(
+                        child: Text(
                           'Login now',
-                          style: TextStyle(
+                          style: textTheme.bodyMedium?.copyWith(
                             fontWeight: FontWeight.bold,
-                            color: Colors.blue,
+                            color: colors.primary,
                           ),
                         ),
                       ),
@@ -610,6 +621,7 @@ class RegisterPageState extends State<RegisterPage>
 
   // Enhanced strength indicator that updates in real-time
   Widget _buildEnhancedStrengthIndicator(String password) {
+    final theme = Theme.of(context);
     final strength = PasswordValidator.getPasswordStrength(password);
 
     return Column(
@@ -643,7 +655,7 @@ class RegisterPageState extends State<RegisterPage>
           builder:
               (context, value, _) => LinearProgressIndicator(
                 value: value,
-                backgroundColor: Colors.grey.shade300,
+                backgroundColor: theme.colorScheme.surfaceContainerHighest,
                 valueColor: AlwaysStoppedAnimation<Color>(strength.color),
                 minHeight: 5,
               ),
@@ -712,6 +724,9 @@ class RegisterPageState extends State<RegisterPage>
     bool isMet,
     bool shouldAnimate,
   ) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+
     return AnimatedContainer(
       duration: const Duration(milliseconds: 300),
       padding: const EdgeInsets.only(bottom: 4.0),
@@ -726,7 +741,7 @@ class RegisterPageState extends State<RegisterPage>
             child: Icon(
               isMet ? Icons.check_circle : Icons.cancel,
               key: ValueKey<bool>(isMet),
-              color: isMet ? Colors.green : Colors.grey,
+              color: isMet ? colors.secondary : colors.onSurfaceVariant,
               size: 16,
             ),
           ),
@@ -735,7 +750,7 @@ class RegisterPageState extends State<RegisterPage>
             text,
             style: TextStyle(
               fontSize: 12,
-              color: isMet ? Colors.black87 : Colors.grey.shade700,
+              color: isMet ? colors.onSurface : colors.onSurfaceVariant,
               fontWeight: isMet ? FontWeight.bold : FontWeight.normal,
             ),
           ),

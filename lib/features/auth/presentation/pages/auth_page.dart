@@ -7,19 +7,46 @@ class AuthPage extends StatefulWidget {
   const AuthPage({super.key});
 
   @override
-  _AuthPageState createState() => _AuthPageState();
+  AuthPageState createState() => AuthPageState();
 }
 
-class _AuthPageState extends State<AuthPage> {
+class AuthPageState extends State<AuthPage>
+    with SingleTickerProviderStateMixin {
   bool _showLoginPage = true;
+  late AnimationController _animationController;
+  late Animation<double> _fadeAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+
+    // Configure animation for smooth transitions
+    _animationController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 300),
+    );
+    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
+    );
+    _animationController.forward();
+  }
+
+  @override
+  void dispose() {
+    _animationController.dispose();
+    super.dispose();
+  }
 
   void _toggleView() {
     setState(() {
+      // Restart animation and toggle view
+      _animationController.reset();
       _showLoginPage = !_showLoginPage;
+      _animationController.forward();
     });
   }
 
-  // Add this method to handle successful authentication
+  // Handle successful authentication
   void _onAuthSuccess() {
     // Navigate to favorites page after successful authentication
     // This replaces the entire navigation stack to prevent going back to login
@@ -30,16 +57,19 @@ class _AuthPageState extends State<AuthPage> {
 
   @override
   Widget build(BuildContext context) {
-    if (_showLoginPage) {
-      return LoginPage(
-        onRegisterTap: _toggleView,
-        onLoginSuccess: _onAuthSuccess, // Pass the callback to LoginPage
-      );
-    } else {
-      return RegisterPage(
-        onLoginTap: _toggleView,
-        onRegisterSuccess: _onAuthSuccess, // Pass the callback to RegisterPage
-      );
-    }
+    // Use FadeTransition for smooth page transitions
+    return FadeTransition(
+      opacity: _fadeAnimation,
+      child:
+          _showLoginPage
+              ? LoginPage(
+                onRegisterTap: _toggleView,
+                onLoginSuccess: _onAuthSuccess,
+              )
+              : RegisterPage(
+                onLoginTap: _toggleView,
+                onRegisterSuccess: _onAuthSuccess,
+              ),
+    );
   }
 }

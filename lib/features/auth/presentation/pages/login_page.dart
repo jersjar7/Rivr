@@ -12,12 +12,12 @@ import '../../../../core/validators/password_validator.dart';
 
 class LoginPage extends StatefulWidget {
   final VoidCallback onRegisterTap;
-  final VoidCallback? onLoginSuccess; // Add callback for successful login
+  final VoidCallback? onLoginSuccess;
 
   const LoginPage({
     super.key,
     required this.onRegisterTap,
-    this.onLoginSuccess, // Optional parameter
+    this.onLoginSuccess,
   });
 
   @override
@@ -136,12 +136,14 @@ class LoginPageState extends State<LoginPage> {
     _passwordController.text = password;
 
     // Show a snackbar to inform the user
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Retrying previous login attempt...'),
-        duration: Duration(seconds: 2),
-      ),
-    );
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Retrying previous login attempt...'),
+          duration: Duration(seconds: 2),
+        ),
+      );
+    }
 
     // Clear pending attempt
     _pendingLoginAttempt = null;
@@ -185,7 +187,6 @@ class LoginPageState extends State<LoginPage> {
     return null;
   }
 
-  // Updated password validation using the PasswordValidator
   String? _validatePassword(String? value) {
     return PasswordValidator.validateForLogin(value);
   }
@@ -227,15 +228,17 @@ class LoginPageState extends State<LoginPage> {
       // Store login attempt to retry when connection is available
       _storePendingLoginAttempt(email, password);
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text(
-            'No internet connection. Your login will be retried when connection is restored.',
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text(
+              'No internet connection. Your login will be retried when connection is restored.',
+            ),
+            backgroundColor: colors.tertiary,
+            duration: const Duration(seconds: 4),
           ),
-          backgroundColor: colors.tertiary,
-          duration: const Duration(seconds: 4),
-        ),
-      );
+        );
+      }
       return;
     }
     print("LOGIN: Network connection check passed");
@@ -346,6 +349,7 @@ class LoginPageState extends State<LoginPage> {
     final authProvider = Provider.of<AuthProvider>(context);
 
     return Scaffold(
+      // Use theme background color instead of hardcoded grey
       backgroundColor: colors.surface,
       body: ConnectionAwareWidget(
         onReconnect: _processPendingLoginAttempt,

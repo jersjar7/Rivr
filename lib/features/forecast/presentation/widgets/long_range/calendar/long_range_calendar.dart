@@ -1,6 +1,7 @@
 // lib/features/forecast/presentation/widgets/long_range/calendar/long_range_calendar.dart
 
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:rivr/core/formatters/flow_value_formatter.dart';
@@ -91,10 +92,12 @@ class _LongRangeCalendarState extends State<LongRangeCalendar> {
   final Map<DateTime, double> _dailyFlows = {};
 
   void _processForecasts() {
-    print("===== CALENDAR DEBUG =====");
-    print(
-      "LongRangeCalendar._processForecasts starting, preferredUnit=${_flowUnitsService.preferredUnit}",
-    );
+    if (kDebugMode) {
+      print("===== CALENDAR DEBUG =====");
+      print(
+        "LongRangeCalendar._processForecasts starting, preferredUnit=${_flowUnitsService.preferredUnit}",
+      );
+    }
 
     _dailyFlows.clear();
 
@@ -113,9 +116,11 @@ class _LongRangeCalendarState extends State<LongRangeCalendar> {
         _sourceUnit,
       );
 
-      print(
-        "Converting forecast flow: $originalFlow ($_sourceUnit) -> $convertedFlow (${_flowUnitsService.preferredUnit})",
-      );
+      if (kDebugMode) {
+        print(
+          "Converting forecast flow: $originalFlow ($_sourceUnit) -> $convertedFlow (${_flowUnitsService.preferredUnit})",
+        );
+      }
 
       // If we already have a value for this day, average them
       if (_dailyFlows.containsKey(date)) {
@@ -126,7 +131,7 @@ class _LongRangeCalendarState extends State<LongRangeCalendar> {
     }
 
     // Print the _dailyFlows data
-    if (_dailyFlows.isNotEmpty) {
+    if (_dailyFlows.isNotEmpty && kDebugMode) {
       final sampleDate = _dailyFlows.keys.first;
       final sampleFlow = _dailyFlows[sampleDate];
       print(
@@ -258,6 +263,8 @@ class _LongRangeCalendarState extends State<LongRangeCalendar> {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
     final rows = <Widget>[];
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
 
     // Get the first day of the month
     final firstDayOfMonth = DateTime(
@@ -288,10 +295,10 @@ class _LongRangeCalendarState extends State<LongRangeCalendar> {
                   fontWeight: FontWeight.bold,
                   color:
                       index == 0 || index == 6
-                          ? Colors
-                              .red
-                              .shade300 // Weekend
-                          : Colors.grey.shade700, // Weekday
+                          ? (isDark ? Colors.red.shade300 : Colors.red.shade400)
+                          : (isDark
+                              ? theme.colorScheme.onSurface
+                              : Colors.grey.shade700),
                 ),
               ),
             ),
@@ -313,9 +320,11 @@ class _LongRangeCalendarState extends State<LongRangeCalendar> {
           // Check if we have flow data for this date
           final flowValue =
               _dailyFlows[DateTime(date.year, date.month, date.day)];
-          print(
-            "Calendar cell for $date: flowValue=$flowValue, preferredUnit=${_flowUnitsService.preferredUnit}",
-          );
+          if (kDebugMode) {
+            print(
+              "Calendar cell for $date: flowValue=$flowValue, preferredUnit=${_flowUnitsService.preferredUnit}",
+            );
+          }
 
           return Expanded(
             child: AspectRatio(
@@ -375,6 +384,8 @@ class _LongRangeCalendarState extends State<LongRangeCalendar> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
     return Column(
       children: [
         // Calendar header with month navigation
@@ -390,8 +401,7 @@ class _LongRangeCalendarState extends State<LongRangeCalendar> {
               ),
               Text(
                 DateFormat('MMMM yyyy').format(_currentMonth),
-                style: const TextStyle(
-                  fontSize: 18,
+                style: theme.textTheme.titleLarge?.copyWith(
                   fontWeight: FontWeight.bold,
                 ),
               ),
@@ -410,6 +420,7 @@ class _LongRangeCalendarState extends State<LongRangeCalendar> {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
           ),
+          color: theme.cardColor,
           child: Padding(
             padding: const EdgeInsets.all(8.0),
             child: Column(key: _calendarKey, children: _buildCalendarRows()),

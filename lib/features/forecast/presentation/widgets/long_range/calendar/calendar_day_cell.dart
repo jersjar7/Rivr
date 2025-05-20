@@ -37,18 +37,30 @@ class CalendarDayCell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+
     final hasData = flowValue != null;
     String? flowCategory;
-    Color cellColor = Colors.grey.shade100;
-    Color textColor = isCurrentMonth ? Colors.black87 : Colors.grey.shade400;
 
-    print("===== CELL DEBUG =====");
-    print(
-      "CalendarDayCell.build: date=$date, flowValue=$flowValue, fromUnit=$fromUnit",
-    );
-    if (returnPeriod != null) {
-      print("returnPeriod.unit=${returnPeriod!.unit}");
-    }
+    // Get theme-appropriate colors
+    Color cellColor = isDark ? colorScheme.surfaceContainerLow : Colors.white;
+    Color emptyMonthCellColor =
+        isDark
+            ? colorScheme.surfaceContainerLowest
+            : colorScheme.surfaceContainerHighest.withValues(alpha: 0.5);
+    Color textColor =
+        isCurrentMonth
+            ? colorScheme.onSurface
+            : colorScheme.onSurface.withValues(alpha: 0.5);
+    Color accentColor = colorScheme.primary;
+    Color borderColor =
+        isToday
+            ? accentColor
+            : (isSelected
+                ? colorScheme.primary
+                : colorScheme.outline.withValues(alpha: 0.3));
 
     // Get formatters from context if not provided
     final effectiveFlowFormatter =
@@ -63,9 +75,7 @@ class CalendarDayCell extends StatelessWidget {
         fromUnit: fromUnit, // Explicitly specify the source unit
       );
 
-      print("Flow category result: $flowCategory");
-
-      cellColor = _getBackgroundColor(flowCategory);
+      cellColor = _getBackgroundColor(flowCategory, isDark, colorScheme);
 
       // Ensure text is readable on colored backgrounds
       textColor = _getTextColor(cellColor);
@@ -76,24 +86,22 @@ class CalendarDayCell extends StatelessWidget {
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         decoration: BoxDecoration(
-          gradient: hasData ? _getGradient(flowCategory) : null,
+          gradient:
+              hasData ? _getGradient(flowCategory, isDark, colorScheme) : null,
           color:
               !hasData
-                  ? (isCurrentMonth ? Colors.white : Colors.grey.shade100)
+                  ? (isCurrentMonth ? cellColor : emptyMonthCellColor)
                   : null,
           borderRadius: BorderRadius.circular(8),
           border: Border.all(
-            color:
-                isToday
-                    ? Colors.blue.shade700
-                    : (isSelected ? Colors.black : Colors.grey.shade300),
+            color: borderColor,
             width: isToday || isSelected ? 2 : 1,
           ),
           boxShadow:
               isSelected
                   ? [
                     BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.2),
+                      color: colorScheme.shadow.withOpacity(isDark ? 0.4 : 0.2),
                       blurRadius: 4,
                       offset: const Offset(0, 2),
                     ),
@@ -128,7 +136,10 @@ class CalendarDayCell extends StatelessWidget {
                 child: Container(
                   padding: const EdgeInsets.symmetric(vertical: 2),
                   decoration: BoxDecoration(
-                    color: Colors.black.withValues(alpha: 0.1),
+                    color:
+                        isDark
+                            ? Colors.black.withValues(alpha: 0.2)
+                            : Colors.black.withValues(alpha: 0.1),
                     borderRadius: const BorderRadius.only(
                       bottomLeft: Radius.circular(7),
                       bottomRight: Radius.circular(7),
@@ -156,9 +167,9 @@ class CalendarDayCell extends StatelessWidget {
                 child: Container(
                   width: 8,
                   height: 8,
-                  decoration: const BoxDecoration(
+                  decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: Colors.blue,
+                    color: accentColor,
                   ),
                 ),
               ),
@@ -168,9 +179,25 @@ class CalendarDayCell extends StatelessWidget {
     );
   }
 
-  Color _getBackgroundColor(String? category) {
-    if (category == null) return Colors.grey.shade100;
-    return FlowThresholds.getColorForCategory(category).withValues(alpha: 0.7);
+  Color _getBackgroundColor(
+    String? category,
+    bool isDark,
+    ColorScheme colorScheme,
+  ) {
+    if (category == null) {
+      return isDark ? colorScheme.surfaceContainerLow : Colors.white;
+    }
+    Color baseColor = FlowThresholds.getColorForCategory(category);
+
+    // Adjust color for dark mode if needed
+    if (isDark) {
+      // Make colors slightly more vibrant in dark mode for better visibility
+      final HSLColor hsl = HSLColor.fromColor(baseColor);
+      baseColor =
+          hsl.withLightness((hsl.lightness * 1.2).clamp(0.0, 1.0)).toColor();
+    }
+
+    return baseColor.withOpacity(isDark ? 0.8 : 0.7);
   }
 
   Color _getTextColor(Color backgroundColor) {
@@ -180,11 +207,15 @@ class CalendarDayCell extends StatelessWidget {
         : Colors.white;
   }
 
-  LinearGradient? _getGradient(String? category) {
+  LinearGradient? _getGradient(
+    String? category,
+    bool isDark,
+    ColorScheme colorScheme,
+  ) {
     if (category == null) return null;
 
     final baseColor = FlowThresholds.getColorForCategory(category);
-    final lighterColor = _lightenColor(baseColor, 0.3);
+    final lighterColor = _lightenColor(baseColor, isDark ? 0.2 : 0.3);
 
     return LinearGradient(
       begin: Alignment.topLeft,
@@ -219,15 +250,11 @@ class CalendarDayCellTooltip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final dateStr = DateFormat('EEEE, MMMM d, y').format(date);
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
 
-    print("===== TOOLTIP DEBUG =====");
-    print(
-      "CalendarDayCellTooltip.build: flowValue=$flowValue, fromUnit=$fromUnit",
-    );
-    if (returnPeriod != null) {
-      print("returnPeriod.unit=${returnPeriod!.unit}");
-    }
+    final dateStr = DateFormat('EEEE, MMMM d, y').format(date);
 
     // Get formatters from context if not provided
     final effectiveFlowFormatter =
@@ -253,21 +280,25 @@ class CalendarDayCellTooltip extends StatelessWidget {
     final categoryColor =
         category != null
             ? FlowThresholds.getColorForCategory(category)
-            : Colors.grey;
+            : colorScheme.outline;
 
     return Container(
       width: 250,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDark ? colorScheme.surfaceContainerHigh : Colors.white,
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.2),
+            color: colorScheme.shadow.withOpacity(isDark ? 0.6 : 0.2),
             blurRadius: 10,
             offset: const Offset(0, 5),
           ),
         ],
+        border: Border.all(
+          color: colorScheme.outline.withValues(alpha: 0.2),
+          width: 1,
+        ),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -275,25 +306,31 @@ class CalendarDayCellTooltip extends StatelessWidget {
         children: [
           Text(
             dateStr,
-            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+            style: theme.textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.bold,
+            ),
           ),
           const SizedBox(height: 8),
           Row(
             children: [
-              const Text(
+              Text(
                 'Flow: ',
-                style: TextStyle(fontWeight: FontWeight.bold),
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
               ),
-              Text(flowStr),
+              Text(flowStr, style: theme.textTheme.bodyMedium),
             ],
           ),
           if (category != null) ...[
             const SizedBox(height: 4),
             Row(
               children: [
-                const Text(
+                Text(
                   'Status: ',
-                  style: TextStyle(fontWeight: FontWeight.bold),
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
                 Container(
                   padding: const EdgeInsets.symmetric(
@@ -312,6 +349,7 @@ class CalendarDayCellTooltip extends StatelessWidget {
                               ? Colors.black87
                               : Colors.white,
                       fontWeight: FontWeight.bold,
+                      fontSize: 12,
                     ),
                   ),
                 ),
@@ -320,7 +358,9 @@ class CalendarDayCellTooltip extends StatelessWidget {
             const SizedBox(height: 8),
             Text(
               description,
-              style: const TextStyle(color: Colors.black87, fontSize: 12),
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: colorScheme.onSurface.withValues(alpha: 0.9),
+              ),
             ),
           ],
         ],

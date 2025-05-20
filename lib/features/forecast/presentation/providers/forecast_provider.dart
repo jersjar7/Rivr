@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:rivr/core/error/failures.dart';
 import 'package:rivr/core/formatters/flow_value_formatter.dart';
 import 'package:rivr/core/models/flow_unit.dart';
+import 'package:rivr/core/models/location_info.dart';
 import 'package:rivr/core/services/flow_units_service.dart';
 import 'package:rivr/core/services/geocoding_service.dart';
 import 'package:rivr/features/forecast/domain/entities/forecast.dart';
@@ -303,8 +304,22 @@ class ForecastProvider extends ChangeNotifier {
     // Get existing location data (coordinates)
     ReachLocation? location = _reachLocations[reachId];
 
-    // If no location data available, return null
-    if (location == null) return null;
+    // If no location data available, try to extract it first
+    if (location == null) {
+      print(
+        "ForecastProvider: No location data found for reach $reachId, attempting to find it",
+      );
+      await _tryExtractLocationInfo(reachId);
+      location = _reachLocations[reachId]; // Check if we found it
+
+      // If we still couldn't find any location data, return null
+      if (location == null) {
+        print(
+          "ForecastProvider: Could not find any coordinates for reach $reachId",
+        );
+        return null;
+      }
+    }
 
     // If we have coordinates but no city/state, attempt geocoding
     if (location.city == null || location.state == null) {
@@ -344,6 +359,18 @@ class ForecastProvider extends ChangeNotifier {
     }
 
     return location;
+  }
+
+  // Helper method for ForecastPage to use directly if needed
+  Future<LocationInfo?> geocodeCoordinates(double lat, double lon) async {
+    try {
+      print("ForecastProvider: Geocoding coordinates lat=$lat, lon=$lon");
+      final geocodingService = sl<GeocodingService>();
+      return await geocodingService.getLocationInfo(lat, lon);
+    } catch (e) {
+      print('ForecastProvider: Error geocoding coordinates: $e');
+      return null;
+    }
   }
 
   // Set location for a reach/river

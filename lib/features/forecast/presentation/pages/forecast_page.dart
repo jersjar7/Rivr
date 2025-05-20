@@ -46,10 +46,13 @@ class _ForecastPageState extends State<ForecastPage>
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
 
-    // Load forecasts when the page loads
+    // Load forecasts and location data when the page loads
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      // Start loading both forecasts and location info right away
       _loadForecasts();
-      // Load location info after forecasts to ensure we have coordinates
+      _loadLocationInfo();
+
+      // Add tab change listener
       _tabController.addListener(_handleTabChange);
     });
   }
@@ -64,7 +67,7 @@ class _ForecastPageState extends State<ForecastPage>
   // Handle tab changes to load location when needed
   void _handleTabChange() {
     if (_tabController.index == 0) {
-      // If we're on the Daily tab, ensure location info is loaded
+      // If we're on the Hourly tab and location info isn't loaded, try again
       if (_locationInfo == null && !_isLoadingLocation) {
         _loadLocationInfo();
       }
@@ -105,28 +108,33 @@ class _ForecastPageState extends State<ForecastPage>
     }
   }
 
-  // Load location information for the river
+  // Load location information for the river with improved logic and error handling
   Future<void> _loadLocationInfo() async {
-    if (!mounted) return;
+    if (!mounted || _isLoadingLocation) return;
 
     setState(() {
       _isLoadingLocation = true;
     });
 
     try {
+      print(
+        "ForecastPage: Starting location info loading for reach: ${widget.reachId}",
+      );
+
       final forecastProvider = Provider.of<ForecastProvider>(
         context,
         listen: false,
       );
 
-      // Use the enhanced getReachLocationFor method that includes geocoding
+      // Use the improved getReachLocationFor method which now actively
+      // attempts to find location data if it's not already available
       final reachLocation = await forecastProvider.getReachLocationFor(
         widget.reachId,
       );
 
       if (reachLocation == null) {
         print(
-          "Location info not loaded: No coordinates available for reach ${widget.reachId}",
+          "ForecastPage: No location information available for reach ${widget.reachId}",
         );
         if (mounted) {
           setState(() {
@@ -136,33 +144,32 @@ class _ForecastPageState extends State<ForecastPage>
         return;
       }
 
-      // If we have city and state from the provider, use them
+      print(
+        "ForecastPage: Retrieved coordinates: lat=${reachLocation.lat}, lon=${reachLocation.lon}",
+      );
+
+      // Set the location info if we have valid data
+      if (mounted) {
+        setState(() {
+          _locationInfo = LocationInfo(
+            city: reachLocation.city ?? "Unknown",
+            state: reachLocation.state ?? "Unknown",
+            lat: reachLocation.lat,
+            lon: reachLocation.lon,
+          );
+          _isLoadingLocation = false;
+        });
+      }
+
       if (reachLocation.city != null && reachLocation.state != null) {
-        if (mounted) {
-          setState(() {
-            _locationInfo = LocationInfo(
-              city: reachLocation.city!,
-              state: reachLocation.state!,
-              lat: reachLocation.lat,
-              lon: reachLocation.lon,
-            );
-            _isLoadingLocation = false;
-          });
-        }
         print(
-          "Location info set from provider: ${reachLocation.city}, ${reachLocation.state}",
+          "ForecastPage: Location info set: ${reachLocation.city}, ${reachLocation.state}",
         );
       } else {
-        // If no city/state available even after geocoding attempt in the provider
-        if (mounted) {
-          setState(() {
-            _isLoadingLocation = false;
-          });
-        }
-        print("Location info not available: Geocoding failed or not attempted");
+        print("ForecastPage: Set coordinates but city/state unavailable");
       }
     } catch (e) {
-      print('Error loading location info: $e');
+      print('ForecastPage: Error loading location info: $e');
       if (mounted) {
         setState(() {
           _isLoadingLocation = false;

@@ -106,30 +106,35 @@ class _FlowIndicatorBarState extends State<FlowIndicatorBar>
     }
   }
 
-  // Calculate the position of the flow marker based on return periods
-  // Updated to properly handle unit conversions
+  // Calculate the position of the flow marker on a linear scale
+  // from 0 to 105% of the 100-year return period value
   double _calculateMarkerPosition() {
     if (widget.returnPeriod == null) {
-      // Default linear position if no return period data
+      // Default middle position if no return period data
       return widget.width * 0.5;
     }
 
-    // Use the proper method that handles unit conversion
-    final percentage = FlowThresholds.calculateFlowPercentage(
-      widget.currentFlow,
-      widget.returnPeriod!,
-      fromUnit: widget.fromUnit, // Pass the source unit for proper conversion
-    );
+    // Get the 100-year return period flow value
+    final flow100yr = widget.returnPeriod!.getFlowForYear(100);
+    if (flow100yr == null) {
+      return widget.width * 0.5;
+    }
+
+    // Define the scale: 0 to 105% of 100-year flow
+    final double maxScale = flow100yr * 1.05;
+
+    // Calculate normalized position on this scale
+    double normalizedPosition = widget.currentFlow / maxScale;
 
     // Position based on percentage (clamped to be within the bar)
-    return (percentage / 100.0 * widget.width).clamp(
+    return (normalizedPosition * widget.width).clamp(
       _markerSize / 2,
       widget.width - _markerSize / 2,
     );
   }
 
-  // Get marker positions for return period lines
-  // Updated to ensure proper unit handling
+  // Get marker positions for return period lines using a linear scale
+  // from 0 to 105% of the 100-year return period flow
   Map<int, double> _getReturnPeriodPositions() {
     if (widget.returnPeriod == null) {
       return {};
@@ -137,28 +142,21 @@ class _FlowIndicatorBarState extends State<FlowIndicatorBar>
 
     final Map<int, double> positions = {};
 
-    // First get all threshold flows to determine proper scaling
-    final List<double> allThresholds = [];
-    for (final year in _returnPeriodYears) {
-      final flow = widget.returnPeriod!.getFlowForYear(year);
-      if (flow != null) {
-        allThresholds.add(flow);
-      }
+    // Get the 100-year return period flow value
+    final flow100yr = widget.returnPeriod!.getFlowForYear(100);
+    if (flow100yr == null) {
+      return positions;
     }
 
-    if (allThresholds.isEmpty) return positions;
+    // Define the scale: 0 to 105% of 100-year flow
+    final double maxScale = flow100yr * 1.05;
 
-    // Calculate min and max for proper scaling
-    final minThreshold = allThresholds.reduce((a, b) => a < b ? a : b);
-    final maxThreshold = allThresholds.reduce((a, b) => a > b ? a : b);
-    final range = maxThreshold - minThreshold;
-
-    // Now calculate positions with proper scaling
+    // Calculate positions for each return period
     for (final year in _returnPeriodYears) {
       final flow = widget.returnPeriod!.getFlowForYear(year);
       if (flow != null) {
-        // Linear scaling between thresholds regardless of unit
-        final normalizedPosition = (flow - minThreshold) / range;
+        // Position based on linear scale
+        final double normalizedPosition = flow / maxScale;
         positions[year] = (normalizedPosition * widget.width).clamp(
           0.0,
           widget.width,
@@ -194,7 +192,7 @@ class _FlowIndicatorBarState extends State<FlowIndicatorBar>
                   border: Border.all(
                     color: Theme.of(
                       context,
-                    ).colorScheme.outline.withOpacity(0.5),
+                    ).colorScheme.outline.withValues(alpha: 0.5),
                   ),
                 ),
                 child: Column(
@@ -380,10 +378,12 @@ class _FlowIndicatorBarState extends State<FlowIndicatorBar>
                       // Estimate the width of the text
                       final textWidth = labelText.length * 7.0;
 
+                      // Center the label on the marker
+                      double calculatedLeft = entry.value - (textWidth / 2);
+
                       // Ensure the label doesn't overflow
-                      double calculatedLeft = entry.value;
                       if (calculatedLeft + textWidth > widget.width) {
-                        calculatedLeft = widget.width - textWidth + 2;
+                        calculatedLeft = widget.width - textWidth;
                       }
                       if (calculatedLeft < 0) {
                         calculatedLeft = 0;

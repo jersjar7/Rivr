@@ -473,7 +473,8 @@ class _HorizontalFlowTimelineState extends State<HorizontalFlowTimeline> {
     // Theme-aware colors for markers
     final markerLineColor =
         isDark ? colorScheme.surfaceContainerHighest : Colors.grey[400];
-    final markerTextColor = isDark ? colorScheme.onSurface : Colors.grey[700];
+    final markerTextColor =
+        isDark ? Colors.black.withValues(alpha: 0.7) : Colors.grey[700];
 
     return SizedBox(
       height: 240,
@@ -527,7 +528,8 @@ class _HorizontalFlowTimelineState extends State<HorizontalFlowTimeline> {
 
     // Default colors if not provided
     lineColor ??= isDark ? Colors.grey[600] : Colors.grey[400];
-    textColor ??= isDark ? Colors.grey[300] : Colors.grey[700];
+    textColor ??=
+        isDark ? Colors.black.withValues(alpha: 0.7) : Colors.grey[700];
 
     final markers = <Widget>[];
     final double hourWidth = 70.0;

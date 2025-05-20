@@ -295,26 +295,34 @@ class _ExpandableDailyForecastRowWithHourlyState
 
           // Hourly flow display widget - pass FlowValueFormatter instead of NumberFormat
           if (widget.forecast.hourlyData.isNotEmpty)
-            HourlyFlowDisplay(
-              forecast: widget.forecast,
-              returnPeriod: widget.returnPeriod,
-              flowValueFormatter:
-                  _flowValueFormatter, // Pass the formatter here
+            Padding(
+              padding: const EdgeInsets.all(8.0),
+              child: HourlyFlowDisplay(
+                forecast: widget.forecast,
+                returnPeriod: widget.returnPeriod,
+                flowValueFormatter:
+                    _flowValueFormatter, // Pass the formatter here
+              ),
             ),
 
           // Data source info
           Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Row(
-              children: [
-                const Icon(Icons.info_outline, size: 16),
-                const SizedBox(width: 8),
-                Text(
-                  'Data source: ${widget.forecast.dataSource}',
-                  style: theme.textTheme.bodySmall,
-                ),
-              ],
-            ),
+            padding: const EdgeInsets.only(left: 10.0, bottom: 5),
+            child:
+                // Check for "unknown", empty, or null
+                (widget.forecast.dataSource != "unknown" &&
+                        widget.forecast.dataSource.isNotEmpty)
+                    ? Row(
+                      children: [
+                        const Icon(Icons.info_outline, size: 16),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Data source: ${widget.forecast.dataSource}',
+                          style: theme.textTheme.bodySmall,
+                        ),
+                      ],
+                    )
+                    : const SizedBox.shrink(),
           ),
         ],
       ),

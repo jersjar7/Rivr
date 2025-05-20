@@ -115,13 +115,28 @@ class _FlowStatusCardState extends State<FlowStatusCard> {
       }
     }
 
-    // Card colors - adapt to theme
+    // Card colors - adapt to theme with more contrast for dark mode
     final Color cardColor =
-        isDark ? colorScheme.secondary : colorScheme.secondary;
+        isDark
+            ? HSLColor.fromColor(colorScheme.tertiary)
+                .withLightness(
+                  (HSLColor.fromColor(colorScheme.tertiary).lightness * 0.5)
+                      .clamp(0.0, 1.0),
+                )
+                .toColor() // Much darker teal for dark mode
+            : colorScheme.secondary; // Original color for light mode
+
     final Color cardColorDark =
         isDark
-            ? colorScheme.secondaryContainer
-            : colorScheme.secondary.withValues(alpha: 0.7);
+            ? HSLColor.fromColor(colorScheme.tertiary)
+                .withLightness(
+                  (HSLColor.fromColor(colorScheme.tertiary).lightness * 0.3)
+                      .clamp(0.0, 1.0),
+                )
+                .toColor() // Even darker gradient end for dark mode
+            : colorScheme.secondary.withValues(
+              alpha: 0.7,
+            ); // Original gradient end for light mode
     final Color textColor =
         Colors
             .white; // Text should be white in both themes on this colored card

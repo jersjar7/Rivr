@@ -275,8 +275,13 @@ class _ForecastPageState extends State<ForecastPage>
           controller: _tabController,
           labelColor:
               theme.colorScheme.tertiary, // Will adapt to light/dark theme
-          unselectedLabelColor: theme.colorScheme.surfaceContainerHighest
-              .withValues(alpha: 0.7),
+          unselectedLabelColor:
+              theme.brightness == Brightness.dark
+                  ? Colors
+                      .white70 // Lighter color for dark theme
+                  : theme.colorScheme.onSurface.withValues(
+                    alpha: 0.7,
+                  ), // Darker color for light theme
           indicatorColor: theme.colorScheme.tertiary,
           tabs: const [
             Tab(text: 'Hourly'),

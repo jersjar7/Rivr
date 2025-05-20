@@ -215,23 +215,37 @@ class _LongRangeCalendarState extends State<LongRangeCalendar> {
 
     _tooltipOverlay = OverlayEntry(
       builder:
-          (context) => Positioned(
-            left: tooltipPosition.dx,
-            top: tooltipPosition.dy,
-            child: Material(
-              color: Colors.transparent,
-              child: GestureDetector(
-                onTap: _removeTooltip,
-                child: CalendarDayCellTooltip(
-                  date: date,
-                  flowValue: flowValue,
-                  returnPeriod: widget.returnPeriod,
-                  flowValueFormatter: _flowValueFormatter,
-                  // Flow values are already in the preferred unit
-                  fromUnit: _flowUnitsService.preferredUnit,
+          (context) => Stack(
+            children: [
+              // Full-screen transparent background to capture taps
+              Positioned.fill(
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: _removeTooltip,
+                  child: Container(color: Colors.transparent),
                 ),
               ),
-            ),
+              // Tooltip content positioned at the calculated position
+              Positioned(
+                left: tooltipPosition.dx,
+                top: tooltipPosition.dy,
+                child: Material(
+                  color: Colors.transparent,
+                  child: GestureDetector(
+                    // Prevent taps on the tooltip from closing it
+                    onTap: () {},
+                    child: CalendarDayCellTooltip(
+                      date: date,
+                      flowValue: flowValue,
+                      returnPeriod: widget.returnPeriod,
+                      flowValueFormatter: _flowValueFormatter,
+                      // Flow values are already in the preferred unit
+                      fromUnit: _flowUnitsService.preferredUnit,
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
     );
 

@@ -34,9 +34,10 @@ void registerForecastDependencies(GetIt sl) {
 
   sl.registerLazySingleton<ReturnPeriodRepository>(
     () => ReturnPeriodRepositoryImpl(
-      remoteDataSource: sl<ForecastRemoteDataSource>(),
-      localDataSource: sl<ForecastLocalDataSource>(),
-      networkInfo: sl<NetworkInfo>(),
+      remoteDataSource: sl(),
+      localDataSource: sl(),
+      networkInfo: sl(),
+      flowUnitsService: sl(), // Make sure this is included
     ),
   );
 

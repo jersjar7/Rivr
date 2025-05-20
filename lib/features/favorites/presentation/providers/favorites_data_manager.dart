@@ -64,7 +64,7 @@ class FavoritesDataManager {
 
       // Generate a random image number
       final random = math.Random();
-      final randomImgNumber = random.nextInt(62) + 1;
+      final randomImgNumber = random.nextInt(96) + 1;
 
       // Get the proper name for this station
       String riverName = "";

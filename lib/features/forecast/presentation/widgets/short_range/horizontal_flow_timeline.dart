@@ -476,16 +476,16 @@ class _HorizontalFlowTimelineState extends State<HorizontalFlowTimeline> {
     final markerTextColor = isDark ? colorScheme.onSurface : Colors.grey[700];
 
     return SizedBox(
-      height: 220,
+      height: 240,
       child: SingleChildScrollView(
         controller: _scrollController,
         scrollDirection: Axis.horizontal,
         child: Container(
           width:
-              _sortedForecasts.length *
-              70.0, // Each hour takes 70 logical pixels
+              _sortedForecasts.length * 70.0 +
+              40.0, // Each hour takes 70 logical pixels
           height: 200,
-          padding: const EdgeInsets.symmetric(horizontal: 16.0),
+          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 10),
           child: Stack(
             clipBehavior: Clip.none, // Allow content to overflow the Stack
             children: [

@@ -15,13 +15,13 @@ class ReturnPeriodRepositoryImpl implements ReturnPeriodRepository {
   final ForecastRemoteDataSource remoteDataSource;
   final ForecastLocalDataSource localDataSource;
   final NetworkInfo networkInfo;
-  final FlowUnitsService? flowUnitsService; // Add FlowUnitsService
+  final FlowUnitsService flowUnitsService; // Non-nullable FlowUnitsService
 
   ReturnPeriodRepositoryImpl({
     required this.remoteDataSource,
     required this.localDataSource,
     required this.networkInfo,
-    this.flowUnitsService, // Flow units service for conversion
+    required this.flowUnitsService, // Make required to ensure it's never null
   });
 
   @override
@@ -36,8 +36,8 @@ class ReturnPeriodRepositoryImpl implements ReturnPeriodRepository {
           reachId,
         );
         if (cachedData != null) {
-          // Get the current preferred unit (default to CFS if service not available)
-          final preferredUnit = flowUnitsService?.preferredUnit ?? FlowUnit.cfs;
+          // Get the current preferred unit
+          final preferredUnit = flowUnitsService.preferredUnit;
 
           // Create ReturnPeriod model, specifying source and target units
           final returnPeriod = ReturnPeriodModel.fromJson(
@@ -68,8 +68,8 @@ class ReturnPeriodRepositoryImpl implements ReturnPeriodRepository {
         // Cache the data
         await localDataSource.cacheReturnPeriods(reachId, returnPeriodData);
 
-        // Get the current preferred unit (default to CFS if service not available)
-        final preferredUnit = flowUnitsService?.preferredUnit ?? FlowUnit.cfs;
+        // Get the current preferred unit
+        final preferredUnit = flowUnitsService.preferredUnit;
 
         // Create ReturnPeriod model, specifying source and target units
         final returnPeriod = ReturnPeriodModel.fromJson(
@@ -93,8 +93,8 @@ class ReturnPeriodRepositoryImpl implements ReturnPeriodRepository {
           reachId,
         );
         if (cachedData != null) {
-          // Get the current preferred unit (default to CFS if service not available)
-          final preferredUnit = flowUnitsService?.preferredUnit ?? FlowUnit.cfs;
+          // Get the current preferred unit
+          final preferredUnit = flowUnitsService.preferredUnit;
 
           // Create ReturnPeriod model with explicit unit conversion
           final returnPeriod = ReturnPeriodModel.fromJson(
@@ -134,7 +134,7 @@ class ReturnPeriodRepositoryImpl implements ReturnPeriodRepository {
 
     return returnPeriodResult.fold((failure) => Left(failure), (returnPeriod) {
       // Pass the current preferred unit for proper comparison
-      final fromUnit = flowUnitsService?.preferredUnit ?? FlowUnit.cfs;
+      final fromUnit = flowUnitsService.preferredUnit;
 
       final category = returnPeriod.getFlowCategory(flow, fromUnit: fromUnit);
       return Right(category);
@@ -151,7 +151,7 @@ class ReturnPeriodRepositoryImpl implements ReturnPeriodRepository {
 
     return returnPeriodResult.fold((failure) => Left(failure), (returnPeriod) {
       // Get the current preferred unit for conversion
-      final preferredUnit = flowUnitsService?.preferredUnit ?? FlowUnit.cfs;
+      final preferredUnit = flowUnitsService.preferredUnit;
 
       // Get threshold with explicit unit conversion
       final threshold = returnPeriod.getFlowForYear(

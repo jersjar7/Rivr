@@ -52,6 +52,10 @@ class ReturnPeriod {
     FlowUnit fromUnit =
         FlowUnit.cfs, // Add parameter to specify unit of provided flow
   }) {
+    print(
+      "ReturnPeriod.getFlowCategory: flow=$flow, fromUnit=$fromUnit, unit=$unit",
+    );
+
     // Convert flow to the same unit as stored in this ReturnPeriod object if needed
     double comparableFlow = flow;
     if (fromUnit != unit) {
@@ -62,6 +66,7 @@ class ReturnPeriod {
                   FlowUnit
                       .cfsToFcmsFactor // Convert CFS to CMS
               : flow * FlowUnit.cmsToFcsFactor; // Convert CMS to CFS
+      print("Converted flow: $flow -> $comparableFlow");
     }
 
     // Now compare with the stored threshold values which are already in the correct unit

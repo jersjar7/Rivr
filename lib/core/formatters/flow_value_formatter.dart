@@ -44,12 +44,16 @@ class FlowValueFormatter {
   String formatWithUnit(double value, FlowUnit fromUnit) {
     if (value.isNaN || value.isInfinite) return 'Invalid';
 
-    // Convert the value to the preferred unit
-    final convertedValue = _unitsService.convertToPreferredUnit(
-      value,
-      fromUnit,
-    );
-    return format(convertedValue);
+    // Only convert if the units are different
+    if (fromUnit == _unitsService.preferredUnit) {
+      return format(value); // Skip conversion if already in preferred unit
+    } else {
+      final convertedValue = _unitsService.convertToPreferredUnit(
+        value,
+        fromUnit,
+      );
+      return format(convertedValue);
+    }
   }
 
   /// Format a flow value for compact display (less space)

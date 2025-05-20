@@ -5,7 +5,6 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:rivr/core/formatters/flow_value_formatter.dart';
 import 'package:rivr/core/models/flow_unit.dart';
-import 'package:rivr/core/services/flow_units_service.dart';
 import 'package:rivr/features/forecast/domain/entities/return_period.dart';
 import 'package:rivr/features/forecast/utils/flow_thresholds.dart';
 
@@ -127,10 +126,7 @@ class CalendarDayCell extends StatelessWidget {
                   child: Center(
                     child: Text(
                       // Format flow using the formatter with proper unit handling
-                      effectiveFlowFormatter.formatNumberOnlyWithConversion(
-                        flowValue!,
-                        fromUnit,
-                      ),
+                      effectiveFlowFormatter.formatNumberOnly(flowValue!),
                       style: TextStyle(
                         fontSize: 10,
                         fontWeight: FontWeight.bold,
@@ -218,13 +214,9 @@ class CalendarDayCellTooltip extends StatelessWidget {
     final effectiveFlowFormatter =
         flowValueFormatter ??
         Provider.of<FlowValueFormatter>(context, listen: false);
-    final flowUnitsService = Provider.of<FlowUnitsService>(
-      context,
-      listen: false,
-    );
 
     // Format flow value with proper unit handling
-    final flowStr = effectiveFlowFormatter.formatWithUnit(flowValue, fromUnit);
+    final flowStr = effectiveFlowFormatter.format(flowValue);
 
     String? category;
     String description = 'Flow information not available';
@@ -233,8 +225,9 @@ class CalendarDayCellTooltip extends StatelessWidget {
       // Get category with proper unit handling
       category = returnPeriod!.getFlowCategory(flowValue, fromUnit: fromUnit);
       description = FlowThresholds.getFlowSummary(
-        flowUnitsService.convertToPreferredUnit(flowValue, fromUnit),
+        flowValue,
         returnPeriod!,
+        fromUnit: fromUnit,
       );
     }
 

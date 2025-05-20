@@ -42,6 +42,14 @@ class CalendarDayCell extends StatelessWidget {
     Color cellColor = Colors.grey.shade100;
     Color textColor = isCurrentMonth ? Colors.black87 : Colors.grey.shade400;
 
+    print("===== CELL DEBUG =====");
+    print(
+      "CalendarDayCell.build: date=$date, flowValue=$flowValue, fromUnit=$fromUnit",
+    );
+    if (returnPeriod != null) {
+      print("returnPeriod.unit=${returnPeriod!.unit}");
+    }
+
     // Get formatters from context if not provided
     final effectiveFlowFormatter =
         flowValueFormatter ??
@@ -54,6 +62,9 @@ class CalendarDayCell extends StatelessWidget {
         flowValue!,
         fromUnit: fromUnit, // Explicitly specify the source unit
       );
+
+      print("Flow category result: $flowCategory");
+
       cellColor = _getBackgroundColor(flowCategory);
 
       // Ensure text is readable on colored backgrounds
@@ -209,6 +220,14 @@ class CalendarDayCellTooltip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final dateStr = DateFormat('EEEE, MMMM d, y').format(date);
+
+    print("===== TOOLTIP DEBUG =====");
+    print(
+      "CalendarDayCellTooltip.build: flowValue=$flowValue, fromUnit=$fromUnit",
+    );
+    if (returnPeriod != null) {
+      print("returnPeriod.unit=${returnPeriod!.unit}");
+    }
 
     // Get formatters from context if not provided
     final effectiveFlowFormatter =

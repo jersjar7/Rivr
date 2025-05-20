@@ -1,5 +1,7 @@
 // lib/features/forecast/domain/entities/return_period.dart
 
+import 'dart:math';
+
 import 'package:rivr/core/models/flow_unit.dart';
 import 'package:rivr/core/services/flow_units_service.dart';
 
@@ -52,6 +54,7 @@ class ReturnPeriod {
     FlowUnit fromUnit =
         FlowUnit.cfs, // Add parameter to specify unit of provided flow
   }) {
+    print("===== UNIT DEBUG =====");
     print(
       "ReturnPeriod.getFlowCategory: flow=$flow, fromUnit=$fromUnit, unit=$unit",
     );
@@ -67,6 +70,8 @@ class ReturnPeriod {
                       .cfsToFcmsFactor // Convert CFS to CMS
               : flow * FlowUnit.cmsToFcsFactor; // Convert CMS to CFS
       print("Converted flow: $flow -> $comparableFlow");
+    } else {
+      print("No conversion needed - units match");
     }
 
     // Now compare with the stored threshold values which are already in the correct unit
@@ -159,7 +164,26 @@ class ReturnPeriodModel extends ReturnPeriod {
     FlowUnit targetUnit = FlowUnit.cfs, // Default target is CFS
     FlowUnitsService? flowUnitsService, // Service for conversion
   }) {
+    print("===== RETURN PERIOD DEBUG =====");
+    print(
+      "ReturnPeriodModel.fromJson: sourceUnit=$sourceUnit, targetUnit=$targetUnit",
+    );
+    print(
+      "JSON data: ${json.toString().substring(0, min(200, json.toString().length))}...",
+    );
+
     final Map<int, double> flowValues = {};
+
+    // Sample values before conversion
+    final rawValues = ReturnPeriod.standardYears
+        .where(
+          (year) =>
+              json.containsKey('return_period_$year') &&
+              json['return_period_$year'] != null,
+        )
+        .map((year) => 'rp$year=${json['return_period_$year']}')
+        .join(', ');
+    print("Raw values before conversion: $rawValues");
 
     // Extract values from JSON (assumed to be in sourceUnit)
     for (final year in ReturnPeriod.standardYears) {
@@ -174,14 +198,14 @@ class ReturnPeriodModel extends ReturnPeriod {
                   ? flowUnitsService.cmsToCfs(value) // CMS to CFS
                   : flowUnitsService.cfsToCms(value); // CFS to CMS
 
+          print(
+            "Converting RP$year: $value ($sourceUnit) -> $convertedValue ($targetUnit)",
+          );
           flowValues[year] = convertedValue;
         } else {
           // Store in original unit if no conversion needed or service missing
           flowValues[year] = value;
-
-          // Note: If conversion is needed but service is missing, we'll store
-          // in sourceUnit but declare the unit as targetUnit, which can cause issues
-          // A warning log could be added here for debugging purposes
+          print("No conversion for RP$year: $value ($sourceUnit)");
         }
       }
     }
@@ -192,9 +216,15 @@ class ReturnPeriodModel extends ReturnPeriod {
       resultUnit =
           sourceUnit; // Important: use sourceUnit when conversion failed
       print(
-        'Warning: ReturnPeriodModel created with values in $sourceUnit but marked as $targetUnit',
+        "WARNING: ReturnPeriodModel created with values in $sourceUnit but marked as $targetUnit",
       );
     }
+
+    print("Final ReturnPeriod unit: $resultUnit");
+    final finalValues = flowValues.entries
+        .map((e) => 'rp${e.key}=${e.value}')
+        .join(', ');
+    print("Final converted values: $finalValues");
 
     return ReturnPeriodModel(
       reachId: reachId,

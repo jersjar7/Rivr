@@ -91,6 +91,11 @@ class _LongRangeCalendarState extends State<LongRangeCalendar> {
   final Map<DateTime, double> _dailyFlows = {};
 
   void _processForecasts() {
+    print("===== CALENDAR DEBUG =====");
+    print(
+      "LongRangeCalendar._processForecasts starting, preferredUnit=${_flowUnitsService.preferredUnit}",
+    );
+
     _dailyFlows.clear();
 
     // First process forecasts
@@ -102,9 +107,14 @@ class _LongRangeCalendarState extends State<LongRangeCalendar> {
       );
 
       // Convert flow to preferred unit
+      final originalFlow = forecast.flow;
       final convertedFlow = _flowUnitsService.convertToPreferredUnit(
         forecast.flow,
         _sourceUnit,
+      );
+
+      print(
+        "Converting forecast flow: $originalFlow ($_sourceUnit) -> $convertedFlow (${_flowUnitsService.preferredUnit})",
       );
 
       // If we already have a value for this day, average them
@@ -113,6 +123,15 @@ class _LongRangeCalendarState extends State<LongRangeCalendar> {
       } else {
         _dailyFlows[date] = convertedFlow;
       }
+    }
+
+    // Print the _dailyFlows data
+    if (_dailyFlows.isNotEmpty) {
+      final sampleDate = _dailyFlows.keys.first;
+      final sampleFlow = _dailyFlows[sampleDate];
+      print(
+        "Sample processed daily flow: $sampleDate => $sampleFlow (${_flowUnitsService.preferredUnit})",
+      );
     }
 
     // Then process longRangeFlows if available
@@ -300,6 +319,9 @@ class _LongRangeCalendarState extends State<LongRangeCalendar> {
           // Check if we have flow data for this date
           final flowValue =
               _dailyFlows[DateTime(date.year, date.month, date.day)];
+          print(
+            "Calendar cell for $date: flowValue=$flowValue, preferredUnit=${_flowUnitsService.preferredUnit}",
+          );
 
           return Expanded(
             child: AspectRatio(

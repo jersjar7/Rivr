@@ -1,13 +1,13 @@
 // lib/core/widgets/empty_state.dart
 import 'package:flutter/material.dart';
 
-/// A reusable empty state widget
+/// A reusable empty state widget with proper theming for both light and dark modes
 class EmptyStateView extends StatelessWidget {
   final String title;
   final String? message;
   final IconData icon;
   final Widget? actionButton;
-  final Color iconColor;
+  final Color? iconColor; // Optional custom color
   final double iconSize;
 
   const EmptyStateView({
@@ -16,12 +16,21 @@ class EmptyStateView extends StatelessWidget {
     this.message,
     required this.icon,
     this.actionButton,
-    this.iconColor = Colors.grey,
+    this.iconColor, // No default, will use theme
     this.iconSize = 64,
   });
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    final textTheme = theme.textTheme;
+    final brightness = theme.brightness;
+    final isDarkMode = brightness == Brightness.dark;
+
+    // Default icon color based on theme if none provided
+    final effectiveIconColor = iconColor ?? colors.primary;
+
     return Center(
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 32.0),
@@ -29,29 +38,37 @@ class EmptyStateView extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.center,
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            Icon(icon, size: iconSize, color: iconColor),
+            Icon(icon, size: iconSize, color: effectiveIconColor),
+
             const SizedBox(height: 24),
+
+            // Title text with proper theme styling
             Text(
               title,
-              style: const TextStyle(
-                fontSize: 20,
+              style: textTheme.titleLarge?.copyWith(
                 fontWeight: FontWeight.bold,
-                color: Colors.black87,
+                // Ensure high contrast in dark mode
+                color: isDarkMode ? Colors.white : colors.onSurface,
               ),
               textAlign: TextAlign.center,
             ),
+
+            // Optional message with proper theme styling
             if (message != null) ...[
               const SizedBox(height: 12),
               Text(
                 message!,
-                style: const TextStyle(fontSize: 16, color: Colors.black54),
+                style: textTheme.bodyMedium?.copyWith(
+                  // Slightly dimmed in both modes but readable
+                  color:
+                      isDarkMode
+                          ? Colors.white.withValues(alpha: 0.7)
+                          : colors.onSurfaceVariant,
+                ),
                 textAlign: TextAlign.center,
               ),
             ],
-            if (actionButton != null) ...[
-              const SizedBox(height: 24),
-              actionButton!,
-            ],
+            const SizedBox(height: 100),
           ],
         ),
       ),
@@ -67,14 +84,39 @@ class EmptyFavoritesView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    final brightness = theme.brightness;
+    final isDarkMode = brightness == Brightness.dark;
 
     return EmptyStateView(
       title: 'No Favorite Rivers Yet',
       message:
-          'Add your favorite rivers to track their flow conditions easily.',
+          'Add your favorite rivers to track their flow conditions and get forecasts at a glance.',
       icon: Icons.favorite_border,
-      iconColor: colors.primaryContainer, // lighter “primary” accent
+      // Use appropriate color based on mode
+      iconColor: isDarkMode ? colors.primary : colors.primaryContainer,
+      actionButton:
+          onExploreMap != null
+              ? ElevatedButton.icon(
+                onPressed: onExploreMap,
+                icon: const Icon(Icons.map_outlined),
+                label: const Text('Explore Map'),
+                style: ElevatedButton.styleFrom(
+                  // Use appropriate colors based on mode
+                  backgroundColor: colors.primary,
+                  foregroundColor: colors.onPrimary,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 24,
+                    vertical: 12,
+                  ),
+                  elevation: 4,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(30),
+                  ),
+                ),
+              )
+              : null,
     );
   }
 }
@@ -100,10 +142,8 @@ class ErrorStateView extends StatelessWidget {
       title: title,
       message: message,
       icon: Icons.error_outline,
-
-      // use your theme’s error color
+      // Use theme's error color
       iconColor: colors.error,
-
       actionButton:
           onRetry != null
               ? OutlinedButton.icon(
@@ -111,7 +151,7 @@ class ErrorStateView extends StatelessWidget {
                 icon: const Icon(Icons.refresh),
                 label: const Text('Try Again'),
                 style: OutlinedButton.styleFrom(
-                  // use your theme’s primary color
+                  // Use theme's primary color
                   foregroundColor: colors.primary,
                   side: BorderSide(color: colors.primary),
                   padding: const EdgeInsets.symmetric(
@@ -145,8 +185,7 @@ class NoForecastDataView extends StatelessWidget {
       message:
           'We couldn\'t find forecast data for $stationName. This could be temporary or the station might not have forecast data.',
       icon: Icons.cloud_off,
-
-      // use your theme’s error color
+      // Use theme's error color
       iconColor: colors.error,
       actionButton:
           onRefresh != null
@@ -155,7 +194,7 @@ class NoForecastDataView extends StatelessWidget {
                 icon: const Icon(Icons.refresh),
                 label: const Text('Refresh'),
                 style: OutlinedButton.styleFrom(
-                  // use your theme’s primary color
+                  // Use theme's primary color
                   foregroundColor: colors.primary,
                   side: BorderSide(color: colors.primary),
                   padding: const EdgeInsets.symmetric(
@@ -191,7 +230,7 @@ class NetworkErrorView extends StatelessWidget {
               ? 'No internet connection detected. Check your network settings and try again.'
               : 'We\'re having trouble connecting to the server. This might be temporary.',
       icon: Icons.cloud_off,
-      iconColor: colors.tertiary, // “call-out” accent (warm coral)
+      iconColor: colors.tertiary, // "call-out" accent
       actionButton:
           onRetry != null
               ? ElevatedButton.icon(

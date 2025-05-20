@@ -60,20 +60,32 @@ class _LiveValidationFieldState extends State<LiveValidationField> {
 
   @override
   void dispose() {
-    _debounce?.cancel();
+    // Make sure to cancel any pending timers
+    if (_debounce != null) {
+      _debounce!.cancel();
+      _debounce = null;
+    }
+
+    // Clean up focus node if we created it
     if (widget.focusNode == null) {
       _focusNode.removeListener(_onFocusChange);
       _focusNode.dispose();
     }
+
     super.dispose();
   }
 
   void _onFocusChange() {
+    if (!mounted) return; // Safety check
+
     final hasFocus = _focusNode.hasFocus;
 
     // When focus is lost, validate regardless of debounce
     if (_isFocused && !hasFocus && _isDirty) {
-      _debounce?.cancel();
+      if (_debounce != null) {
+        _debounce!.cancel();
+        _debounce = null;
+      }
       _validate(widget.controller.text);
     }
 
@@ -83,6 +95,8 @@ class _LiveValidationFieldState extends State<LiveValidationField> {
   }
 
   void _onTextChanged(String value) {
+    if (!mounted) return; // Safety check
+
     if (widget.onChanged != null) {
       widget.onChanged!(value);
     }
@@ -95,15 +109,21 @@ class _LiveValidationFieldState extends State<LiveValidationField> {
     });
 
     // Cancel previous debounce timer
-    _debounce?.cancel();
+    if (_debounce != null) {
+      _debounce!.cancel();
+    }
 
-    // Set up new debounce timer
+    // Set up new debounce timer with mounted check
     _debounce = Timer(widget.debounceTime, () {
-      _validate(value);
+      if (mounted) {
+        // Important: check if still mounted before validating
+        _validate(value);
+      }
     });
   }
 
   void _validate(String value) {
+    if (!mounted) return; // Safety check
     if (widget.validator == null) return;
 
     final error = widget.validator!(value);
@@ -115,16 +135,19 @@ class _LiveValidationFieldState extends State<LiveValidationField> {
 
   @override
   Widget build(BuildContext context) {
+    // Get theme colors
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
 
-    // Use themed colors instead of hardcoded colors
-    final successColor = colors.secondary;
+    // Theme-based colors
     final errorColor = colors.error;
     final primaryColor = colors.primary;
-    final warningColor = colors.tertiary; // For recovery suggestions
-    final surfaceColor = colors.surfaceContainerHighest; // For field background
-    final borderColor = colors.outline; // For normal border
+    final successColor = colors.secondary;
+    final warningColor = colors.tertiary;
+    final surfaceColor = colors.surfaceContainerHighest;
+    final borderColor = colors.outline;
+    final onSurfaceColor = colors.onSurface;
+    final onSurfaceVariantColor = colors.onSurfaceVariant;
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 25.0, vertical: 8.0),
@@ -137,7 +160,7 @@ class _LiveValidationFieldState extends State<LiveValidationField> {
             keyboardType: widget.keyboardType,
             focusNode: _focusNode,
             onChanged: _onTextChanged,
-            style: TextStyle(color: colors.onSurface), // Themed text color
+            style: TextStyle(color: onSurfaceColor),
             decoration: InputDecoration(
               enabledBorder: OutlineInputBorder(
                 borderSide: BorderSide(
@@ -164,7 +187,7 @@ class _LiveValidationFieldState extends State<LiveValidationField> {
                 borderRadius: BorderRadius.circular(12),
               ),
               hintText: widget.hintText,
-              hintStyle: TextStyle(color: colors.onSurfaceVariant),
+              hintStyle: TextStyle(color: onSurfaceVariantColor),
               fillColor: surfaceColor,
               filled: true,
               prefixIcon:
@@ -172,7 +195,7 @@ class _LiveValidationFieldState extends State<LiveValidationField> {
                       ? Icon(
                         widget.prefixIcon,
                         color:
-                            _isFocused ? primaryColor : colors.onSurfaceVariant,
+                            _isFocused ? primaryColor : onSurfaceVariantColor,
                       )
                       : null,
               suffixIcon:

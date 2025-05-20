@@ -1,4 +1,4 @@
-// lib/core/widgets/enhanced_error_display.dart
+// lib/features/auth/presentation/widgets/enhanced_error_display.dart
 
 import 'package:flutter/material.dart';
 
@@ -27,6 +27,17 @@ class _EnhancedErrorDisplayState extends State<EnhancedErrorDisplay> {
 
   @override
   Widget build(BuildContext context) {
+    // Get theme colors for proper light/dark mode support
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+
+    // Error colors based on theme
+    final errorColor = colors.error;
+    final errorContainerColor = colors.error.withValues(alpha: 0.1);
+    final errorBorderColor = colors.error.withValues(alpha: 0.3);
+
+    final secondaryTextColor = colors.onSurfaceVariant;
+
     final String mainMessage =
         widget.collapsible && !_isExpanded && widget.message.length > 80
             ? '${widget.message.substring(0, 80)}...'
@@ -37,9 +48,9 @@ class _EnhancedErrorDisplayState extends State<EnhancedErrorDisplay> {
       child: Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: Colors.red.withOpacity(0.1),
+          color: errorContainerColor,
           borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: Colors.red.shade200),
+          border: Border.all(color: errorBorderColor),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -49,11 +60,7 @@ class _EnhancedErrorDisplayState extends State<EnhancedErrorDisplay> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 if (widget.showIcon) ...[
-                  Icon(
-                    Icons.error_outline,
-                    color: Colors.red.shade700,
-                    size: 20,
-                  ),
+                  Icon(Icons.error_outline, color: errorColor, size: 20),
                   const SizedBox(width: 8),
                 ],
                 Expanded(
@@ -62,7 +69,10 @@ class _EnhancedErrorDisplayState extends State<EnhancedErrorDisplay> {
                     children: [
                       Text(
                         mainMessage,
-                        style: TextStyle(color: Colors.red.shade700),
+                        style: TextStyle(
+                          color: errorColor,
+                          fontWeight: FontWeight.w500,
+                        ),
                       ),
 
                       // Recovery suggestion if provided
@@ -71,7 +81,7 @@ class _EnhancedErrorDisplayState extends State<EnhancedErrorDisplay> {
                         Text(
                           widget.recoverySuggestion!,
                           style: TextStyle(
-                            color: Colors.grey.shade800,
+                            color: secondaryTextColor,
                             fontSize: 13,
                             fontStyle: FontStyle.italic,
                           ),
@@ -95,6 +105,7 @@ class _EnhancedErrorDisplayState extends State<EnhancedErrorDisplay> {
                     });
                   },
                   style: TextButton.styleFrom(
+                    foregroundColor: errorColor,
                     minimumSize: Size.zero,
                     padding: const EdgeInsets.symmetric(
                       horizontal: 8,
@@ -104,7 +115,7 @@ class _EnhancedErrorDisplayState extends State<EnhancedErrorDisplay> {
                   ),
                   child: Text(
                     _isExpanded ? 'Show less' : 'Show more',
-                    style: TextStyle(color: Colors.red.shade700, fontSize: 12),
+                    style: TextStyle(fontSize: 12),
                   ),
                 ),
               ),
@@ -120,7 +131,7 @@ class _EnhancedErrorDisplayState extends State<EnhancedErrorDisplay> {
                   icon: const Icon(Icons.refresh, size: 16),
                   label: const Text('Retry'),
                   style: TextButton.styleFrom(
-                    foregroundColor: Colors.red.shade700,
+                    foregroundColor: errorColor,
                     padding: const EdgeInsets.symmetric(
                       horizontal: 12,
                       vertical: 8,

@@ -20,6 +20,19 @@ class ForgotPasswordPageState extends State<ForgotPasswordPage> {
   bool _emailSent = false;
 
   @override
+  void initState() {
+    super.initState();
+
+    // Clear previous success/error messages when the page loads
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        final authProvider = Provider.of<AuthProvider>(context, listen: false);
+        authProvider.clearMessages();
+      }
+    });
+  }
+
+  @override
   void dispose() {
     _emailController.dispose();
     super.dispose();
@@ -123,7 +136,7 @@ class ForgotPasswordPageState extends State<ForgotPasswordPage> {
                     const SizedBox(height: 25),
 
                     // If email was sent successfully, show success state
-                    if (_emailSent)
+                    if (_emailSent || authProvider.successMessage.isNotEmpty)
                       _buildSuccessState()
                     else
                       Column(

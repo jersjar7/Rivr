@@ -433,7 +433,7 @@ class _StationListDrawerState extends State<StationListDrawer> {
                   TextField(
                     controller: _searchController,
                     decoration: InputDecoration(
-                      hintText: 'Search stations by name or ID',
+                      hintText: 'Search by distance or name',
                       hintStyle: TextStyle(
                         color: colors.onPrimary.withValues(alpha: 0.7),
                       ),
@@ -468,24 +468,22 @@ class _StationListDrawerState extends State<StationListDrawer> {
                   const SizedBox(height: 16),
                   Row(
                     children: [
-                      Text(
-                        'Sort by:',
-                        style: TextStyle(
-                          color: colors.onPrimary.withValues(alpha: 0.7),
-                        ),
-                      ),
+                      Text('Sort by:', style: TextStyle(color: Colors.white70)),
                       const SizedBox(width: 8),
                       ChoiceChip(
                         label: const Text('Distance'),
                         selected: _sortByDistance,
                         onSelected: (_) => _toggleSortOrder(),
-                        selectedColor: colors.onPrimary,
-                        backgroundColor: colors.primaryContainer,
+                        selectedColor: Colors.white,
+                        backgroundColor: theme.primaryColor.withValues(
+                          alpha: 0.7,
+                        ),
+                        checkmarkColor: theme.primaryColor, // Add this line
                         labelStyle: TextStyle(
                           color:
                               _sortByDistance
-                                  ? colors.primary
-                                  : colors.onPrimary,
+                                  ? theme.primaryColor
+                                  : Colors.white,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
@@ -494,13 +492,16 @@ class _StationListDrawerState extends State<StationListDrawer> {
                         label: const Text('Name'),
                         selected: !_sortByDistance,
                         onSelected: (_) => _toggleSortOrder(),
-                        selectedColor: colors.onPrimary,
-                        backgroundColor: colors.primaryContainer,
+                        selectedColor: Colors.white,
+                        backgroundColor: theme.primaryColor.withValues(
+                          alpha: 0.7,
+                        ),
+                        checkmarkColor: theme.primaryColor, // Add this line
                         labelStyle: TextStyle(
                           color:
                               !_sortByDistance
-                                  ? colors.primary
-                                  : colors.onPrimary,
+                                  ? theme.primaryColor
+                                  : Colors.white,
                           fontWeight: FontWeight.bold,
                         ),
                       ),

@@ -479,11 +479,30 @@ class _OptimizedMapPageState extends State<OptimizedMapPage>
   void _toggle3DTerrain(bool enable) {
     if (_mapboxMap == null) return;
 
+    // 1. Get providers
+    final mapProvider = Provider.of<MapProvider>(context, listen: false);
+
+    // 2. Update local state
     setState(() {
       _is3DMode = enable;
     });
 
-    _initHelper.toggle3DTerrain(mapboxMap: _mapboxMap!, enable: enable);
+    // 3. Call MapProvider's toggle method to ensure proper state sync
+    if (mapProvider.is3DMode != enable) {
+      mapProvider.toggle3DTerrain();
+    }
+
+    // 4. Also call helper to ensure map styling updates correctly
+    _initHelper.toggle3DTerrain(mapboxMap: _mapboxMap!, enable: enable).then((
+      _,
+    ) {
+      // 5. Set camera pitch to reinforce the change
+      if (enable) {
+        mapProvider.setCameraPitch(MapConstants.defaultTilt);
+      } else {
+        mapProvider.setCameraPitch(0);
+      }
+    });
   }
 
   // Refresh stations

@@ -2,8 +2,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
-
-import 'style_selector_sheet.dart';
+import 'package:rivr/features/map/presentation/widgets/map_components/enhanced_map_style_selector.dart';
 
 /// A widget that provides map control buttons (style selector, terrain toggle, zoom)
 class MapControls extends StatelessWidget {
@@ -67,7 +66,7 @@ class MapControls extends StatelessWidget {
         ),
 
         // Zoom controls at bottom-right
-        Positioned(right: 16, bottom: 150, child: _buildZoomControls(context)),
+        // Positioned(right: 16, bottom: 150, child: _buildZoomControls(context)),
       ],
     );
   }
@@ -188,80 +187,11 @@ class MapControls extends StatelessWidget {
     );
   }
 
-  Widget _buildZoomControls(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(8),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withAlpha(26),
-            blurRadius: 4,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        children: [
-          // Zoom in button
-          SizedBox(
-            height: 48,
-            width: 48,
-            child: _buildZoomButton(
-              icon: Icons.add,
-              tooltip: 'Zoom in',
-              onPressed: onZoomIn,
-              borderRadius: const BorderRadius.vertical(
-                top: Radius.circular(8),
-              ),
-            ),
-          ),
-
-          // Divider
-          Container(height: 1, width: 36, color: Colors.grey.withAlpha(77)),
-
-          // Zoom out button
-          SizedBox(
-            height: 48,
-            width: 48,
-            child: _buildZoomButton(
-              icon: Icons.remove,
-              tooltip: 'Zoom out',
-              onPressed: onZoomOut,
-              borderRadius: const BorderRadius.vertical(
-                bottom: Radius.circular(8),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildZoomButton({
-    required IconData icon,
-    required String tooltip,
-    required VoidCallback onPressed,
-    required BorderRadius borderRadius,
-  }) {
-    return Tooltip(
-      message: tooltip,
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: onPressed,
-          borderRadius: borderRadius,
-          child: Center(child: Icon(icon)),
-        ),
-      ),
-    );
-  }
-
   void _showStyleSelector(BuildContext context) {
     showModalBottomSheet(
       context: context,
       builder:
-          (context) => StyleSelectorSheet(
+          (context) => EnhancedMapStyleSelector(
             currentStyle: currentStyle,
             onStyleSelected: (style) {
               onStyleChanged(style);

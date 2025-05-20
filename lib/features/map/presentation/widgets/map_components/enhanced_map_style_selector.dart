@@ -15,13 +15,17 @@ class EnhancedMapStyleSelector extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    final textTheme = theme.textTheme;
+
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: colors.surface,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.1),
+            color: colors.shadow,
             blurRadius: 10,
             offset: const Offset(0, -2),
           ),
@@ -30,29 +34,24 @@ class EnhancedMapStyleSelector extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // // Handle bar
-          // Container(
-          //   margin: const EdgeInsets.only(top: 12),
-          //   width: 40,
-          //   height: 4,
-          //   decoration: BoxDecoration(
-          //     color: Colors.grey[300],
-          //     borderRadius: BorderRadius.circular(2),
-          //   ),
-          // ),
-
           // Header
           Padding(
             padding: const EdgeInsets.fromLTRB(20, 5, 24, 1),
             child: Row(
               children: [
-                const Text(
+                Text(
                   'Choose Map',
-                  style: TextStyle(fontSize: 18.0, fontWeight: FontWeight.bold),
+                  style: textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: colors.onSurface,
+                  ),
                 ),
                 const Spacer(),
                 IconButton(
-                  icon: const Icon(Icons.close_rounded),
+                  icon: Icon(
+                    Icons.close_rounded,
+                    color: colors.onSurfaceVariant,
+                  ),
                   onPressed: () => Navigator.pop(context),
                   tooltip: 'Close',
                 ),
@@ -73,17 +72,17 @@ class EnhancedMapStyleSelector extends StatelessWidget {
               children: [
                 _buildStyleCard(
                   context,
-                  'Standard',
-                  MapConstants.mapboxStandard,
-                  'assets/map_previews/standard.png',
-                  Icons.public,
-                ),
-                _buildStyleCard(
-                  context,
                   'Streets',
                   MapConstants.mapboxStreets,
                   'assets/map_previews/streets.png',
                   Icons.map,
+                ),
+                _buildStyleCard(
+                  context,
+                  'Standard',
+                  MapConstants.mapboxStandard,
+                  'assets/map_previews/standard.png',
+                  Icons.public,
                 ),
                 _buildStyleCard(
                   context,
@@ -128,25 +127,26 @@ class EnhancedMapStyleSelector extends StatelessWidget {
     String imagePath,
     IconData iconData,
   ) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
     final bool isSelected = currentStyle == styleUri;
-    final Color primaryColor = Theme.of(context).primaryColor;
     final borderRadius = BorderRadius.circular(12);
 
     return GestureDetector(
       onTap: () => onStyleSelected(styleUri),
       child: Container(
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: colors.surface,
           borderRadius: borderRadius,
           border: Border.all(
-            color: isSelected ? primaryColor : Colors.grey[300]!,
+            color: isSelected ? colors.primary : colors.outlineVariant,
             width: isSelected ? 2 : 1,
           ),
           boxShadow:
               isSelected
                   ? [
                     BoxShadow(
-                      color: primaryColor.withValues(alpha: 0.3),
+                      color: colors.primary.withValues(alpha: 0.3),
                       blurRadius: 8,
                       offset: const Offset(0, 2),
                     ),
@@ -163,21 +163,35 @@ class EnhancedMapStyleSelector extends StatelessWidget {
                 children: [
                   // Image preview
                   Container(
-                    // margin: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      borderRadius: BorderRadius.only(
+                      borderRadius: const BorderRadius.only(
                         topLeft: Radius.circular(8),
                         topRight: Radius.circular(8),
                         bottomLeft: Radius.circular(0),
                         bottomRight: Radius.circular(0),
                       ),
-                      // border: Border.all(color: Colors.grey[300]!, width: 1),
                       image: DecorationImage(
                         image: AssetImage(imagePath),
                         fit: BoxFit.cover,
+                        opacity:
+                            theme.brightness == Brightness.dark
+                                ? 0.85
+                                : 1.0, // Slightly dim in dark mode
                       ),
                     ),
                   ),
+
+                  // Optional: Overlay for dark mode to prevent images from being too bright
+                  if (theme.brightness == Brightness.dark)
+                    Container(
+                      decoration: BoxDecoration(
+                        borderRadius: const BorderRadius.only(
+                          topLeft: Radius.circular(8),
+                          topRight: Radius.circular(8),
+                        ),
+                        color: Colors.black.withValues(alpha: 0.1),
+                      ),
+                    ),
                 ],
               ),
             ),
@@ -196,7 +210,7 @@ class EnhancedMapStyleSelector extends StatelessWidget {
                     style: TextStyle(
                       fontWeight:
                           isSelected ? FontWeight.bold : FontWeight.w400,
-                      color: isSelected ? primaryColor : Colors.black87,
+                      color: isSelected ? colors.primary : colors.onSurface,
                       fontSize: 14,
                     ),
                   ),

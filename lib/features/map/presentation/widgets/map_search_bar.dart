@@ -126,17 +126,23 @@ class _MapSearchBarState extends State<MapSearchBar> {
 
   @override
   Widget build(BuildContext context) {
+    // Get theme and colors from the context
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    final textTheme = theme.textTheme;
+
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
+        // Search input container
         Container(
           margin: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(8),
+            color: colors.surface,
+            borderRadius: BorderRadius.circular(16),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withValues(alpha: 0.1),
+                color: colors.shadow,
                 blurRadius: 8,
                 offset: const Offset(0, 2),
               ),
@@ -145,13 +151,17 @@ class _MapSearchBarState extends State<MapSearchBar> {
           child: TextField(
             controller: _searchController,
             focusNode: _focusNode,
+            style: textTheme.bodyLarge?.copyWith(color: colors.onSurface),
             decoration: InputDecoration(
               hintText: 'Search for a place',
-              prefixIcon: const Icon(Icons.search),
+              hintStyle: textTheme.bodyLarge?.copyWith(
+                color: colors.onSurfaceVariant,
+              ),
+              prefixIcon: Icon(Icons.search, color: colors.primary),
               suffixIcon:
                   _searchController.text.isNotEmpty
                       ? IconButton(
-                        icon: const Icon(Icons.clear),
+                        icon: Icon(Icons.clear, color: colors.onSurfaceVariant),
                         onPressed: () {
                           _searchController.clear();
                           setState(() {
@@ -170,45 +180,63 @@ class _MapSearchBarState extends State<MapSearchBar> {
           ),
         ),
 
+        // Loading indicator
         if (_isSearching)
-          const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 16),
-            child: LinearProgressIndicator(),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: LinearProgressIndicator(
+              color: colors.primary,
+              backgroundColor: colors.surfaceContainerHighest,
+            ),
           ),
 
+        // Search results list
         if (_searchResults.isNotEmpty)
           Container(
             margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: colors.surface,
               borderRadius: BorderRadius.circular(8),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.1),
+                  color: colors.shadow,
                   blurRadius: 8,
                   offset: const Offset(0, 2),
                 ),
               ],
             ),
             constraints: const BoxConstraints(maxHeight: 300),
-            child: ListView.builder(
-              shrinkWrap: true,
-              itemCount: _searchResults.length,
-              itemBuilder: (context, index) {
-                final result = _searchResults[index];
-                return ListTile(
-                  title: Text(result.name),
-                  subtitle:
-                      result.address != null
-                          ? Text(
-                            result.address!,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          )
-                          : null,
-                  onTap: () => _onSearchResultSelected(result),
-                );
-              },
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: ListView.builder(
+                shrinkWrap: true,
+                itemCount: _searchResults.length,
+                itemBuilder: (context, index) {
+                  final result = _searchResults[index];
+                  return ListTile(
+                    title: Text(
+                      result.name,
+                      style: textTheme.titleSmall?.copyWith(
+                        color: colors.onSurface,
+                      ),
+                    ),
+                    subtitle:
+                        result.address != null
+                            ? Text(
+                              result.address!,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: textTheme.bodySmall?.copyWith(
+                                color: colors.onSurfaceVariant,
+                              ),
+                            )
+                            : null,
+                    onTap: () => _onSearchResultSelected(result),
+                    tileColor: colors.surface,
+                    hoverColor: colors.surfaceContainerHighest.withOpacity(0.3),
+                  );
+                },
+              ),
             ),
           ),
       ],

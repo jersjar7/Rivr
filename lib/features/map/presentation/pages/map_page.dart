@@ -183,15 +183,30 @@ class _OptimizedMapPageState extends State<OptimizedMapPage>
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    final textTheme = theme.textTheme;
+
     return WillPopScope(
       onWillPop: _onWillPop,
       child: Scaffold(
         key: _scaffoldKey,
+        backgroundColor:
+            colors.surface, // Add explicit background color for the scaffold
         drawer: const StationListDrawer(),
         appBar: AppBar(
-          title: const Text('Add River'),
+          title: Text(
+            'Add River',
+            style: textTheme.titleMedium?.copyWith(
+              color: colors.onPrimary,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          backgroundColor: colors.primary,
+          foregroundColor: colors.onPrimary,
+          elevation: 2,
           leading: IconButton(
-            icon: const Icon(Icons.arrow_back),
+            icon: Icon(Icons.arrow_back, color: colors.onPrimary),
             // When back button is pressed in AppBar, execute callback if provided
             onPressed: () {
               if (widget.onStationAddedToFavorites != null) {
@@ -218,7 +233,11 @@ class _OptimizedMapPageState extends State<OptimizedMapPage>
               top: MediaQuery.of(context).padding.top + 100,
               child: DrawerPullTag(
                 onTap: () => _scaffoldKey.currentState?.openDrawer(),
-                backgroundColor: Theme.of(context).primaryColor,
+                backgroundColor:
+                    colors.brightness == Brightness.dark
+                        ? colors
+                            .secondary // Use secondary color in dark mode
+                        : colors.primary, // Use primary color in light mode
               ),
             ),
 
@@ -271,6 +290,35 @@ class _OptimizedMapPageState extends State<OptimizedMapPage>
         );
 
         try {
+          // Get the current brightness from the theme
+          final brightness = Theme.of(context).brightness;
+          String styleUri = mapProvider.currentStyle;
+
+          // Automatically switch to a dark map style when in dark mode
+          // and to a light style when in light mode
+          if (brightness == Brightness.dark) {
+            // Only switch if not already using a dark style
+            if (!styleUri.contains('dark') && !styleUri.contains('satellite')) {
+              styleUri = MapConstants.mapboxDark;
+
+              // Update the provider's style (without rebuilding)
+              // This ensures the stored style stays in sync
+              Future.microtask(() {
+                mapProvider.setCurrentStyleWithoutRebuild(styleUri);
+              });
+            }
+          } else {
+            // For light mode, switch back to a light style if using dark
+            if (styleUri.contains('dark')) {
+              styleUri = MapConstants.mapboxStreets; // Or any other light style
+
+              // Update the provider's style (without rebuilding)
+              Future.microtask(() {
+                mapProvider.setCurrentStyleWithoutRebuild(styleUri);
+              });
+            }
+          }
+
           // Use a unique key for the MapWidget to force recreation when needed
           return MapWidget(
             key: _mapKey,
@@ -281,7 +329,7 @@ class _OptimizedMapPageState extends State<OptimizedMapPage>
               pitch: _is3DMode ? MapConstants.defaultTilt : 0.0,
               bearing: 0,
             ),
-            styleUri: mapProvider.currentStyle,
+            styleUri: styleUri,
             onCameraChangeListener: _handleCameraChanged,
             // Add the onTapListener here
             onTapListener: (tapData) {
@@ -294,6 +342,7 @@ class _OptimizedMapPageState extends State<OptimizedMapPage>
           );
         } catch (e) {
           print("OPTIMIZED MAP: Exception building map: $e");
+          // Pass theme context to the error view
           return MapErrorView(error: e.toString(), onRetry: _resetMap);
         }
       },

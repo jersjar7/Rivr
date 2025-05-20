@@ -100,6 +100,22 @@ class MapProvider with ChangeNotifier {
     notifyListeners();
   }
 
+  /// Updates the current style without triggering a rebuild
+  /// This is used for theme-driven style changes
+  void setCurrentStyleWithoutRebuild(String styleUri) {
+    if (_currentStyle != styleUri) {
+      _currentStyle = styleUri;
+      // Don't call notifyListeners() to avoid a rebuild cycle
+      // The style will be applied directly to the MapWidget
+
+      // Optionally save the style preference if you store it
+      // For example:
+      // _preferencesService.saveMapStyle(styleUri);
+
+      print("MapProvider: Style updated to $styleUri without rebuild");
+    }
+  }
+
   // Helper method to trigger debounce
   void triggerDebounceTimer(VoidCallback callback) {
     if (_debounceTimer?.isActive ?? false) {

@@ -53,7 +53,6 @@ class MapControls extends StatelessWidget {
                   icon: Icons.layers,
                   tooltip: 'Map style: ${_getStyleName(currentStyle)}',
                   onPressed: () => _showStyleSelector(context),
-                  badge: _getStyleName(currentStyle).characters.first,
                 ),
 
                 const SizedBox(height: 12),
@@ -95,9 +94,21 @@ class MapControls extends StatelessWidget {
     required IconData icon,
     required String tooltip,
     required VoidCallback onPressed,
-    String? badge,
+    // String? badge, // Kept for compatibility, but won't be displayed
   }) {
-    final Color activeColor = Theme.of(context).primaryColor;
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    final brightness = theme.brightness;
+
+    // Use consistent styling for all buttons
+    final Color bgColor = colors.surface;
+
+    // Use secondary (teal) color for icon in dark mode
+    final Color iconColor =
+        brightness == Brightness.dark
+            ? colors
+                .secondary // Teal in dark mode
+            : colors.onSurface; // Normal icon color in light mode
 
     return Tooltip(
       message: tooltip,
@@ -105,11 +116,11 @@ class MapControls extends StatelessWidget {
         height: 48,
         width: 48,
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: bgColor,
           borderRadius: BorderRadius.circular(8),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withAlpha(26),
+              color: colors.shadow,
               blurRadius: 4,
               offset: const Offset(0, 2),
             ),
@@ -117,37 +128,11 @@ class MapControls extends StatelessWidget {
         ),
         child: Material(
           color: Colors.transparent,
+          borderRadius: BorderRadius.circular(8),
           child: InkWell(
             onTap: onPressed,
             borderRadius: BorderRadius.circular(8),
-            child: Stack(
-              children: [
-                Center(child: Icon(icon, color: Colors.black87, size: 24)),
-                if (badge != null)
-                  Positioned(
-                    right: 6,
-                    bottom: 6,
-                    child: Container(
-                      width: 16,
-                      height: 16,
-                      decoration: BoxDecoration(
-                        color: activeColor,
-                        shape: BoxShape.circle,
-                      ),
-                      child: Center(
-                        child: Text(
-                          badge,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-              ],
-            ),
+            child: Center(child: Icon(icon, color: iconColor, size: 24)),
           ),
         ),
       ),
@@ -156,16 +141,31 @@ class MapControls extends StatelessWidget {
 
   Widget _build3DToggleButton(BuildContext context) {
     final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    final brightness = theme.brightness;
+
+    // Use the same background color as the control buttons
+    final Color bgColor = colors.surface;
+
+    // For icon color, use secondary in dark mode regardless of toggle state
+    // In light mode, use onSurface
+    final Color iconColor =
+        brightness == Brightness.dark
+            ? colors
+                .secondary // Always teal in dark mode
+            : (is3DMode
+                ? colors.primary
+                : colors.onSurface); // In light mode, highlight when active
 
     return Container(
       width: 48,
       height: 48,
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: bgColor,
         borderRadius: BorderRadius.circular(8),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withAlpha(26),
+            color: colors.shadow,
             blurRadius: 4,
             offset: const Offset(0, 2),
           ),
@@ -173,13 +173,14 @@ class MapControls extends StatelessWidget {
       ),
       child: Material(
         color: Colors.transparent,
+        borderRadius: BorderRadius.circular(8),
         child: InkWell(
           onTap: () => onToggle3D(!is3DMode),
           borderRadius: BorderRadius.circular(8),
           child: Center(
             child: Icon(
               is3DMode ? Icons.view_in_ar : Icons.map,
-              color: is3DMode ? theme.primaryColor : Colors.black87,
+              color: iconColor,
             ),
           ),
         ),

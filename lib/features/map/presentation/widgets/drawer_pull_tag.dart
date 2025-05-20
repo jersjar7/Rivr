@@ -19,37 +19,49 @@ class DrawerPullTag extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    final brightness = theme.brightness;
+
+    // Use more explicit color assignments
+    Color bgColor =
+        backgroundColor ??
+        (brightness == Brightness.light
+            ? colors.primary
+            : colors
+                .secondary); // Use secondary in dark mode for more visibility
+
+    Color chevronColor =
+        iconColor ??
+        (brightness == Brightness.light
+            ? colors.onPrimary
+            : colors.onSecondary);
 
     return Material(
       color: Colors.transparent,
-      elevation: 4, // Add elevation for better visibility
+      elevation: 6, // Increased elevation for better visibility
       child: GestureDetector(
         onTap: onTap,
         child: Container(
           height: 70,
           width: 24,
           decoration: BoxDecoration(
-            color: backgroundColor ?? theme.primaryColor,
+            color: bgColor,
             borderRadius: const BorderRadius.only(
               topRight: Radius.circular(8),
               bottomRight: Radius.circular(8),
             ),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withValues(
-                  alpha: 0.3,
-                ), // More visible shadow
+                color: Colors.black.withOpacity(
+                  0.3,
+                ), // Use fixed shadow color for better visibility
                 blurRadius: 4,
                 offset: const Offset(2, 2),
               ),
             ],
           ),
           child: Center(
-            child: Icon(
-              Icons.chevron_right,
-              color: iconColor ?? Colors.white,
-              size: 20,
-            ),
+            child: Icon(Icons.chevron_right, color: chevronColor, size: 20),
           ),
         ),
       ),

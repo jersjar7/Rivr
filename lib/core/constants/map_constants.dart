@@ -59,7 +59,7 @@ class MapConstants {
   static const int searchResultLimit = 5;
 
   // Animation durations
-  static const int mapAnimationDurationMs = 2000;
+  static const int mapAnimationDurationMs = 5000;
   static const int mapAnimationDelayMs = 0;
 
   // Add this method to log the token status

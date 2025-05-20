@@ -77,7 +77,7 @@ class _FavoritesDrawerState extends State<FavoritesDrawer> {
                       (expanded) => _toggleSection('measurement'),
                   leading: Icon(Icons.straighten, color: colors.primary),
                   title: Text(
-                    'Measurement & Display',
+                    'Units & Theme',
                     style: textTheme.titleSmall?.copyWith(
                       fontWeight: FontWeight.bold,
                     ),

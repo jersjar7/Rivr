@@ -286,7 +286,7 @@ class _ForecastPageState extends State<ForecastPage>
               theme.brightness == Brightness.dark
                   ? Colors
                       .white70 // Lighter color for dark theme
-                  : theme.colorScheme.onSurface.withValues(
+                  : theme.colorScheme.surface.withValues(
                     alpha: 0.7,
                   ), // Darker color for light theme
           indicatorColor: theme.colorScheme.tertiary,

@@ -565,14 +565,14 @@ class _HydrographChartState extends State<HydrographChart> {
                   color: colorScheme.tertiary.withValues(alpha: 0.7),
                   borderRadius: BorderRadius.circular(16),
                 ),
-                child: Text(
-                  'Pinch to zoom • Double tap to reset',
-                  style: TextStyle(
-                    color: colorScheme.onTertiary,
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
+                // child: Text(
+                //   'Pinch to zoom • Double tap to reset',
+                //   style: TextStyle(
+                //     color: colorScheme.onTertiary,
+                //     fontSize: 12,
+                //     fontWeight: FontWeight.bold,
+                //   ),
+                // ),
               ),
             ),
           ),

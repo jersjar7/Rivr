@@ -141,15 +141,9 @@ class _LongRangeCalendarState extends State<LongRangeCalendar> {
           // Use 'mean' or 'avg' flow value if available
           final flow = flowData['mean'] ?? flowData['avg'] ?? flowData['flow'];
           if (flow != null) {
-            // Convert flow to preferred unit
-            final convertedFlow = _flowUnitsService.convertToPreferredUnit(
-              flow,
-              _sourceUnit,
-            );
-
-            // Normalize to start of day to ensure proper matching
+            // Use the value as is - it's already in the preferred unit
             final normalizedDate = DateTime(date.year, date.month, date.day);
-            _dailyFlows[normalizedDate] = convertedFlow;
+            _dailyFlows[normalizedDate] = flow;
           }
         } catch (e) {
           // Skip entries that can't be processed

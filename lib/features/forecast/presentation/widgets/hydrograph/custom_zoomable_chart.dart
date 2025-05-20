@@ -1108,52 +1108,6 @@ class _CustomZoomableChartState extends State<CustomZoomableChart> {
             ),
           ),
         ),
-
-        // Zoom indicator
-        if (_currentZoomLevel > 1.05)
-          Positioned(
-            top: 8,
-            right: 8,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(
-                color: colorScheme.primaryContainer.withValues(alpha: 0.8),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Text(
-                '${_currentZoomLevel.toStringAsFixed(1)}x',
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
-                  color: colorScheme.onPrimaryContainer,
-                ),
-              ),
-            ),
-          ),
-
-        // Zoom instructions hint
-        Positioned(
-          bottom: 12,
-          left: 0,
-          right: 0,
-          child: Center(
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                color: colorScheme.tertiary.withValues(alpha: 0.7),
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: Text(
-                'Pinch to zoom • Double tap to reset',
-                style: TextStyle(
-                  color: colorScheme.onTertiary,
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-          ),
-        ),
       ],
     );
   }

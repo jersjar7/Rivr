@@ -1,6 +1,7 @@
 // lib/app.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:rivr/core/providers/theme_provider.dart';
 import 'package:rivr/core/theme/app_theme.dart';
 import 'core/di/service_locator.dart';
 import 'core/navigation/app_router.dart';
@@ -25,16 +26,20 @@ class RivrApp extends StatelessWidget {
         // Add ReachProvider which isn't a global provider
         ChangeNotifierProvider(create: (_) => ReachProvider()),
       ],
-      child: MaterialApp(
-        title: 'Rivr',
-        theme: primaryTheme,
-        darkTheme: darkTheme,
-        themeMode: ThemeMode.system,
-        initialRoute: '/',
-        onGenerateRoute: AppRouter.generateRoute,
-        builder: (context, child) {
-          // Optimize the app layout by using a more efficient structure
-          return _OptimizedAppLayout(child: child!);
+      child: Consumer<ThemeProvider>(
+        builder: (context, themeProvider, _) {
+          return MaterialApp(
+            title: 'Rivr',
+            theme: primaryTheme,
+            darkTheme: darkTheme,
+            themeMode: themeProvider.themeMode,
+            initialRoute: '/',
+            onGenerateRoute: AppRouter.generateRoute,
+            builder: (context, child) {
+              // Optimize the app layout by using a more efficient structure
+              return _OptimizedAppLayout(child: child!);
+            },
+          );
         },
       ),
     );

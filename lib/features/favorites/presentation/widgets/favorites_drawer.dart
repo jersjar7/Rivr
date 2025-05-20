@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:rivr/core/services/flow_units_service.dart';
 import 'package:rivr/features/forecast/presentation/widgets/unit_selector_widget.dart';
+import 'package:rivr/features/settings/presentation/pages/theme_settings_page.dart';
 import '../../../../features/auth/presentation/providers/auth_provider.dart';
 
 class FavoritesDrawer extends StatefulWidget {
@@ -122,9 +123,9 @@ class _FavoritesDrawerState extends State<FavoritesDrawer> {
                       title: Text('Theme Settings'),
                       trailing: Icon(Icons.arrow_forward_ios, size: 16),
                       onTap: () {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Theme setting coming soon'),
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (context) => const ThemeSettingsPage(),
                           ),
                         );
                       },

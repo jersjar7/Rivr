@@ -9,6 +9,7 @@ import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:rivr/core/di/map_di.dart';
 import 'package:rivr/core/formatters/flow_value_formatter.dart';
 import 'package:rivr/core/network/connection_monitor.dart';
+import 'package:rivr/core/providers/theme_provider.dart';
 import 'package:rivr/core/services/flow_units_service.dart';
 import 'package:rivr/core/services/geocoding_service.dart';
 import 'package:rivr/core/services/stream_name_service.dart';
@@ -158,6 +159,11 @@ Future<void> setupServiceLocator() async {
   // Register FlowValueFormatter
   sl.registerLazySingleton<FlowValueFormatter>(
     () => FlowValueFormatter(unitsService: sl<FlowUnitsService>()),
+  );
+
+  // Register ThemeProvider
+  sl.registerLazySingleton<ThemeProvider>(
+    () => ThemeProvider(preferences: sl<SharedPreferences>()),
   );
 }
 

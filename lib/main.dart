@@ -4,6 +4,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:rivr/core/formatters/flow_value_formatter.dart';
+import 'package:rivr/core/providers/theme_provider.dart';
 import 'package:rivr/core/services/flow_units_service.dart';
 import 'firebase_options.dart';
 import 'app.dart';
@@ -135,6 +136,11 @@ Future<void> main() async {
           create: (_) => sl<FlowUnitsService>(),
         ),
         Provider<FlowValueFormatter>(create: (_) => sl<FlowValueFormatter>()),
+
+        // ThemeProvider
+        ChangeNotifierProvider<ThemeProvider>(
+          create: (_) => sl<ThemeProvider>(),
+        ),
       ],
       child: const RivrApp(),
     ),

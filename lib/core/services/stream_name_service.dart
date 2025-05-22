@@ -60,6 +60,10 @@ class StreamNameService {
 
     // Try to get from database
     final db = await _appDatabase.database;
+
+    // Ensure table exists before querying
+    await _ensureTableExists(db);
+
     final results = await db.query(
       'stream_names',
       where: 'station_id = ?',

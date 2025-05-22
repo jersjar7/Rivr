@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:rivr/core/services/flow_units_service.dart';
+import 'package:rivr/features/auth/domain/entities/user.dart';
 import 'package:rivr/features/forecast/presentation/widgets/unit_selector_widget.dart';
 import 'package:rivr/features/settings/presentation/pages/theme_settings_page.dart';
 import '../../../../features/auth/presentation/providers/auth_provider.dart';
@@ -316,11 +317,61 @@ class _FavoritesDrawerState extends State<FavoritesDrawer> {
                   ),
                   onTap: widget.onLogout,
                 ),
+                ListTile(
+                  leading: Icon(Icons.bug_report, color: colors.error),
+                  title: Text('Debug User'),
+                  onTap: _debugUser,
+                ),
               ],
             ),
           ),
         ],
       ),
     );
+  }
+
+  String _getUserDisplayName(User? user) {
+    if (user == null) return 'River Enthusiast';
+
+    // Try firstName first
+    if (user.firstName != null && user.firstName!.trim().isNotEmpty) {
+      return user.firstName!.trim();
+    }
+
+    // Fallback to email username
+    if (user.email.isNotEmpty) {
+      final emailParts = user.email.split('@');
+      if (emailParts.isNotEmpty) {
+        final username = emailParts[0];
+        // Capitalize first letter
+        return username.isEmpty
+            ? 'River Enthusiast'
+            : '${username[0].toUpperCase()}${username.substring(1)}';
+      }
+    }
+
+    return 'River Enthusiast';
+  }
+
+  void _debugUser() {
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final user = authProvider.currentUser;
+
+    print('=== USER DEBUG ===');
+    print('User exists: ${user != null}');
+    if (user != null) {
+      print('UID: ${user.uid}');
+      print('Email: ${user.email}');
+      print(
+        'FirstName: "${user.firstName}" (${user.firstName?.length ?? 0} chars)',
+      );
+      print(
+        'LastName: "${user.lastName}" (${user.lastName?.length ?? 0} chars)',
+      );
+      print(
+        'Profession: "${user.profession}" (${user.profession?.length ?? 0} chars)',
+      );
+    }
+    print('==================');
   }
 }

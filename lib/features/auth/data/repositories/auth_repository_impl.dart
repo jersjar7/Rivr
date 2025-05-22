@@ -188,7 +188,7 @@ class AuthRepositoryImpl implements AuthRepository {
               profession,
             )
             .timeout(
-              const Duration(seconds: 8),
+              const Duration(seconds: 30),
               onTimeout: () {
                 print("AUTH REPO: Remote data source timed out");
                 throw AuthException(message: 'Registration request timed out');

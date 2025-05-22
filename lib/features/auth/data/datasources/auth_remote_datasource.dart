@@ -94,26 +94,20 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     String lastName,
     String profession,
   ) async {
-    print("REMOTE_DS: registerWithEmailAndPassword called");
     try {
-      print("REMOTE_DS: Calling Firebase Auth createUserWithEmailAndPassword");
+      // Create Firebase Auth user
       final userCredential = await firebaseAuth
           .createUserWithEmailAndPassword(email: email, password: password)
           .timeout(
-            const Duration(seconds: 5),
+            const Duration(seconds: 10),
             onTimeout: () {
-              print("REMOTE_DS: Firebase Auth createUser timed out");
-              throw AuthException(message: 'Firebase registration timed out');
+              throw AuthException(message: 'Registration timed out');
             },
           );
 
-      print("REMOTE_DS: Firebase Auth returned");
-
       if (userCredential.user == null) {
-        print("REMOTE_DS: User is null from Firebase");
         throw AuthException(message: 'Registration failed');
       }
-      print("REMOTE_DS: Got user from Firebase: ${userCredential.user!.uid}");
 
       final user = UserModel(
         uid: userCredential.user!.uid,
@@ -123,45 +117,31 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
         profession: profession,
       );
 
-      // Save user details to Firestore - make this non-blocking
-      print("REMOTE_DS: Saving user details to Firestore");
-      try {
-        await firestore
-            .collection('users')
-            .doc(user.uid)
-            .set({
-              'first_name': firstName,
-              'last_name': lastName,
-              'email': email,
-              'profession': profession,
-              'created_at': FieldValue.serverTimestamp(),
-              'last_login': FieldValue.serverTimestamp(),
-            })
-            .timeout(
-              const Duration(seconds: 3),
-              onTimeout: () {
-                print("REMOTE_DS: Firestore save timed out");
-                // Don't throw here - we'll continue with the user creation
-                // The repository will handle setting up the profile later
-                return;
-              },
-            );
-        print("REMOTE_DS: User details saved to Firestore");
-      } catch (e) {
-        print("REMOTE_DS: Error saving to Firestore: $e");
-        // Don't throw here - we want to return the user even if Firestore fails
-      }
+      // Save user profile to Firestore
+      await firestore
+          .collection('users')
+          .doc(user.uid)
+          .set({
+            'first_name': firstName,
+            'last_name': lastName,
+            'email': email,
+            'profession': profession,
+            'created_at': FieldValue.serverTimestamp(),
+            'last_login': FieldValue.serverTimestamp(),
+          })
+          .timeout(
+            const Duration(seconds: 30),
+            onTimeout: () {
+              throw AuthException(message: 'Failed to save user profile');
+            },
+          );
 
-      print("REMOTE_DS: Returning user model");
       return user;
     } on firebase.FirebaseAuthException catch (e) {
-      print("REMOTE_DS: FirebaseAuthException: ${e.code} - ${e.message}");
       throw AuthException(message: FirebaseErrorMapper.mapAuthError(e));
-    } on AuthException catch (e) {
-      print("REMOTE_DS: Caught AuthException: ${e.message}");
+    } on AuthException {
       rethrow;
     } catch (e) {
-      print("REMOTE_DS: Unexpected error: $e");
       throw AuthException(message: 'Registration failed: ${e.toString()}');
     }
   }

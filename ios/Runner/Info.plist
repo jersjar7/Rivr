@@ -6,6 +6,11 @@
 	<string>sk.eyJ1IjoiamVyc29uZGV2cyIsImEiOiJjbTkyYXpueTQwOXRzMmxvaGdoMTg2eWN1In0.qzghyzkAlVXDNiOBG1-HVQ</string>
 	<key>NSFaceIDUsageDescription</key>
     <string>Enable Face ID for quick and secure login to your Rivr account</string>
+	<key>LSApplicationQueriesSchemes</key>
+	<array>
+	<!-- If you ever test canLaunchUrl on https:// -->
+	<string>https</string>
+	</array>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>

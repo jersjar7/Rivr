@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:rivr/core/services/flow_units_service.dart';
 import 'package:rivr/features/forecast/presentation/widgets/unit_selector_widget.dart';
 import 'package:rivr/features/settings/presentation/pages/theme_settings_page.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../../../features/auth/presentation/providers/auth_provider.dart';
 
 class FavoritesDrawer extends StatefulWidget {
@@ -150,7 +151,7 @@ class _FavoritesDrawerState extends State<FavoritesDrawer> {
                   ],
                 ),
 
-                // Notifications & Alerts Section (Expandable)
+                // ── Notifications & Alerts Section ──────────────────────────
                 ExpansionTile(
                   initiallyExpanded:
                       _expandedSections['notifications'] ?? false,
@@ -160,12 +161,28 @@ class _FavoritesDrawerState extends State<FavoritesDrawer> {
                     Icons.notifications_none,
                     color: colors.primary,
                   ),
-                  title: Text(
-                    'Notifications & Alerts',
-                    style: textTheme.titleSmall?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
+
+                  // Title row with a subtle “Coming Soon” on the right
+                  title: Column(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Notifications & Alerts',
+                        style: textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      Text(
+                        'Coming Soon',
+                        style: textTheme.labelSmall?.copyWith(
+                          color: colors.onSurface.withOpacity(0.6),
+                        ),
+                      ),
+                    ],
                   ),
+
+                  // One inert child just to show the feature name
                   children: [
                     ListTile(
                       contentPadding: const EdgeInsets.only(
@@ -173,29 +190,38 @@ class _FavoritesDrawerState extends State<FavoritesDrawer> {
                         right: 16,
                       ),
                       title: Text('Flow Level Notifications'),
-                      trailing: Icon(Icons.arrow_forward_ios, size: 16),
-                      onTap: () {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Flow notifications coming soon'),
-                          ),
-                        );
-                      },
+                      // no trailing arrow, no onTap
                     ),
                   ],
                 ),
 
-                // Data Management Section (Expandable)
+                // ── Data Management Section ────────────────────────────────
                 ExpansionTile(
                   initiallyExpanded: _expandedSections['data'] ?? false,
                   onExpansionChanged: (expanded) => _toggleSection('data'),
                   leading: Icon(Icons.storage, color: colors.primary),
-                  title: Text(
-                    'Data Management',
-                    style: textTheme.titleSmall?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
+
+                  // Title + “Coming Soon”
+                  title: Column(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Data Management',
+                        style: textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      Text(
+                        'Coming Soon',
+                        style: textTheme.labelSmall?.copyWith(
+                          color: colors.onSurface.withOpacity(0.6),
+                        ),
+                      ),
+                    ],
                   ),
+
+                  // Inert “Clear Cache” tile
                   children: [
                     ListTile(
                       contentPadding: const EdgeInsets.only(
@@ -203,14 +229,7 @@ class _FavoritesDrawerState extends State<FavoritesDrawer> {
                         right: 16,
                       ),
                       title: Text('Clear Cache'),
-                      trailing: Icon(Icons.arrow_forward_ios, size: 16),
-                      onTap: () {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Cache clearing coming soon'),
-                          ),
-                        );
-                      },
+                      // no trailing arrow, no onTap
                     ),
                   ],
                 ),
@@ -234,27 +253,17 @@ class _FavoritesDrawerState extends State<FavoritesDrawer> {
                       ),
                       title: Text('About the App'),
                       trailing: Icon(Icons.arrow_forward_ios, size: 16),
-                      onTap: () {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('About page coming soon'),
-                          ),
+                      onTap: () async {
+                        final uri = Uri.parse(
+                          'https://docs.ciroh.org/docuhub-staging/docs/products/Mobile%20Apps/RIVR/',
                         );
-                      },
-                    ),
-                    ListTile(
-                      contentPadding: const EdgeInsets.only(
-                        left: 72,
-                        right: 16,
-                      ),
-                      title: Text('Data Sources'),
-                      trailing: Icon(Icons.arrow_forward_ios, size: 16),
-                      onTap: () {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Data sources info coming soon'),
-                          ),
-                        );
+                        if (!await launchUrl(
+                          uri,
+                          mode: LaunchMode.externalApplication,
+                        )) {
+                          // optional: handle failure, e.g. show a SnackBar or log
+                          print('Could not launch $uri');
+                        }
                       },
                     ),
                   ],
@@ -277,51 +286,26 @@ class _FavoritesDrawerState extends State<FavoritesDrawer> {
                         left: 72,
                         right: 16,
                       ),
-                      title: Text('Report a Bug'),
+                      title: Text('Report a Bug or\nRequest a Feature'),
                       trailing: Icon(Icons.arrow_forward_ios, size: 16),
-                      onTap: () {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Bug reporting coming soon'),
-                          ),
+                      onTap: () async {
+                        final uri = Uri.parse(
+                          'https://github.com/jersjar7/Rivr/issues',
                         );
-                      },
-                    ),
-                    ListTile(
-                      contentPadding: const EdgeInsets.only(
-                        left: 72,
-                        right: 16,
-                      ),
-                      title: Text('Feature Requests'),
-                      trailing: Icon(Icons.arrow_forward_ios, size: 16),
-                      onTap: () {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Feature requests coming soon'),
-                          ),
-                        );
-                      },
-                    ),
-                    ListTile(
-                      contentPadding: const EdgeInsets.only(
-                        left: 72,
-                        right: 16,
-                      ),
-                      title: Text('Contact Developers'),
-                      trailing: Icon(Icons.arrow_forward_ios, size: 16),
-                      onTap: () {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Contact form coming soon'),
-                          ),
-                        );
+                        if (!await launchUrl(
+                          uri,
+                          mode: LaunchMode.externalApplication,
+                        )) {
+                          // optional: handle failure, e.g. show a SnackBar or log
+                          print('Could not launch $uri');
+                        }
                       },
                     ),
                   ],
                 ),
 
                 // Log Out Button (Always visible)
-                Divider(),
+                Divider(indent: 10, endIndent: 10),
                 ListTile(
                   leading: Icon(Icons.exit_to_app, color: colors.error),
                   title: Text(
@@ -333,11 +317,67 @@ class _FavoritesDrawerState extends State<FavoritesDrawer> {
                   ),
                   onTap: widget.onLogout,
                 ),
+                Divider(indent: 10, endIndent: 10),
                 ListTile(
                   leading: Icon(Icons.bug_report, color: colors.error),
                   title: Text('Debug User'),
                   onTap: _debugUser,
                 ),
+                // ── SPONSORS LOGO GRID ───────────────────────────────────────
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                    vertical: 16.0,
+                    horizontal: 24.0,
+                  ),
+                  child: Column(
+                    children: [
+                      // Row 1: single BYU SVG centered
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Image.asset(
+                            'assets/img/sponsors/BYU MonogramWordmark_navy@2x.png',
+                            height: 130,
+                          ),
+                        ],
+                      ),
+                      // Row 2: two logos
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                        children: [
+                          Image.asset(
+                            'assets/img/sponsors/NOAA-logo.png',
+                            height: 80,
+                          ),
+                          Image.asset(
+                            'assets/img/sponsors/ciroh_logo.png',
+                            height: 80,
+                          ),
+                        ],
+                      ),
+
+                      const SizedBox(height: 12),
+
+                      // Row 3: two more logos
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                        children: [
+                          Image.asset(
+                            'assets/img/sponsors/Office_of_Water_Prediction_Logo.png',
+                            height: 80,
+                          ),
+                          Image.asset(
+                            'assets/img/sponsors/University-of-Alabama-Logo.png',
+                            height: 70,
+                          ),
+                        ],
+                      ),
+
+                      const SizedBox(height: 2),
+                    ],
+                  ),
+                ),
+                // ─────────────────────────────────────────────────────────────
               ],
             ),
           ),

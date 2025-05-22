@@ -208,6 +208,22 @@ class MapTapHandler {
     );
   }
 
+  // Helper function for parsing station IDs
+  int parseStationId(String id) {
+    try {
+      // Try standard integer parsing first
+      return int.parse(id);
+    } catch (_) {
+      try {
+        // If that fails, try parsing as a double and converting to int
+        return double.parse(id).toInt();
+      } catch (_) {
+        // As a last resort, try stripping the decimal part
+        return int.parse(id.split('.')[0]);
+      }
+    }
+  }
+
   /// Handle tap on an individual station
   Future<void> handleStationTap(
     String stationId,
@@ -221,7 +237,7 @@ class MapTapHandler {
 
     try {
       // Try to parse the station ID as an integer
-      final int stationIdInt = int.parse(stationId);
+      final int stationIdInt = parseStationId(stationId);
 
       // Initialize station name
       String stationName = "";

@@ -43,7 +43,6 @@ class FavoritesRepositoryImpl implements FavoritesRepository {
           lastUpdated: favorite.lastUpdated,
           originalApiName: favorite.originalApiName,
           customImagePath: favorite.customImagePath,
-          // Add these missing properties
           lat: favorite.lat,
           lon: favorite.lon,
           elevation: favorite.elevation,

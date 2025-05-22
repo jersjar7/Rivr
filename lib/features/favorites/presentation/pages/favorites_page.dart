@@ -206,7 +206,6 @@ class _FavoritesPageState extends State<FavoritesPage>
       );
 
       if (index >= 0) {
-        // Create updated model
         final updatedFavorite = FavoriteModel(
           stationId: favorite.stationId,
           name: favorite.name,
@@ -218,6 +217,11 @@ class _FavoritesPageState extends State<FavoritesPage>
           lastUpdated: timestamp, // Update timestamp
           originalApiName: favorite.originalApiName,
           customImagePath: favorite.customImagePath,
+          lat: favorite.lat,
+          lon: favorite.lon,
+          elevation: favorite.elevation,
+          city: favorite.city,
+          state: favorite.state,
         );
 
         // Update the provider's list directly

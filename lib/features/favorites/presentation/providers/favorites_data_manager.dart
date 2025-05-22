@@ -215,6 +215,11 @@ class FavoritesDataManager {
                 lastUpdated: favorite.lastUpdated,
                 originalApiName: favorite.originalApiName,
                 customImagePath: favorite.customImagePath,
+                lat: favorite.lat,
+                lon: favorite.lon,
+                elevation: favorite.elevation,
+                city: favorite.city,
+                state: favorite.state,
               );
 
       // Check connectivity
@@ -337,6 +342,11 @@ class FavoritesDataManager {
         lastUpdated: DateTime.now().millisecondsSinceEpoch,
         originalApiName: originalApiNameToUse,
         customImagePath: favorite.customImagePath,
+        lat: favorite.lat,
+        lon: favorite.lon,
+        elevation: favorite.elevation,
+        city: favorite.city,
+        state: favorite.state,
       );
       print(
         "DEBUG: Created updated favorite: ${updatedFavorite.stationId}, name: '${updatedFavorite.name}', originalApiName: '${updatedFavorite.originalApiName}', customImagePath: '${updatedFavorite.customImagePath}'",
@@ -412,6 +422,10 @@ class FavoritesDataManager {
     String stationId,
     int imgNumber,
   ) async {
+    print("🔥 DEBUG: FavoritesDataManager.updateFavoriteImage called!");
+    print(
+      "🔥 This method is missing location properties and will cause city/state to disappear!",
+    );
     if (parent.isProcessing) return false;
 
     try {
@@ -439,6 +453,11 @@ class FavoritesDataManager {
         lastUpdated: DateTime.now().millisecondsSinceEpoch,
         originalApiName: favorite.originalApiName,
         customImagePath: favorite.customImagePath,
+        lat: favorite.lat,
+        lon: favorite.lon,
+        elevation: favorite.elevation,
+        city: favorite.city,
+        state: favorite.state,
       );
 
       // Update local list first for responsive UI
@@ -515,6 +534,11 @@ class FavoritesDataManager {
         lastUpdated: DateTime.now().millisecondsSinceEpoch,
         originalApiName: favorite.originalApiName,
         customImagePath: customImagePath, // Update the custom image path
+        lat: favorite.lat,
+        lon: favorite.lon,
+        elevation: favorite.elevation,
+        city: favorite.city,
+        state: favorite.state,
       );
 
       // Update local list first for responsive UI
@@ -617,6 +641,11 @@ class FavoritesDataManager {
             lastUpdated: fav.lastUpdated,
             originalApiName: fav.originalApiName,
             customImagePath: fav.customImagePath,
+            lat: fav.lat,
+            lon: fav.lon,
+            elevation: fav.elevation,
+            city: fav.city,
+            state: fav.state,
           ),
         );
       }

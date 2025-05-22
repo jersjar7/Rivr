@@ -555,7 +555,7 @@ class LoginPageState extends State<LoginPage> {
                               context,
                             ).pushNamed('/biometric-settings'),
                         child: Text(
-                          'Set up biometric login',
+                          'Biometric Login Coming Soon',
                           style: textTheme.bodyMedium?.copyWith(
                             color: colors.primary,
                           ),

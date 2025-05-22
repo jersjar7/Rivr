@@ -131,7 +131,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       await firebaseAuth
           .sendPasswordResetEmail(email: email)
           .timeout(
-            const Duration(seconds: 5),
+            const Duration(seconds: 20),
             onTimeout: () {
               print("REMOTE_DS: Password reset email request timed out");
               throw AuthException(

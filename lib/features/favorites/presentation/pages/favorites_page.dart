@@ -321,7 +321,7 @@ class _FavoritesPageState extends State<FavoritesPage>
                         child: ClipRRect(
                           borderRadius: BorderRadius.circular(7),
                           child: Image.asset(
-                            'assets/img/river_images/$imgNumber.png',
+                            'assets/img/river_images/$imgNumber.webp',
                             fit: BoxFit.cover,
                             errorBuilder: (c, e, st) {
                               return Container(

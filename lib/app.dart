@@ -29,6 +29,7 @@ class RivrApp extends StatelessWidget {
       child: Consumer<ThemeProvider>(
         builder: (context, themeProvider, _) {
           return MaterialApp(
+            debugShowCheckedModeBanner: false,
             title: 'Rivr',
             theme: primaryTheme,
             darkTheme: darkTheme,

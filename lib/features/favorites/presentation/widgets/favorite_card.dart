@@ -522,7 +522,7 @@ class _FavoriteCardState extends State<FavoriteCard> {
 
   Widget _buildDefaultImage(int imgNumber, Color cardColor) {
     return Image.asset(
-      'assets/img/river_images/$imgNumber.png',
+      'assets/img/river_images/$imgNumber.webp',
       height: 160,
       width: double.infinity,
       fit: BoxFit.cover,

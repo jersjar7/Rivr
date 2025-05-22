@@ -318,11 +318,11 @@ class _FavoritesDrawerState extends State<FavoritesDrawer> {
                   onTap: widget.onLogout,
                 ),
                 Divider(indent: 10, endIndent: 10),
-                ListTile(
-                  leading: Icon(Icons.bug_report, color: colors.error),
-                  title: Text('Debug User'),
-                  onTap: _debugUser,
-                ),
+                // ListTile(
+                //   leading: Icon(Icons.bug_report, color: colors.error),
+                //   title: Text('Debug User'),
+                //   onTap: _debugUser,
+                // ),
                 // ── SPONSORS LOGO GRID ───────────────────────────────────────
                 Padding(
                   padding: const EdgeInsets.symmetric(
@@ -386,25 +386,25 @@ class _FavoritesDrawerState extends State<FavoritesDrawer> {
     );
   }
 
-  void _debugUser() {
-    final authProvider = Provider.of<AuthProvider>(context, listen: false);
-    final user = authProvider.currentUser;
+  // void _debugUser() {
+  //   final authProvider = Provider.of<AuthProvider>(context, listen: false);
+  //   final user = authProvider.currentUser;
 
-    print('=== USER DEBUG ===');
-    print('User exists: ${user != null}');
-    if (user != null) {
-      print('UID: ${user.uid}');
-      print('Email: ${user.email}');
-      print(
-        'FirstName: "${user.firstName}" (${user.firstName?.length ?? 0} chars)',
-      );
-      print(
-        'LastName: "${user.lastName}" (${user.lastName?.length ?? 0} chars)',
-      );
-      print(
-        'Profession: "${user.profession}" (${user.profession?.length ?? 0} chars)',
-      );
-    }
-    print('==================');
-  }
+  //   print('=== USER DEBUG ===');
+  //   print('User exists: ${user != null}');
+  //   if (user != null) {
+  //     print('UID: ${user.uid}');
+  //     print('Email: ${user.email}');
+  //     print(
+  //       'FirstName: "${user.firstName}" (${user.firstName?.length ?? 0} chars)',
+  //     );
+  //     print(
+  //       'LastName: "${user.lastName}" (${user.lastName?.length ?? 0} chars)',
+  //     );
+  //     print(
+  //       'Profession: "${user.profession}" (${user.profession?.length ?? 0} chars)',
+  //     );
+  //   }
+  //   print('==================');
+  // }
 }

@@ -58,14 +58,14 @@ class _FavoritesDrawerState extends State<FavoritesDrawer> {
               children: [
                 Text(
                   user?.firstName ?? 'River',
-                  style: textTheme.titleMedium?.copyWith(
+                  style: textTheme.titleLarge?.copyWith(
                     color: colors.onPrimary,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
                 Text(
                   user?.lastName ?? 'Enthusiast',
-                  style: textTheme.titleMedium?.copyWith(
+                  style: textTheme.titleLarge?.copyWith(
                     color: colors.onPrimary,
                     fontWeight: FontWeight.bold,
                   ),
@@ -73,8 +73,13 @@ class _FavoritesDrawerState extends State<FavoritesDrawer> {
               ],
             ),
 
-            // 3) Remove the email line entirely so you only have two total lines
-            accountEmail: const SizedBox.shrink(),
+            // 3) Profession in place of email
+            accountEmail: Text(
+              user?.profession ?? 'River Explorer',
+              style: textTheme.titleMedium?.copyWith(
+                color: colors.onPrimary.withValues(alpha: 0.8),
+              ),
+            ),
           ),
 
           // Scrollable Content Area with Expandable Sections

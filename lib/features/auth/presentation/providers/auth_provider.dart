@@ -319,37 +319,18 @@ class AuthProvider with ChangeNotifier {
     String profession,
   ) async {
     print("AUTH PROVIDER: register started");
-    if (email.isEmpty ||
-        password.isEmpty ||
-        firstName.isEmpty ||
-        lastName.isEmpty) {
-      print("AUTH PROVIDER: Empty required fields detected");
-      _errorMessage = 'Please fill in all required fields';
-      notifyListeners();
-      return null;
-    }
-
-    print("AUTH PROVIDER: Setting loading state");
     _isLoading = true;
     _errorMessage = '';
-    _successMessage = '';
     notifyListeners();
 
-    print("AUTH PROVIDER: Calling _register use case");
     try {
-      // Add timeout to prevent hanging
+      // ✂️ Removed .timeout(...)—just await the use-case directly
       final result = await _register(
         email,
         password,
         firstName,
         lastName,
         profession,
-      ).timeout(
-        const Duration(seconds: 10),
-        onTimeout: () {
-          print("AUTH PROVIDER: register use case timed out");
-          return Left(AuthFailure(message: 'Registration timed out'));
-        },
       );
 
       print("AUTH PROVIDER: _register use case returned a result");
@@ -363,27 +344,11 @@ class AuthProvider with ChangeNotifier {
           return null;
         },
         (user) async {
-          print(
-            "AUTH PROVIDER: register success, got user with id: ${user.uid}",
-          );
+          print("AUTH PROVIDER: register success, saving auth data");
+          await _authStorage.saveAuthData(userId: user.uid, email: user.email);
           _currentUser = user;
           _isLoading = false;
-
-          // Save auth data to secure storage
-          print("AUTH PROVIDER: Saving auth data to storage");
-          try {
-            await _authStorage.saveAuthData(
-              userId: user.uid,
-              email: user.email,
-            );
-            print("AUTH PROVIDER: Auth data saved successfully");
-          } catch (e) {
-            print("AUTH PROVIDER: Error saving auth data: $e");
-          }
-
-          _successMessage = 'Registration successful';
           notifyListeners();
-          print("AUTH PROVIDER: register method completed successfully");
           return user;
         },
       );

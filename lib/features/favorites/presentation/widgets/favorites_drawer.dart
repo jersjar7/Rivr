@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:rivr/core/services/flow_units_service.dart';
-import 'package:rivr/features/auth/domain/entities/user.dart';
 import 'package:rivr/features/forecast/presentation/widgets/unit_selector_widget.dart';
 import 'package:rivr/features/settings/presentation/pages/theme_settings_page.dart';
 import '../../../../features/auth/presentation/providers/auth_provider.dart';
@@ -47,23 +46,35 @@ class _FavoritesDrawerState extends State<FavoritesDrawer> {
           // Static User Profile Header
           UserAccountsDrawerHeader(
             decoration: BoxDecoration(color: colors.primary),
-            currentAccountPicture: CircleAvatar(
-              backgroundColor: colors.secondary,
-              child: Icon(Icons.person, size: 40, color: colors.onSecondary),
+
+            // 1) Remove the avatar
+            currentAccountPicture: null,
+
+            // 2) Two‐line name, but let the Column shrink to fit
+            accountName: Column(
+              mainAxisSize:
+                  MainAxisSize.min, // ← key: only as tall as its children
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  user?.firstName ?? 'River',
+                  style: textTheme.titleMedium?.copyWith(
+                    color: colors.onPrimary,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                Text(
+                  user?.lastName ?? 'Enthusiast',
+                  style: textTheme.titleMedium?.copyWith(
+                    color: colors.onPrimary,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
             ),
-            accountName: Text(
-              user?.firstName ?? 'River Enthusiast',
-              style: textTheme.titleMedium?.copyWith(
-                color: colors.onPrimary,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            accountEmail: Text(
-              user?.email ?? 'user@example.com',
-              style: textTheme.bodyMedium?.copyWith(
-                color: colors.onPrimary.withOpacity(0.8),
-              ),
-            ),
+
+            // 3) Remove the email line entirely so you only have two total lines
+            accountEmail: const SizedBox.shrink(),
           ),
 
           // Scrollable Content Area with Expandable Sections
@@ -328,29 +339,6 @@ class _FavoritesDrawerState extends State<FavoritesDrawer> {
         ],
       ),
     );
-  }
-
-  String _getUserDisplayName(User? user) {
-    if (user == null) return 'River Enthusiast';
-
-    // Try firstName first
-    if (user.firstName != null && user.firstName!.trim().isNotEmpty) {
-      return user.firstName!.trim();
-    }
-
-    // Fallback to email username
-    if (user.email.isNotEmpty) {
-      final emailParts = user.email.split('@');
-      if (emailParts.isNotEmpty) {
-        final username = emailParts[0];
-        // Capitalize first letter
-        return username.isEmpty
-            ? 'River Enthusiast'
-            : '${username[0].toUpperCase()}${username.substring(1)}';
-      }
-    }
-
-    return 'River Enthusiast';
   }
 
   void _debugUser() {

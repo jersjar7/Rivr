@@ -175,54 +175,46 @@ class AuthRepositoryImpl implements AuthRepository {
     String profession,
   ) async {
     print("AUTH REPO: registerWithEmailAndPassword called");
-    if (await networkInfo.isConnected) {
-      print("AUTH REPO: Network is connected");
-      try {
-        print("AUTH REPO: Calling remote data source");
-        final user = await remoteDataSource
-            .registerWithEmailAndPassword(
-              email,
-              password,
-              firstName,
-              lastName,
-              profession,
-            )
-            .timeout(
-              const Duration(seconds: 30),
-              onTimeout: () {
-                print("AUTH REPO: Remote data source timed out");
-                throw AuthException(message: 'Registration request timed out');
-              },
-            );
-
-        print("AUTH REPO: Remote data source returned successfully");
-
-        // Replace await with background processing for non-critical setup
-        print("AUTH REPO: Setting up initial profile in background");
-        userProfileService
-            .setupInitialProfile(
-              userId: user.uid,
-              email: email,
-              firstName: firstName,
-              lastName: lastName,
-              profession: profession,
-            )
-            .catchError((e) {
-              print("AUTH REPO: Error in background profile setup: $e");
-            });
-
-        print("AUTH REPO: Returning user");
-        return Right(user);
-      } on AuthException catch (e) {
-        print("AUTH REPO: AuthException caught: ${e.message}");
-        return Left(AuthFailure(message: e.message));
-      } catch (e) {
-        print("AUTH REPO: Unexpected error: $e");
-        return Left(ServerFailure(message: e.toString()));
-      }
-    } else {
+    if (!await networkInfo.isConnected) {
       print("AUTH REPO: No internet connection");
       return Left(NetworkFailure(message: 'No internet connection'));
+    }
+
+    try {
+      print("AUTH REPO: Network is connected");
+      print("AUTH REPO: Calling remote data source");
+      // ✂️ No more .timeout(...) here
+      final user = await remoteDataSource.registerWithEmailAndPassword(
+        email,
+        password,
+        firstName,
+        lastName,
+        profession,
+      );
+      print("AUTH REPO: Remote data source returned successfully");
+
+      // Firestore write in background
+      print("AUTH REPO: Setting up initial profile in background");
+      userProfileService
+          .setupInitialProfile(
+            userId: user.uid,
+            email: email,
+            firstName: firstName,
+            lastName: lastName,
+            profession: profession,
+          )
+          .catchError((e) {
+            print("AUTH REPO: Error in background profile setup: $e");
+          });
+
+      print("AUTH REPO: Returning user");
+      return Right(user);
+    } on AuthException catch (e) {
+      print("AUTH REPO: AuthException caught: ${e.message}");
+      return Left(AuthFailure(message: e.message));
+    } catch (e) {
+      print("AUTH REPO: Unexpected error: $e");
+      return Left(ServerFailure(message: e.toString()));
     }
   }
 

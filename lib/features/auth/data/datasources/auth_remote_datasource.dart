@@ -95,7 +95,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     String profession,
   ) async {
     try {
-      // Create Firebase Auth user
+      // 1) Create the Firebase‐Auth user (10s timeout)
       final userCredential = await firebaseAuth
           .createUserWithEmailAndPassword(email: email, password: password)
           .timeout(
@@ -109,40 +109,18 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
         throw AuthException(message: 'Registration failed');
       }
 
-      final user = UserModel(
+      // 2) Immediately return your model—no Firestore write here
+      return UserModel(
         uid: userCredential.user!.uid,
         email: email,
         firstName: firstName,
         lastName: lastName,
         profession: profession,
       );
-
-      // Save user profile to Firestore
-      await firestore
-          .collection('users')
-          .doc(user.uid)
-          .set({
-            'first_name': firstName,
-            'last_name': lastName,
-            'email': email,
-            'profession': profession,
-            'created_at': FieldValue.serverTimestamp(),
-            'last_login': FieldValue.serverTimestamp(),
-          })
-          .timeout(
-            const Duration(seconds: 30),
-            onTimeout: () {
-              throw AuthException(message: 'Failed to save user profile');
-            },
-          );
-
-      return user;
     } on firebase.FirebaseAuthException catch (e) {
       throw AuthException(message: FirebaseErrorMapper.mapAuthError(e));
-    } on AuthException {
-      rethrow;
     } catch (e) {
-      throw AuthException(message: 'Registration failed: ${e.toString()}');
+      throw AuthException(message: 'Authentication failed: ${e.toString()}');
     }
   }
 

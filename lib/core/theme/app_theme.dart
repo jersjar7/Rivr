@@ -138,7 +138,7 @@ final ThemeData primaryTheme = ThemeData(
   ),
 
   // Card styling
-  cardTheme: CardTheme(
+  cardTheme: CardThemeData(
     color: AppColors.surface,
     elevation: 2,
     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -370,7 +370,7 @@ final ThemeData darkTheme = ThemeData(
   ),
 
   // Card styling
-  cardTheme: CardTheme(
+  cardTheme: CardThemeData(
     color: AppColors.darkSurfaceVariant,
     elevation: 4,
     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),

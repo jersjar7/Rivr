@@ -1,3 +1,13 @@
+// Kotlin DSL syntax for keystore properties
+import java.util.Properties
+import java.io.FileInputStream
+
+val keystoreProperties = Properties()
+val keystorePropertiesFile = rootProject.file("key.properties")
+if (keystorePropertiesFile.exists()) {
+    keystoreProperties.load(FileInputStream(keystorePropertiesFile))
+}
+
 plugins {
     id("com.android.application")
     // START: FlutterFire Configuration
@@ -25,13 +35,23 @@ android {
     defaultConfig {
         // Update this to match your Firebase configuration
         // Check your google-services.json for the correct package_name
-        applicationId = "com.byu_hydroinformatics_lab.rivr" // Note: underscores instead of hyphens
+        applicationId = "com.byu_hydroinformatics_lab.rivrapp" // Note: underscores instead of hyphens
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = 30
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+    }
+
+    // Kotlin DSL signing configuration
+    signingConfigs {
+        create("release") {
+            keyAlias = keystoreProperties["keyAlias"] as String
+            keyPassword = keystoreProperties["keyPassword"] as String
+            storeFile = keystoreProperties["storeFile"]?.let { file(it as String) }
+            storePassword = keystoreProperties["storePassword"] as String
+        }
     }
 
     // Enable BuildConfig generation
@@ -50,6 +70,9 @@ android {
             isShrinkResources = false
         }
         getByName("release") {
+            // Kotlin DSL syntax for signing config
+            signingConfig = signingConfigs.getByName("release")
+
             buildConfigField("String", "ENV", "\"production\"")
             // Enable both code and resource shrinking for release
             isMinifyEnabled = true

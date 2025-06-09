@@ -69,12 +69,12 @@ class UserLocationMarkerManager {
     if (_mapboxMap == null) return;
 
     try {
-      // Create blue dot marker
-      final blueDotImage = await _createBlueDotImage();
+      // Create green dot marker
+      final greenDotImage = await _createGreenDotImage();
       await _mapboxMap!.style.addStyleImage(
         "user-location-dot",
         1.0,
-        blueDotImage,
+        greenDotImage,
         false,
         [],
         [],
@@ -99,16 +99,16 @@ class UserLocationMarkerManager {
     }
   }
 
-  /// Create blue dot image for user location
-  Future<mapbox.MbxImage> _createBlueDotImage() async {
+  /// Create green dot image for user location
+  Future<mapbox.MbxImage> _createGreenDotImage() async {
     const size = 20; // Smaller and subtle
     final recorder = ui.PictureRecorder();
     final canvas = Canvas(recorder);
 
-    // Draw blue dot with white border
+    // Draw green dot with white border
     final paint =
         Paint()
-          ..color = Colors.blue
+          ..color = Colors.green
           ..style = PaintingStyle.fill;
 
     final borderPaint =
@@ -140,15 +140,15 @@ class UserLocationMarkerManager {
     final recorder = ui.PictureRecorder();
     final canvas = Canvas(recorder);
 
-    // Draw semi-transparent blue circle
+    // Draw semi-transparent green circle
     final paint =
         Paint()
-          ..color = Colors.blue.withValues(alpha: 0.2)
+          ..color = Colors.green.withValues(alpha: 0.2)
           ..style = PaintingStyle.fill;
 
     final borderPaint =
         Paint()
-          ..color = Colors.blue.withValues(alpha: 0.4)
+          ..color = Colors.green.withValues(alpha: 0.4)
           ..style = PaintingStyle.stroke
           ..strokeWidth = 1.0;
 
@@ -201,7 +201,7 @@ class UserLocationMarkerManager {
         ),
       );
 
-      // Create blue dot annotation (above accuracy circle)
+      // Create green dot annotation (above accuracy circle)
       _userLocationAnnotation = await _userLocationAnnotationManager!.create(
         mapbox.PointAnnotationOptions(
           geometry: point,
@@ -277,7 +277,7 @@ class UserLocationMarkerManager {
     return size / 100.0; // Base accuracy image is 100px
   }
 
-  /// Start pulsing animation for blue dot
+  /// Start pulsing animation for green dot
   void _startPulseAnimation() {
     _stopPulseAnimation();
 
@@ -345,7 +345,7 @@ class UserLocationMarkerManager {
     );
   }
 
-  /// Update blue dot annotation with current animation values
+  /// Update green dot annotation with current animation values
   Future<void> _updateDotAnnotation() async {
     if (_userLocationAnnotation == null ||
         _userLocationAnnotationManager == null ||

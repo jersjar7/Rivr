@@ -293,7 +293,7 @@ class _ForecastPageState extends State<ForecastPage>
           tabs: const [
             Tab(text: 'Hourly'),
             Tab(text: 'Daily'),
-            Tab(text: 'Monthly'),
+            Tab(text: 'Month'),
           ],
         ),
       ),

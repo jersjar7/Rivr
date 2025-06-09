@@ -244,9 +244,13 @@ class MapInitializationHelper {
   }) async {
     if (_styleManager == null) return;
 
+    print("MAP INIT: Starting style change to $newStyle");
+
     _styleManager!.changeMapStyle(
       newStyle,
       onStyleChanged: () {
+        print("MAP INIT: Style changed callback triggered");
+
         // Update the style in map provider
         if (mapProvider.currentStyle != newStyle) {
           mapProvider.setCurrentStyle(newStyle);
@@ -257,17 +261,10 @@ class MapInitializationHelper {
           _styleManager!.enable3DTerrain();
         }
 
-        // Refresh stations after style change is complete
-        final stations = stationProvider.stations;
-        if (stations.isNotEmpty) {
-          clusteredMapProvider
-              .updateStations(mapboxMap, stations)
-              .catchError(
-                (e) => print(
-                  "MAP INIT: Error updating stations after style change: $e",
-                ),
-              );
-        }
+        print("MAP INIT: Style change completed");
+
+        // NOTE: Station restoration is handled automatically by MapStyleManager
+        // via clusterProvider.handleMapStyleChanged(mapboxMap) - no manual intervention needed
       },
     );
   }

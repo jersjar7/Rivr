@@ -203,9 +203,43 @@ class MapTapHandler {
 
       print("Feature properties: $properties");
 
-      // Handle cluster tap
+      // Check for different cluster property patterns - both top-level and nested
+      bool isCluster = false;
+
+      // Check top-level properties
       if (properties.containsKey('cluster') && properties['cluster'] == true) {
-        await handleClusterTap(properties, mapCoord, mapProvider);
+        isCluster = true;
+      } else if (properties.containsKey('point_count')) {
+        isCluster = true;
+      }
+
+      // Check nested properties
+      if (!isCluster &&
+          properties.containsKey('properties') &&
+          properties['properties'] is Map) {
+        final nestedProps = properties['properties'] as Map;
+        if (nestedProps.containsKey('cluster') &&
+            nestedProps['cluster'] == true) {
+          isCluster = true;
+        } else if (nestedProps.containsKey('point_count')) {
+          isCluster = true;
+        }
+      }
+
+      print("DEBUG: Is cluster? $isCluster");
+
+      // Handle cluster tap - USE THE isCluster VARIABLE
+      if (isCluster) {
+        print("DEBUG: Handling cluster tap");
+        // Extract cluster properties from nested object if needed
+        Map<String, dynamic> clusterProps = properties;
+        if (properties.containsKey('properties') &&
+            properties['properties'] is Map) {
+          clusterProps = Map<String, dynamic>.from(properties);
+          final nestedProps = properties['properties'] as Map;
+          clusterProps.addAll(Map<String, dynamic>.from(nestedProps));
+        }
+        await handleClusterTap(clusterProps, mapCoord, mapProvider);
         // Remove info panel when zooming into a cluster
         _removeInfoPanel();
         return;
@@ -244,6 +278,14 @@ class MapTapHandler {
     MapProvider mapProvider,
   ) async {
     print("Tapped on cluster with ${properties['point_count']} points");
+
+    // Show user-friendly message
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Please zoom in to select an individual station'),
+        duration: Duration(seconds: 2),
+      ),
+    );
 
     // Zoom in to expand the cluster
     final newZoom = mapProvider.currentZoom + 2.0;
@@ -393,6 +435,12 @@ class MapTapHandler {
     MapProvider mapProvider,
   ) {
     try {
+      // Safety check - ensure we have a valid station ID
+      if (station.stationId <= 0) {
+        print("WARNING: Invalid station ID, not showing info panel");
+        return;
+      }
+
       // Remove existing panel first
       _removeInfoPanel();
 

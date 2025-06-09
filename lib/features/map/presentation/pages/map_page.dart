@@ -331,62 +331,6 @@ class _OptimizedMapPageState extends State<OptimizedMapPage>
               ),
             ),
 
-            // // Manual location controls (only show after initial load)
-            // if (!_isLoadingInitialLocation)
-            //   Positioned(
-            //     right: 16,
-            //     bottom: 200,
-            //     child: Column(
-            //       children: [
-            //         // Current location button
-            //         FloatingActionButton(
-            //           mini: true,
-            //           onPressed:
-            //               _isGettingManualLocation
-            //                   ? null
-            //                   : _goToCurrentLocation,
-            //           backgroundColor: Colors.white,
-            //           foregroundColor: Colors.blue,
-            //           tooltip: 'Go to my location',
-            //           child:
-            //               _isGettingManualLocation
-            //                   ? const SizedBox(
-            //                     width: 20,
-            //                     height: 20,
-            //                     child: CircularProgressIndicator(
-            //                       strokeWidth: 2,
-            //                     ),
-            //                   )
-            //                   : const Icon(Icons.my_location),
-            //         ),
-            //         const SizedBox(height: 8),
-
-            //         // Location toggle button
-            //         FloatingActionButton(
-            //           mini: true,
-            //           onPressed: _toggleAutoLocation,
-            //           backgroundColor:
-            //               _useCurrentLocation
-            //                   ? Colors.blue
-            //                   : Colors.grey.shade300,
-            //           foregroundColor:
-            //               _useCurrentLocation
-            //                   ? Colors.white
-            //                   : Colors.grey.shade600,
-            //           tooltip:
-            //               _useCurrentLocation
-            //                   ? 'Disable auto-location'
-            //                   : 'Enable auto-location',
-            //           child: Icon(
-            //             _useCurrentLocation
-            //                 ? Icons.location_on
-            //                 : Icons.location_off,
-            //           ),
-            //         ),
-            //       ],
-            //     ),
-            //   ),
-
             // UI Elements
             SafeArea(
               child: Column(

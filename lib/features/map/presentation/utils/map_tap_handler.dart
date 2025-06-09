@@ -14,12 +14,15 @@ import '../providers/enhanced_clustered_map_provider.dart';
 import '../providers/station_provider.dart';
 import '../providers/map_provider.dart';
 import '../widgets/stream_info_panel.dart';
+import 'user_location_marker_manager.dart';
 import '../../../../core/constants/map_constants.dart';
 
 class MapTapHandler {
   final MapboxMap mapboxMap;
   final BuildContext context;
   final Function? onStationAddedToFavorites;
+  final UserLocationMarkerManager?
+  locationMarkerManager; // Add location marker manager
 
   // Track the currently displayed info panel
   StreamInfoPanel? _currentInfoPanel;
@@ -35,6 +38,7 @@ class MapTapHandler {
     required this.mapboxMap,
     required this.context,
     this.onStationAddedToFavorites,
+    this.locationMarkerManager, // Add location marker manager parameter
   }) {
     // Initialize provider references immediately
     _authProvider = Provider.of<AuthProvider>(context, listen: false);
@@ -71,7 +75,19 @@ class MapTapHandler {
         "Map tapped at screen coord: $screenCoord, map coord: ${mapCoord.coordinates.lat}, ${mapCoord.coordinates.lng}",
       );
 
-      // Query for features at the tap location
+      // First check if tap is on user location marker (if location marker manager is available)
+      if (locationMarkerManager != null) {
+        final isLocationMarkerTap = await _checkLocationMarkerTap(
+          screenCoord,
+          mapCoord,
+        );
+        if (isLocationMarkerTap) {
+          locationMarkerManager!.handleLocationMarkerTap();
+          return; // Early return if location marker was tapped
+        }
+      }
+
+      // Query for features at the tap location (stations/clusters)
       final features = await queryFeaturesAtPoint(screenCoord);
 
       // If no features found, deselect current station and remove info panel
@@ -95,6 +111,39 @@ class MapTapHandler {
     }
   }
 
+  /// Check if the tap is on the user location marker
+  Future<bool> _checkLocationMarkerTap(
+    ScreenCoordinate screenCoord,
+    Point mapCoord,
+  ) async {
+    if (locationMarkerManager == null) return false;
+
+    try {
+      // Query for features at the tap location specifically looking for user location markers
+      final geometry = RenderedQueryGeometry.fromScreenCoordinate(screenCoord);
+      final options = RenderedQueryOptions(
+        layerIds: [], // Empty to query all layers
+        filter: null,
+      );
+
+      final features = await mapboxMap.queryRenderedFeatures(geometry, options);
+
+      // Check if any of the features are user location markers
+      for (final feature in features) {
+        if (feature?.queriedFeature.feature['iconImage'] ==
+            'user-location-dot') {
+          print("MapTapHandler: User location marker tapped");
+          return true;
+        }
+      }
+
+      return false;
+    } catch (e) {
+      print("MapTapHandler: Error checking location marker tap: $e");
+      return false;
+    }
+  }
+
   /// Query for features at the given screen coordinate
   Future<List<QueriedRenderedFeature?>> queryFeaturesAtPoint(
     ScreenCoordinate point,
@@ -103,7 +152,7 @@ class MapTapHandler {
       // Create a rendered query geometry for the point
       final geometry = RenderedQueryGeometry.fromScreenCoordinate(point);
 
-      // Query for rendered features at this point
+      // Query for rendered features at this point (excluding user location markers)
       final options = RenderedQueryOptions(
         layerIds: [
           'clusters',

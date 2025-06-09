@@ -11,6 +11,7 @@ import '../providers/map_provider.dart';
 import '../providers/station_provider.dart';
 import '../providers/enhanced_clustered_map_provider.dart';
 import '../utils/map_initialization_helper.dart';
+import '../utils/user_location_marker_manager.dart';
 import '../widgets/map_search_bar.dart';
 import '../widgets/station_list_drawer.dart';
 import '../widgets/drawer_pull_tag.dart';
@@ -62,8 +63,9 @@ class _OptimizedMapPageState extends State<OptimizedMapPage>
   bool _hasUserManuallyMoved = false;
   bool _isGettingManualLocation = false;
 
-  // Helper instance
+  // Helper instances
   late MapInitializationHelper _initHelper;
+  late UserLocationMarkerManager _locationMarkerManager;
 
   // Map tap handler
   MapTapHandler? _mapTapHandler;
@@ -79,8 +81,9 @@ class _OptimizedMapPageState extends State<OptimizedMapPage>
     // Log token status on init
     MapConstants.logTokenStatus();
 
-    // Create initialization helper
+    // Create helper instances
     _initHelper = MapInitializationHelper();
+    _locationMarkerManager = UserLocationMarkerManager();
 
     // Initialize map center based on provided coordinates or current location
     _initializeMapCenter();
@@ -187,6 +190,9 @@ class _OptimizedMapPageState extends State<OptimizedMapPage>
         _mapTapHandler = null;
       }
 
+      // Clean up location marker manager
+      _locationMarkerManager.dispose();
+
       // Clean up clustering resources first using the cached provider reference
       if (_clusteredMapProvider != null) {
         try {
@@ -257,6 +263,11 @@ class _OptimizedMapPageState extends State<OptimizedMapPage>
       if (_mapProvider != null) {
         _mapProvider!.goToLocation(point, zoom: 15.0);
 
+        // Update location marker if auto-location is enabled
+        if (_useCurrentLocation) {
+          await _locationMarkerManager.updateLocationMarker();
+        }
+
         // Show a brief message if we got actual location vs fallback
         if (mounted && !MapConstants.isDefaultLocation(point)) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -291,6 +302,32 @@ class _OptimizedMapPageState extends State<OptimizedMapPage>
         });
       }
     }
+  }
+
+  // Toggle auto-location on/off
+  Future<void> _toggleAutoLocation() async {
+    setState(() {
+      _useCurrentLocation = !_useCurrentLocation;
+    });
+
+    // Show/hide location marker based on auto-location state
+    if (_useCurrentLocation) {
+      await _locationMarkerManager.updateLocationMarker();
+      await _locationMarkerManager.showLocationMarker();
+    } else {
+      await _locationMarkerManager.hideLocationMarker();
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          _useCurrentLocation
+              ? 'Auto-location enabled'
+              : 'Auto-location disabled',
+        ),
+        duration: const Duration(seconds: 2),
+      ),
+    );
   }
 
   @override
@@ -416,21 +453,7 @@ class _OptimizedMapPageState extends State<OptimizedMapPage>
                     // Location toggle button
                     FloatingActionButton(
                       mini: true,
-                      onPressed: () {
-                        setState(() {
-                          _useCurrentLocation = !_useCurrentLocation;
-                        });
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(
-                              _useCurrentLocation
-                                  ? 'Auto-location enabled'
-                                  : 'Auto-location disabled',
-                            ),
-                            duration: const Duration(seconds: 2),
-                          ),
-                        );
-                      },
+                      onPressed: _toggleAutoLocation,
                       backgroundColor:
                           _useCurrentLocation
                               ? Colors.blue
@@ -562,7 +585,7 @@ class _OptimizedMapPageState extends State<OptimizedMapPage>
   }
 
   // Handle map creation with proper initialization
-  void _onMapCreated(MapboxMap mapboxMap, MapProvider mapProvider) {
+  void _onMapCreated(MapboxMap mapboxMap, MapProvider mapProvider) async {
     print("OPTIMIZED MAP: onMapCreated called");
 
     // Prevent multiple initializations
@@ -582,11 +605,16 @@ class _OptimizedMapPageState extends State<OptimizedMapPage>
       listen: false,
     );
 
-    // Initialize the map tap handler, passing the callback
+    // Initialize the location marker manager
+    await _locationMarkerManager.initialize(mapboxMap, context);
+
+    // Initialize the map tap handler, passing the callback and location marker manager
     _mapTapHandler = MapTapHandler(
       mapboxMap: mapboxMap,
       context: context,
       onStationAddedToFavorites: widget.onStationAddedToFavorites,
+      locationMarkerManager:
+          _locationMarkerManager, // Pass reference for tap handling
     );
     _mapTapHandler!.setupTapHandlers();
 
@@ -599,6 +627,15 @@ class _OptimizedMapPageState extends State<OptimizedMapPage>
       clusteredMapProvider: _clusteredMapProvider!,
       is3DMode: _is3DMode,
     );
+
+    // Show location marker if auto-location is enabled and we have a location
+    if (_useCurrentLocation &&
+        !MapConstants.isDefaultLocation(
+          _initialCenter ?? MapConstants.defaultCenter,
+        )) {
+      await _locationMarkerManager.updateLocationMarker();
+      await _locationMarkerManager.showLocationMarker();
+    }
   }
 
   // Handle camera change events with debouncing

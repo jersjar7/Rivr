@@ -86,7 +86,7 @@ class StreamInfoContent extends StatelessWidget {
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                 decoration: BoxDecoration(
-                  color: colors.primary.withOpacity(0.1),
+                  color: colors.primary.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(4),
                 ),
                 child: Text(
@@ -107,7 +107,7 @@ class StreamInfoContent extends StatelessWidget {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               decoration: BoxDecoration(
-                color: colors.primary.withOpacity(0.1),
+                color: colors.primary.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(4),
               ),
               child: Row(
@@ -181,26 +181,50 @@ class StreamInfoContent extends StatelessWidget {
 
           // Action buttons
           Padding(
-            padding: const EdgeInsets.only(left: 8, right: 8),
+            padding: const EdgeInsets.only(left: 2, right: 2),
             child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              mainAxisAlignment:
+                  MainAxisAlignment
+                      .spaceBetween, // Keep this for spacing between the buttons
               children: [
-                OutlinedButton.icon(
-                  onPressed: onAddToFavorites,
-                  icon: const Icon(Icons.favorite_border),
-                  label: const Text('Add to Favorites'),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: colors.primary,
+                // Wrap the first button with Expanded
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: onAddToFavorites,
+                    icon: const Icon(Icons.add_circle_outlined, size: 25),
+                    label: Padding(
+                      padding: const EdgeInsets.only(left: 8.0),
+                      child: const Text(
+                        'Add to \nMy Rivers',
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: colors.primary,
+                      // You might want to add visualDensity or minimumSize if buttons look too big
+                      // minimumSize: const Size.fromHeight(40), // Example
+                    ),
                   ),
                 ),
-                const SizedBox(width: 8),
-                ElevatedButton.icon(
-                  onPressed: () => onViewForecast(stationId, streamName),
-                  icon: const Icon(Icons.analytics),
-                  label: const Text('View Forecast'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: colors.primary,
-                    foregroundColor: colors.onPrimary,
+                const SizedBox(width: 8), // Spacer between buttons
+                // Wrap the second button with Expanded
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: () => onViewForecast(stationId, streamName),
+                    icon: const Icon(Icons.analytics, size: 25),
+                    label: Padding(
+                      padding: const EdgeInsets.only(left: 8.0),
+                      child: const Text(
+                        'View \nForecast',
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: colors.primary,
+                      foregroundColor: colors.onPrimary,
+                      // You might want to add visualDensity or minimumSize if buttons look too big
+                      // minimumSize: const Size.fromHeight(40), // Example
+                    ),
                   ),
                 ),
               ],

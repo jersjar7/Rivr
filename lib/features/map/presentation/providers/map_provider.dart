@@ -5,8 +5,10 @@ import 'dart:math' as Math;
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
+import 'package:geolocator/geolocator.dart' as geolocator;
 
 import '../../../../core/constants/map_constants.dart';
+import '../../../../core/services/location_service.dart';
 import '../../domain/entities/search_result.dart';
 import '../../domain/usecases/search_location.dart';
 
@@ -46,11 +48,24 @@ class MapProvider with ChangeNotifier {
   String? _errorMessage;
   String? get errorMessage => _errorMessage;
 
+  // Location state
+  bool _userLocationEnabled = true;
+  bool get userLocationEnabled => _userLocationEnabled;
+
+  bool _isGettingLocation = false;
+  bool get isGettingLocation => _isGettingLocation;
+
+  geolocator.Position? _currentUserLocation;
+  geolocator.Position? get currentUserLocation => _currentUserLocation;
+
   // Debounce timer
   Timer? _debounceTimer;
 
   // Search use case
   final SearchLocation searchLocationUseCase;
+
+  // Location service
+  final LocationService _locationService = LocationService.instance;
 
   // Add a boolean to track disposal state
   bool _isDisposed = false;
@@ -300,6 +315,86 @@ class MapProvider with ChangeNotifier {
     } catch (e) {
       print('Error going to location: $e');
       _setError('Failed to navigate to location');
+    }
+  }
+
+  // LOCATION METHODS
+
+  /// Toggle user location marker visibility
+  void toggleUserLocationEnabled() {
+    print(
+      "MAP PROVIDER: Toggling user location enabled: $_userLocationEnabled -> ${!_userLocationEnabled}",
+    );
+    _userLocationEnabled = !_userLocationEnabled;
+    notifyListeners();
+  }
+
+  /// Get current user location and center map on it
+  Future<bool> goToCurrentLocation() async {
+    if (_mapboxMap == null) return false;
+
+    print("MAP PROVIDER: Getting current location");
+    _isGettingLocation = true;
+    notifyListeners();
+
+    try {
+      final position = await _locationService.getCurrentPosition(
+        timeout: const Duration(seconds: 10),
+      );
+
+      if (position != null) {
+        _currentUserLocation = position;
+
+        // Create map point
+        final point = Point(
+          coordinates: Position(position.longitude, position.latitude),
+        );
+
+        // Center map respecting current zoom (don't force a specific zoom)
+        goToLocation(point, zoom: _currentZoom);
+
+        print(
+          "MAP PROVIDER: Successfully centered on current location: ${position.latitude}, ${position.longitude}",
+        );
+
+        _isGettingLocation = false;
+        notifyListeners();
+        return true;
+      } else {
+        print("MAP PROVIDER: Could not get current location");
+        _setError('Could not get current location');
+        _isGettingLocation = false;
+        notifyListeners();
+        return false;
+      }
+    } catch (e) {
+      print("MAP PROVIDER: Error getting current location: $e");
+      _setError('Error getting location: ${e.toString()}');
+      _isGettingLocation = false;
+      notifyListeners();
+      return false;
+    }
+  }
+
+  /// Update current user location (for marker updates)
+  Future<void> updateCurrentUserLocation() async {
+    if (!_userLocationEnabled) return;
+
+    try {
+      final position = await _locationService.getCurrentPosition(
+        timeout: const Duration(seconds: 5),
+      );
+
+      if (position != null) {
+        _currentUserLocation = position;
+        print(
+          "MAP PROVIDER: Updated current user location: ${position.latitude}, ${position.longitude}",
+        );
+        notifyListeners();
+      }
+    } catch (e) {
+      print("MAP PROVIDER: Error updating user location: $e");
+      // Don't show error for background updates
     }
   }
 

@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
 import 'package:rivr/features/map/presentation/widgets/map_components/enhanced_map_style_selector.dart';
 
-/// A widget that provides map control buttons (style selector, terrain toggle, zoom)
+/// A widget that provides map control buttons (style selector, terrain toggle, zoom, location)
 class MapControls extends StatelessWidget {
   final bool is3DMode;
   final String currentStyle;
@@ -13,6 +13,12 @@ class MapControls extends StatelessWidget {
   final VoidCallback onRefresh;
   final VoidCallback onZoomIn;
   final VoidCallback onZoomOut;
+
+  // Location control properties
+  final bool userLocationEnabled;
+  final bool isGettingLocation;
+  final VoidCallback onToggleUserLocation;
+  final VoidCallback onGoToCurrentLocation;
 
   const MapControls({
     super.key,
@@ -23,6 +29,11 @@ class MapControls extends StatelessWidget {
     required this.onRefresh,
     required this.onZoomIn,
     required this.onZoomOut,
+    // Location control parameters
+    required this.userLocationEnabled,
+    required this.isGettingLocation,
+    required this.onToggleUserLocation,
+    required this.onGoToCurrentLocation,
   });
 
   @override
@@ -59,6 +70,16 @@ class MapControls extends StatelessWidget {
 
                 // 3D/2D toggle button
                 _build3DToggleButton(context),
+
+                const SizedBox(height: 12),
+
+                // Location toggle button
+                _buildLocationToggleButton(context),
+
+                const SizedBox(height: 12),
+
+                // My location button
+                _buildMyLocationButton(context),
               ],
             ),
           ),
@@ -181,6 +202,115 @@ class MapControls extends StatelessWidget {
             child: Icon(
               is3DMode ? Icons.view_in_ar : Icons.map,
               color: iconColor,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLocationToggleButton(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    final brightness = theme.brightness;
+
+    // Use the same background color as the control buttons
+    final Color bgColor = colors.surface;
+
+    // For icon color, follow the same pattern as 3D toggle
+    final Color iconColor =
+        brightness == Brightness.dark
+            ? colors
+                .secondary // Always teal in dark mode
+            : (userLocationEnabled
+                ? colors.primary
+                : colors.onSurface); // In light mode, highlight when active
+
+    return Tooltip(
+      message:
+          userLocationEnabled ? 'Hide location marker' : 'Show location marker',
+      child: Container(
+        width: 48,
+        height: 48,
+        decoration: BoxDecoration(
+          color: bgColor,
+          borderRadius: BorderRadius.circular(8),
+          boxShadow: [
+            BoxShadow(
+              color: colors.shadow,
+              blurRadius: 4,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Material(
+          color: Colors.transparent,
+          borderRadius: BorderRadius.circular(8),
+          child: InkWell(
+            onTap: onToggleUserLocation,
+            borderRadius: BorderRadius.circular(8),
+            child: Center(
+              child: Icon(
+                userLocationEnabled ? Icons.location_on : Icons.location_off,
+                color: iconColor,
+                size: 24,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMyLocationButton(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    final brightness = theme.brightness;
+
+    // Use the same background color as the control buttons
+    final Color bgColor = colors.surface;
+
+    // Use secondary (teal) color for icon in dark mode
+    final Color iconColor =
+        brightness == Brightness.dark
+            ? colors
+                .secondary // Teal in dark mode
+            : colors.onSurface; // Normal icon color in light mode
+
+    return Tooltip(
+      message: 'Go to my location',
+      child: Container(
+        height: 48,
+        width: 48,
+        decoration: BoxDecoration(
+          color: bgColor,
+          borderRadius: BorderRadius.circular(8),
+          boxShadow: [
+            BoxShadow(
+              color: colors.shadow,
+              blurRadius: 4,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Material(
+          color: Colors.transparent,
+          borderRadius: BorderRadius.circular(8),
+          child: InkWell(
+            onTap: isGettingLocation ? null : onGoToCurrentLocation,
+            borderRadius: BorderRadius.circular(8),
+            child: Center(
+              child:
+                  isGettingLocation
+                      ? SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation<Color>(iconColor),
+                        ),
+                      )
+                      : Icon(Icons.my_location, color: iconColor, size: 24),
             ),
           ),
         ),

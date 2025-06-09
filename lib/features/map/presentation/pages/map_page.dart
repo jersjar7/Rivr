@@ -6,7 +6,6 @@ import 'package:provider/provider.dart';
 import 'package:rivr/features/map/presentation/utils/map_tap_handler.dart';
 
 import '../../../../core/constants/map_constants.dart';
-import '../../../../core/services/location_service.dart';
 import '../providers/map_provider.dart';
 import '../providers/station_provider.dart';
 import '../providers/enhanced_clustered_map_provider.dart';
@@ -61,7 +60,6 @@ class _OptimizedMapPageState extends State<OptimizedMapPage>
   bool _isLoadingInitialLocation = true;
   bool _useCurrentLocation = true;
   bool _hasUserManuallyMoved = false;
-  bool _isGettingManualLocation = false;
 
   // Helper instances
   late MapInitializationHelper _initHelper;
@@ -69,9 +67,6 @@ class _OptimizedMapPageState extends State<OptimizedMapPage>
 
   // Map tap handler
   MapTapHandler? _mapTapHandler;
-
-  // Location service
-  final LocationService _locationService = LocationService.instance;
 
   @override
   void initState() {
@@ -246,90 +241,6 @@ class _OptimizedMapPageState extends State<OptimizedMapPage>
     return true; // Allow the page to be popped
   }
 
-  // Manual location button handler
-  Future<void> _goToCurrentLocation() async {
-    if (_isGettingManualLocation) return;
-
-    setState(() {
-      _isGettingManualLocation = true;
-    });
-
-    try {
-      final point = await _locationService.getCurrentPositionAsPoint().timeout(
-        const Duration(seconds: 10),
-        onTimeout: () => MapConstants.defaultCenter,
-      );
-
-      if (_mapProvider != null) {
-        _mapProvider!.goToLocation(point, zoom: 15.0);
-
-        // Update location marker if auto-location is enabled
-        if (_useCurrentLocation) {
-          await _locationMarkerManager.updateLocationMarker();
-        }
-
-        // Show a brief message if we got actual location vs fallback
-        if (mounted && !MapConstants.isDefaultLocation(point)) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Centered on your current location'),
-              duration: Duration(seconds: 2),
-            ),
-          );
-        } else if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Could not get current location'),
-              duration: Duration(seconds: 2),
-            ),
-          );
-        }
-      }
-    } catch (e) {
-      print("Error getting manual location: $e");
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Error getting location'),
-            duration: Duration(seconds: 2),
-          ),
-        );
-      }
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isGettingManualLocation = false;
-        });
-      }
-    }
-  }
-
-  // Toggle auto-location on/off
-  Future<void> _toggleAutoLocation() async {
-    setState(() {
-      _useCurrentLocation = !_useCurrentLocation;
-    });
-
-    // Show/hide location marker based on auto-location state
-    if (_useCurrentLocation) {
-      await _locationMarkerManager.updateLocationMarker();
-      await _locationMarkerManager.showLocationMarker();
-    } else {
-      await _locationMarkerManager.hideLocationMarker();
-    }
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          _useCurrentLocation
-              ? 'Auto-location enabled'
-              : 'Auto-location disabled',
-        ),
-        duration: const Duration(seconds: 2),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -420,61 +331,61 @@ class _OptimizedMapPageState extends State<OptimizedMapPage>
               ),
             ),
 
-            // Manual location controls (only show after initial load)
-            if (!_isLoadingInitialLocation)
-              Positioned(
-                right: 16,
-                bottom: 200,
-                child: Column(
-                  children: [
-                    // Current location button
-                    FloatingActionButton(
-                      mini: true,
-                      onPressed:
-                          _isGettingManualLocation
-                              ? null
-                              : _goToCurrentLocation,
-                      backgroundColor: Colors.white,
-                      foregroundColor: Colors.blue,
-                      tooltip: 'Go to my location',
-                      child:
-                          _isGettingManualLocation
-                              ? const SizedBox(
-                                width: 20,
-                                height: 20,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                ),
-                              )
-                              : const Icon(Icons.my_location),
-                    ),
-                    const SizedBox(height: 8),
+            // // Manual location controls (only show after initial load)
+            // if (!_isLoadingInitialLocation)
+            //   Positioned(
+            //     right: 16,
+            //     bottom: 200,
+            //     child: Column(
+            //       children: [
+            //         // Current location button
+            //         FloatingActionButton(
+            //           mini: true,
+            //           onPressed:
+            //               _isGettingManualLocation
+            //                   ? null
+            //                   : _goToCurrentLocation,
+            //           backgroundColor: Colors.white,
+            //           foregroundColor: Colors.blue,
+            //           tooltip: 'Go to my location',
+            //           child:
+            //               _isGettingManualLocation
+            //                   ? const SizedBox(
+            //                     width: 20,
+            //                     height: 20,
+            //                     child: CircularProgressIndicator(
+            //                       strokeWidth: 2,
+            //                     ),
+            //                   )
+            //                   : const Icon(Icons.my_location),
+            //         ),
+            //         const SizedBox(height: 8),
 
-                    // Location toggle button
-                    FloatingActionButton(
-                      mini: true,
-                      onPressed: _toggleAutoLocation,
-                      backgroundColor:
-                          _useCurrentLocation
-                              ? Colors.blue
-                              : Colors.grey.shade300,
-                      foregroundColor:
-                          _useCurrentLocation
-                              ? Colors.white
-                              : Colors.grey.shade600,
-                      tooltip:
-                          _useCurrentLocation
-                              ? 'Disable auto-location'
-                              : 'Enable auto-location',
-                      child: Icon(
-                        _useCurrentLocation
-                            ? Icons.location_on
-                            : Icons.location_off,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+            //         // Location toggle button
+            //         FloatingActionButton(
+            //           mini: true,
+            //           onPressed: _toggleAutoLocation,
+            //           backgroundColor:
+            //               _useCurrentLocation
+            //                   ? Colors.blue
+            //                   : Colors.grey.shade300,
+            //           foregroundColor:
+            //               _useCurrentLocation
+            //                   ? Colors.white
+            //                   : Colors.grey.shade600,
+            //           tooltip:
+            //               _useCurrentLocation
+            //                   ? 'Disable auto-location'
+            //                   : 'Enable auto-location',
+            //           child: Icon(
+            //             _useCurrentLocation
+            //                 ? Icons.location_on
+            //                 : Icons.location_off,
+            //           ),
+            //         ),
+            //       ],
+            //     ),
+            //   ),
 
             // UI Elements
             SafeArea(
@@ -508,6 +419,12 @@ class _OptimizedMapPageState extends State<OptimizedMapPage>
                   onRefresh: _refreshStations,
                   onZoomIn: _zoomIn,
                   onZoomOut: _zoomOut,
+                  // Location control properties
+                  userLocationEnabled: mapProvider.userLocationEnabled,
+                  isGettingLocation: mapProvider.isGettingLocation,
+                  onToggleUserLocation: () => _toggleUserLocation(mapProvider),
+                  onGoToCurrentLocation:
+                      () => _goToCurrentLocationFromControls(mapProvider),
                 );
               },
             ),
@@ -515,6 +432,65 @@ class _OptimizedMapPageState extends State<OptimizedMapPage>
         ),
       ),
     );
+  }
+
+  /// Toggle user location marker from controls
+  Future<void> _toggleUserLocation(MapProvider mapProvider) async {
+    mapProvider.toggleUserLocationEnabled();
+
+    // Update location marker manager
+    if (mapProvider.userLocationEnabled) {
+      await _locationMarkerManager.updateLocationMarker();
+      await _locationMarkerManager.showLocationMarker();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Location marker enabled'),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+    } else {
+      await _locationMarkerManager.hideLocationMarker();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Location marker disabled'),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+    }
+  }
+
+  /// Go to current location from map controls
+  Future<void> _goToCurrentLocationFromControls(MapProvider mapProvider) async {
+    final success = await mapProvider.goToCurrentLocation();
+
+    if (!mounted) return;
+
+    // Update location marker if enabled and location was successful
+    if (success && mapProvider.userLocationEnabled) {
+      await _locationMarkerManager.updateLocationMarker();
+      await _locationMarkerManager.showLocationMarker();
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Centered on your current location'),
+          duration: Duration(seconds: 2),
+        ),
+      );
+    } else if (!success) {
+      // Error message will be shown by MapProvider, but we can add additional feedback
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Could not get current location'),
+          duration: Duration(seconds: 2),
+        ),
+      );
+    }
   }
 
   Widget _buildMap() {

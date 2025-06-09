@@ -67,24 +67,6 @@ class ClusteredMapDataSourceImpl implements ClusteredMapDataSource {
       await style.addStyleLayer(clusterLayer, null);
       print("DEBUG: Added cluster layer '$_clustersLayerId'");
 
-      // Unclustered single‐point circles (always visible)
-      final circleLayer = '''{
-        "id": "$_unclusteredCircleLayerId",
-        "type": "circle",
-        "source": "$_sourceId",
-        "filter": ["!", ["has", "point_count"]],
-        "paint": {
-          "circle-color": "#11b4da",
-          "circle-radius": 6,
-          "circle-stroke-width": 1,
-          "circle-stroke-color": "#ffffff"
-        }
-      }''';
-      await style.addStyleLayer(circleLayer, null);
-      print(
-        "DEBUG: Added unclustered-circle layer '$_unclusteredCircleLayerId'",
-      );
-
       // Unclustered symbol layer on top of circles (for normal markers)
       final pointsLayer = '''{
         "id": "$_unclusteredPointsLayerId",

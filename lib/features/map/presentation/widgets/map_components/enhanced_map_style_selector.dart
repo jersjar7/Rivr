@@ -72,17 +72,17 @@ class EnhancedMapStyleSelector extends StatelessWidget {
               children: [
                 _buildStyleCard(
                   context,
-                  'Streets',
-                  MapConstants.mapboxStreets,
-                  'assets/map_previews/streets.png',
-                  Icons.map,
-                ),
-                _buildStyleCard(
-                  context,
                   'Standard',
                   MapConstants.mapboxStandard,
                   'assets/map_previews/standard.png',
                   Icons.public,
+                ),
+                _buildStyleCard(
+                  context,
+                  'Streets',
+                  MapConstants.mapboxStreets,
+                  'assets/map_previews/streets.png',
+                  Icons.map,
                 ),
                 _buildStyleCard(
                   context,

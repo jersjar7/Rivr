@@ -25,7 +25,7 @@ class MapConstants {
   static const String mapboxOutdoors = MapboxStyles.OUTDOORS;
 
   // Default map style
-  static const String defaultMapStyle = MapboxStyles.MAPBOX_STREETS;
+  static const String defaultMapStyle = MapboxStyles.STANDARD;
 
   // Default map center (Utah, USA) - fallback location
   static final Point defaultCenter = Point(

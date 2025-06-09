@@ -465,7 +465,8 @@ class _OptimizedMapPageState extends State<OptimizedMapPage>
           } else {
             // For light mode, switch back to a light style if using dark
             if (styleUri.contains('dark')) {
-              styleUri = MapConstants.mapboxStreets; // Or any other light style
+              styleUri =
+                  MapConstants.mapboxStandard; // Or any other light style
 
               // Update the provider's style (without rebuilding)
               Future.microtask(() {

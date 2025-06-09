@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import 'package:rivr/features/map/presentation/utils/map_tap_handler.dart';
 
 import '../../../../core/constants/map_constants.dart';
+import '../../../../core/services/location_service.dart';
 import '../providers/map_provider.dart';
 import '../providers/station_provider.dart';
 import '../providers/enhanced_clustered_map_provider.dart';
@@ -55,11 +56,20 @@ class _OptimizedMapPageState extends State<OptimizedMapPage>
   bool _showZoomHint = true;
   bool _hasUserInteracted = false;
 
+  // Location-related state
+  bool _isLoadingInitialLocation = true;
+  bool _useCurrentLocation = true;
+  bool _hasUserManuallyMoved = false;
+  bool _isGettingManualLocation = false;
+
   // Helper instance
   late MapInitializationHelper _initHelper;
 
   // Map tap handler
   MapTapHandler? _mapTapHandler;
+
+  // Location service
+  final LocationService _locationService = LocationService.instance;
 
   @override
   void initState() {
@@ -69,15 +79,56 @@ class _OptimizedMapPageState extends State<OptimizedMapPage>
     // Log token status on init
     MapConstants.logTokenStatus();
 
-    // Initialize center point from given coordinates or default
-    if (widget.lat != 0.0 && widget.lon != 0.0) {
-      _initialCenter = Point(coordinates: Position(widget.lon, widget.lat));
-    }
-
     // Create initialization helper
     _initHelper = MapInitializationHelper();
 
+    // Initialize map center based on provided coordinates or current location
+    _initializeMapCenter();
+
     print("OPTIMIZED MAP PAGE: initState completed");
+  }
+
+  /// Initialize the map center based on provided coordinates or current location
+  Future<void> _initializeMapCenter() async {
+    try {
+      // If lat/lon are provided and not zero, use them (disable auto-location)
+      if (widget.lat != 0.0 && widget.lon != 0.0) {
+        _initialCenter = Point(coordinates: Position(widget.lon, widget.lat));
+        _useCurrentLocation =
+            false; // Don't try current location if coordinates provided
+        setState(() {
+          _isLoadingInitialLocation = false;
+        });
+        print(
+          "OPTIMIZED MAP PAGE: Using provided coordinates: ${widget.lat}, ${widget.lon}",
+        );
+        return;
+      }
+
+      // Otherwise, try to get current location if user hasn't disabled it
+      final center = await MapConstants.getInitialCenter(
+        useCurrentLocation: _useCurrentLocation,
+      );
+
+      setState(() {
+        _initialCenter = center;
+        _isLoadingInitialLocation = false;
+      });
+
+      // Log whether we got actual location or fallback
+      if (MapConstants.isDefaultLocation(center)) {
+        print("OPTIMIZED MAP PAGE: Using default Utah location");
+      } else {
+        print("OPTIMIZED MAP PAGE: Using current device location");
+      }
+    } catch (e) {
+      print("OPTIMIZED MAP PAGE: Error initializing map center: $e");
+      // Fallback to default center
+      setState(() {
+        _initialCenter = MapConstants.defaultCenter;
+        _isLoadingInitialLocation = false;
+      });
+    }
   }
 
   @override
@@ -101,6 +152,8 @@ class _OptimizedMapPageState extends State<OptimizedMapPage>
     if ((oldWidget.lat != widget.lat || oldWidget.lon != widget.lon) &&
         (widget.lat != 0.0 || widget.lon != 0.0)) {
       _initialCenter = Point(coordinates: Position(widget.lon, widget.lat));
+      _useCurrentLocation =
+          false; // Disable auto-location when coordinates are provided
       Future.microtask(() => _resetMap());
     }
   }
@@ -117,6 +170,7 @@ class _OptimizedMapPageState extends State<OptimizedMapPage>
   @override
   void dispose() {
     print("OPTIMIZED MAP PAGE: dispose called");
+    WidgetsBinding.instance.removeObserver(this);
     // Schedule cleanup for next frame instead of doing it immediately
     SchedulerBinding.instance.addPostFrameCallback((_) {
       _cleanupMapResources();
@@ -165,7 +219,12 @@ class _OptimizedMapPageState extends State<OptimizedMapPage>
 
     setState(() {
       _mapKey = UniqueKey(); // This will recreate the MapWidget
+      _hasUserManuallyMoved = false; // Reset user interaction flag
     });
+
+    // Re-initialize map center
+    _isLoadingInitialLocation = true;
+    _initializeMapCenter();
 
     Future.delayed(const Duration(milliseconds: 500), () {
       _isResetting = false;
@@ -181,18 +240,103 @@ class _OptimizedMapPageState extends State<OptimizedMapPage>
     return true; // Allow the page to be popped
   }
 
+  // Manual location button handler
+  Future<void> _goToCurrentLocation() async {
+    if (_isGettingManualLocation) return;
+
+    setState(() {
+      _isGettingManualLocation = true;
+    });
+
+    try {
+      final point = await _locationService.getCurrentPositionAsPoint().timeout(
+        const Duration(seconds: 10),
+        onTimeout: () => MapConstants.defaultCenter,
+      );
+
+      if (_mapProvider != null) {
+        _mapProvider!.goToLocation(point, zoom: 15.0);
+
+        // Show a brief message if we got actual location vs fallback
+        if (mounted && !MapConstants.isDefaultLocation(point)) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Centered on your current location'),
+              duration: Duration(seconds: 2),
+            ),
+          );
+        } else if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Could not get current location'),
+              duration: Duration(seconds: 2),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      print("Error getting manual location: $e");
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Error getting location'),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isGettingManualLocation = false;
+        });
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
     final textTheme = theme.textTheme;
 
+    // Show loading indicator while determining initial location
+    if (_isLoadingInitialLocation) {
+      return Scaffold(
+        backgroundColor: colors.surface,
+        appBar: AppBar(
+          title: Text(
+            'Add River',
+            style: textTheme.titleMedium?.copyWith(
+              color: colors.onPrimary,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          backgroundColor: colors.primary,
+          foregroundColor: colors.onPrimary,
+        ),
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const CircularProgressIndicator(),
+              const SizedBox(height: 16),
+              Text(
+                _useCurrentLocation
+                    ? 'Getting your location...'
+                    : 'Loading map...',
+                style: textTheme.bodyLarge,
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     return WillPopScope(
       onWillPop: _onWillPop,
       child: Scaffold(
         key: _scaffoldKey,
-        backgroundColor:
-            colors.surface, // Add explicit background color for the scaffold
+        backgroundColor: colors.surface,
         drawer: const StationListDrawer(),
         appBar: AppBar(
           title: Text(
@@ -207,7 +351,6 @@ class _OptimizedMapPageState extends State<OptimizedMapPage>
           elevation: 2,
           leading: IconButton(
             icon: Icon(Icons.arrow_back, color: colors.onPrimary),
-            // When back button is pressed in AppBar, execute callback if provided
             onPressed: () {
               if (widget.onStationAddedToFavorites != null) {
                 widget.onStationAddedToFavorites!();
@@ -235,11 +378,80 @@ class _OptimizedMapPageState extends State<OptimizedMapPage>
                 onTap: () => _scaffoldKey.currentState?.openDrawer(),
                 backgroundColor:
                     colors.brightness == Brightness.dark
-                        ? colors
-                            .secondary // Use secondary color in dark mode
-                        : colors.primary, // Use primary color in light mode
+                        ? colors.secondary
+                        : colors.primary,
               ),
             ),
+
+            // Manual location controls (only show after initial load)
+            if (!_isLoadingInitialLocation)
+              Positioned(
+                right: 16,
+                bottom: 200,
+                child: Column(
+                  children: [
+                    // Current location button
+                    FloatingActionButton(
+                      mini: true,
+                      onPressed:
+                          _isGettingManualLocation
+                              ? null
+                              : _goToCurrentLocation,
+                      backgroundColor: Colors.white,
+                      foregroundColor: Colors.blue,
+                      tooltip: 'Go to my location',
+                      child:
+                          _isGettingManualLocation
+                              ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              )
+                              : const Icon(Icons.my_location),
+                    ),
+                    const SizedBox(height: 8),
+
+                    // Location toggle button
+                    FloatingActionButton(
+                      mini: true,
+                      onPressed: () {
+                        setState(() {
+                          _useCurrentLocation = !_useCurrentLocation;
+                        });
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              _useCurrentLocation
+                                  ? 'Auto-location enabled'
+                                  : 'Auto-location disabled',
+                            ),
+                            duration: const Duration(seconds: 2),
+                          ),
+                        );
+                      },
+                      backgroundColor:
+                          _useCurrentLocation
+                              ? Colors.blue
+                              : Colors.grey.shade300,
+                      foregroundColor:
+                          _useCurrentLocation
+                              ? Colors.white
+                              : Colors.grey.shade600,
+                      tooltip:
+                          _useCurrentLocation
+                              ? 'Disable auto-location'
+                              : 'Enable auto-location',
+                      child: Icon(
+                        _useCurrentLocation
+                            ? Icons.location_on
+                            : Icons.location_off,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
 
             // UI Elements
             SafeArea(
@@ -395,6 +607,15 @@ class _OptimizedMapPageState extends State<OptimizedMapPage>
       _hasUserInteracted = true;
       return; // skip the first, system-driven change
     }
+
+    // Mark that user has manually moved the map (prevents auto-return to location)
+    if (!_hasUserManuallyMoved) {
+      setState(() {
+        _hasUserManuallyMoved = true;
+      });
+      print("OPTIMIZED MAP: User has manually moved the map");
+    }
+
     final mapProvider = Provider.of<MapProvider>(context, listen: false);
     mapProvider.triggerDebounceTimer(_onMapMoved);
   }

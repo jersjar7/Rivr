@@ -12,6 +12,7 @@ import 'package:rivr/core/network/connection_monitor.dart';
 import 'package:rivr/core/providers/theme_provider.dart';
 import 'package:rivr/core/services/flow_units_service.dart';
 import 'package:rivr/core/services/geocoding_service.dart';
+import 'package:rivr/core/services/location_service.dart';
 import 'package:rivr/core/services/stream_name_service.dart';
 import 'package:rivr/features/map/data/datasources/map_station_local_datasource.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -133,6 +134,9 @@ Future<void> setupServiceLocator() async {
   _registerForecastDependencies(); // Forecast dependencies
   registerMapDependencies(sl); // Register map dependencies
   _registerProviders(); // Register all providers
+
+  // Register DeviceLocationService
+  registerLocationService(sl);
 
   // Register geocoding service
   registerGeocodingService(sl);
@@ -344,4 +348,10 @@ void registerGeocodingService(GetIt sl) {
       networkInfo: sl<NetworkInfo>(),
     ),
   );
+}
+
+/// Register location service
+void registerLocationService(GetIt sl) {
+  // Location service (singleton since we want to maintain state)
+  sl.registerLazySingleton<LocationService>(() => LocationService.instance);
 }

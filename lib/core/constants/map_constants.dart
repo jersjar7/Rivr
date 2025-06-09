@@ -2,6 +2,7 @@
 
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
+import '../services/location_service.dart';
 
 class MapConstants {
   // Access token from environment file
@@ -26,7 +27,7 @@ class MapConstants {
   // Default map style
   static const String defaultMapStyle = MapboxStyles.MAPBOX_STREETS;
 
-  // Default map center (Utah, USA)
+  // Default map center (Utah, USA) - fallback location
   static final Point defaultCenter = Point(
     coordinates: Position(-111.658531, 40.233845),
   );
@@ -61,6 +62,67 @@ class MapConstants {
   // Animation durations
   static const int mapAnimationDurationMs = 5000;
   static const int mapAnimationDelayMs = 0;
+
+  // Location settings
+  static const Duration locationTimeout = Duration(seconds: 5);
+
+  /// Get initial map center - tries current location first, falls back to Utah
+  /// This method includes a 5-second timeout and proper error handling
+  static Future<Point> getInitialCenter({
+    bool useCurrentLocation = true,
+  }) async {
+    if (!useCurrentLocation) {
+      print(
+        "MAP CONSTANTS: Using default Utah location (user disabled current location)",
+      );
+      return defaultCenter;
+    }
+
+    try {
+      print(
+        "MAP CONSTANTS: Trying to get current location for initial map center...",
+      );
+
+      final locationService = LocationService.instance;
+      final point = await locationService.getCurrentPositionAsPoint().timeout(
+        locationTimeout,
+        onTimeout: () {
+          print(
+            "MAP CONSTANTS: Location timeout after ${locationTimeout.inSeconds}s, using default center",
+          );
+          return defaultCenter;
+        },
+      );
+
+      // Check if we got the actual current location or the fallback
+      final currentPos = locationService.lastKnownPosition;
+      if (currentPos != null) {
+        print(
+          "MAP CONSTANTS: Successfully got current location: ${currentPos.latitude}, ${currentPos.longitude}",
+        );
+      } else {
+        print(
+          "MAP CONSTANTS: Location service returned default center (no GPS)",
+        );
+      }
+
+      return point;
+    } catch (e) {
+      print("MAP CONSTANTS: Error getting current location: $e");
+      print("MAP CONSTANTS: Falling back to default Utah location");
+      return defaultCenter;
+    }
+  }
+
+  /// Check if a point is the default Utah location
+  static bool isDefaultLocation(Point point) {
+    const double tolerance =
+        0.001; // Small tolerance for floating point comparison
+    return (point.coordinates.lng - defaultCenter.coordinates.lng).abs() <
+            tolerance &&
+        (point.coordinates.lat - defaultCenter.coordinates.lat).abs() <
+            tolerance;
+  }
 
   // Add this method to log the token status
   static void logTokenStatus() {

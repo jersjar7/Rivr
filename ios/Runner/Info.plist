@@ -6,6 +6,10 @@
 	<string>sk.eyJ1IjoiamVyc29uZGV2cyIsImEiOiJjbTkyYXpueTQwOXRzMmxvaGdoMTg2eWN1In0.qzghyzkAlVXDNiOBG1-HVQ</string>
 	<key>NSFaceIDUsageDescription</key>
     <string>Enable Face ID for quick and secure login to your Rivr account</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+    <string>Rivr needs location access to center the map on your current location and show nearby river stations.</string>
+    <key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+    <string>Rivr needs location access to center the map on your current location and show nearby river stations.</string>
 	<key>LSApplicationQueriesSchemes</key>
 	<array>
 	<!-- If you ever test canLaunchUrl on https:// -->

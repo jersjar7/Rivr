@@ -42,8 +42,8 @@ class MapControls extends StatelessWidget {
       children: [
         // Control buttons at top-right
         Positioned(
-          top: 26,
-          right: 16,
+          top: 60,
+          right: 8,
           child: SafeArea(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.end,

@@ -35,28 +35,28 @@ This thesis follows a Design Science Research (DSR) methodology, focusing on cre
 ### Component Design Rationale
 
 #### 1. NOAA API Integration Layer
-**Purpose**: Fetch and process real-time flow data 
+**Purpose**: Fetch and process real-time flow data  
 **Design Decisions**:
 - Scheduled polling every 30 minutes (thesis scope)
 - Error handling for API unavailability
 - Data transformation from NOAA format to app-friendly structure
 
 #### 2. Cloud Functions Processing
-**Purpose**: Serverless processing and alert generation 
+**Purpose**: Serverless processing and alert generation  
 **Design Decisions**:
 - Firebase Cloud Functions for scalability
 - Threshold comparison logic
 - Alert priority classification system
 
 #### 3. User Preference Management
-**Purpose**: Store custom thresholds and notification settings 
+**Purpose**: Store custom thresholds and notification settings  
 **Design Decisions**:
 - Firestore collections for real-time sync
 - User-specific threshold configurations
 - Notification frequency controls
 
 #### 4. Notification Delivery System
-**Purpose**: Reliable alert delivery to mobile devices 
+**Purpose**: Reliable alert delivery to mobile devices  
 **Design Decisions**:
 - Firebase Cloud Messaging for cross-platform support
 - Foreground and background notification handling

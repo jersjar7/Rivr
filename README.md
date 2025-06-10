@@ -19,3 +19,11 @@ Rivr is a **Flutter application** designed to provide users with comprehensive r
 * **Firebase Authentication:** Secure user access and data.
 * **SQLite Local Storage:** Efficiently store and manage local station data.
 * **NOAA API Integration:** Retrieve accurate and real-time river flow data directly from NOAA's National Water Model.
+
+---
+
+## About
+
+Rivr is developed as a **Master's thesis project** by **Jerson Garcia** under the supervision of **Dr. Dan Ames**. This work is conducted at the **Hydroinformatics Lab** at **Brigham Young University**.
+
+We are grateful for the support and funding provided by **CIROH**, which makes the development of this application possible.

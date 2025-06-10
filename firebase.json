@@ -1,1 +1,52 @@
-{"flutter":{"platforms":{"android":{"default":{"projectId":"rivr-official","appId":"1:892775201186:android:199bb3c2b8ab33d584dafb","fileOutput":"android/app/google-services.json"}},"ios":{"default":{"projectId":"rivr-official","appId":"1:892775201186:ios:31cc57368732dfd584dafb","uploadDebugSymbols":false,"fileOutput":"ios/Runner/GoogleService-Info.plist"}},"dart":{"lib/firebase_options.dart":{"projectId":"rivr-official","configurations":{"android":"1:892775201186:android:199bb3c2b8ab33d584dafb","ios":"1:892775201186:ios:31cc57368732dfd584dafb","web":"1:892775201186:web:1634005f124413b684dafb"}}}}}}
+{
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "rivr-official",
+          "appId": "1:892775201186:android:199bb3c2b8ab33d584dafb",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "ios": {
+        "default": {
+          "projectId": "rivr-official",
+          "appId": "1:892775201186:ios:31cc57368732dfd584dafb",
+          "uploadDebugSymbols": false,
+          "fileOutput": "ios/Runner/GoogleService-Info.plist"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "rivr-official",
+          "configurations": {
+            "android": "1:892775201186:android:199bb3c2b8ab33d584dafb",
+            "ios": "1:892775201186:ios:31cc57368732dfd584dafb",
+            "web": "1:892775201186:web:1634005f124413b684dafb"
+          }
+        }
+      }
+    }
+  },
+  "functions": [
+    {
+      "source": "functions",
+      "codebase": "default",
+      "ignore": [
+        "node_modules",
+        ".git",
+        "firebase-debug.log",
+        "firebase-debug.*.log",
+        "*.local"
+      ],
+      "predeploy": [
+        "npm --prefix \"$RESOURCE_DIR\" run lint",
+        "npm --prefix \"$RESOURCE_DIR\" run build"
+      ]
+    }
+  ],
+  "firestore": {
+    "rules": "firestore.rules",
+    "indexes": "firestore.indexes.json"
+  }
+}

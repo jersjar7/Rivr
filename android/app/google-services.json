@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "892775201186",
+    "project_id": "rivr-official",
+    "storage_bucket": "rivr-official.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:892775201186:android:199bb3c2b8ab33d584dafb",
+        "android_client_info": {
+          "package_name": "com.byu_hydroinformatics_lab.rivr"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAFj01yP4GDCoFzJrMwiwqld7fFYy7hvKU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:892775201186:android:a7d58b39e5f2a5a284dafb",
+        "android_client_info": {
+          "package_name": "com.byu_hydroinformatics_lab.rivrapp"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAFj01yP4GDCoFzJrMwiwqld7fFYy7hvKU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

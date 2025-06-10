@@ -1,0 +1,23 @@
+// functions/tsconfig.json
+{
+  "compilerOptions": {
+    "module": "NodeNext",
+    "esModuleInterop": true,
+    "moduleResolution": "nodenext",
+    "target": "es2017",
+    "outDir": "lib",
+    "sourceMap": true,
+
+    // keep strict mode on, but override the specific bits:
+    "strict": true,
+    "noImplicitAny": false,        // allow your implicit-any event params
+    "noUnusedLocals": false,       // disable the import-unused errors
+    "noUnusedParameters": false,   // same for unused function params
+
+    // IGNORE errors in node_modules (like that bad Int32Array<ArrayBuffer>):
+    "skipLibCheck": true
+  },
+
+  "compileOnSave": true,
+  "include": ["src"]
+}

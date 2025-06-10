@@ -36,7 +36,6 @@ This thesis follows a Design Science Research (DSR) methodology, focusing on cre
 
 #### 1. NOAA API Integration Layer
 **Purpose**: Fetch and process real-time flow data
-
 **Design Decisions**:
 - Scheduled polling every 30 minutes (thesis scope)
 - Error handling for API unavailability

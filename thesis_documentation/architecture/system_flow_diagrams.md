@@ -10,7 +10,7 @@ This document provides comprehensive flow diagrams for the Rivr notification sys
 graph TB
     subgraph "External Data Sources"
         NOAA[NOAA National Water Model API]
-        USGS[USGS Backup API]
+        CIROH[CIROH Return Periods API]
     end
     
     subgraph "Firebase Cloud Infrastructure"

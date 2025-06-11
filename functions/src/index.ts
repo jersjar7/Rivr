@@ -1,4 +1,7 @@
-// functions/src/index.ts - Main Cloud Functions entry point
+// Temporary fix for functions/src/index.ts
+// Comment out the auth functions that are failing to deploy
+
+// functions/src/index.ts - Temporarily disable auth functions
 
 import * as admin from "firebase-admin";
 import * as logger from "firebase-functions/logger";
@@ -22,9 +25,9 @@ import {
   FirestoreEvent,
 } from "firebase-functions/v2/firestore";
 
-// v1 Auth triggers + types
-import {auth} from "firebase-functions/v1";
-import type {UserRecord} from "firebase-admin/auth";
+// v1 Auth triggers + types - COMMENTED OUT TEMPORARILY
+// import {auth} from "firebase-functions/v1";
+// import type {UserRecord} from "firebase-admin/auth";
 
 // Initialize Firebase Admin SDK
 admin.initializeApp();
@@ -104,7 +107,11 @@ export const processThresholdUpdates = onDocumentWritten(
   }
 );
 
-// ===== USER MANAGEMENT FUNCTIONS =====
+// ===== USER MANAGEMENT FUNCTIONS - TEMPORARILY DISABLED =====
+
+/*
+// TEMPORARILY COMMENTED OUT - These functions are failing to deploy
+// We'll fix them after the core notification system is working
 
 // Initialize preferences on user creation (v1)
 export const initializeUserPreferences = auth.user().onCreate(
@@ -139,6 +146,7 @@ export const cleanupUserData = auth.user().onDelete(
     logger.info(`Cleaned up data for user ${user.uid}`);
   }
 );
+*/
 
 // ===== THESIS-SPECIFIC FUNCTIONS =====
 
@@ -187,6 +195,44 @@ export const updateFCMToken = onCall(
       fcmToken: token,
       tokenUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
     });
+    return {success: true};
+  }
+);
+
+// ===== MANUAL USER SETUP FUNCTION (Replacement for auth triggers) =====
+
+// Manual function to initialize user preferences when auth triggers fail
+export const manualInitializeUserPreferences = onCall(
+  async (request: CallableRequest): Promise<{success: boolean}> => {
+    if (!request.auth) {
+      throw new HttpsError("unauthenticated", "Must be authenticated");
+    }
+
+    const db = admin.firestore();
+    const userId = request.auth.uid;
+
+    // Check if preferences already exist
+    const existingPrefs = await db
+      .collection("notificationPreferences")
+      .doc(userId)
+      .get();
+
+    if (existingPrefs.exists) {
+      return {success: true}; // Already initialized
+    }
+
+    // Create default preferences
+    await db.collection("notificationPreferences").doc(userId).set({
+      emergencyAlerts: true,
+      activityAlerts: false,
+      informationAlerts: false,
+      frequency: "realtime",
+      quietHours: {enabled: false, start: "22:00", end: "07:00"},
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    logger.info(`Manually initialized preferences for user ${userId}`);
     return {success: true};
   }
 );

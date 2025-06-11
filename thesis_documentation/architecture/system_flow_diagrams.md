@@ -32,7 +32,7 @@ graph TB
     end
     
     NOAA --> CF
-    USGS --> CF
+    CIROH --> CF
     CF --> FS
     CF --> FCM
     FS --> APP

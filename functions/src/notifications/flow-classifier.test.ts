@@ -1,7 +1,10 @@
 // functions/src/notifications/flow-classifier.test.ts
 
-import { FlowClassifier, AlertPriority, FlowCategory } from './flow-classifier';
-import { FlowData, FlowUnit, ReturnPeriod, UserThreshold } from '../types';
+import { FlowData } from '../types/flow-data';
+import { FlowUnit } from '../types/flow-unit';
+import { ReturnPeriod } from '../types/return-period';
+import { FlowClassifier, AlertPriority, FlowCategory, UserThreshold } from './flow-classifier';
+
 
 /**
  * Test suite for the Flow Classifier with NOAA data samples
@@ -29,32 +32,22 @@ const sampleUserThresholds: UserThreshold[] = [
     id: 'thresh1',
     userId: 'user123',
     reachId: '12345',
-    reachName: 'Green River at Moab',
     activityType: 'kayaking',
-    thresholdType: 'range',
     minFlow: 200,
     maxFlow: 400,
     unit: FlowUnit.CFS,
     alertPriority: AlertPriority.ACTIVITY,
-    enabled: true,
-    description: 'Ideal kayaking conditions',
-    createdAt: new Date(),
-    updatedAt: new Date()
+    enabled: true
   },
   {
     id: 'thresh2',
     userId: 'user123',
     reachId: '12345',
-    reachName: 'Green River at Moab',
     activityType: 'fishing',
-    thresholdType: 'max',
     maxFlow: 180,
     unit: FlowUnit.CFS,
     alertPriority: AlertPriority.ACTIVITY,
-    enabled: true,
-    description: 'Good fishing flows',
-    createdAt: new Date(),
-    updatedAt: new Date()
+    enabled: true
   }
 ];
 
@@ -270,7 +263,7 @@ export function testNoaaIntegration(): void {
 }
 
 // Export test functions for use in Cloud Functions
-export { testFlowClassifier as runFlowClassifierTests, testNoaaIntegration };
+export { testFlowClassifier as runFlowClassifierTests };
 
 // If running directly (for development testing)
 if (require.main === module) {

@@ -1,6 +1,8 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:rivr/core/services/flow_units_service.dart';
+import 'package:rivr/features/favorites/presentation/widgets/quick_notigication_test.dart';
 import 'package:rivr/features/forecast/presentation/widgets/unit_selector_widget.dart';
 import 'package:rivr/features/settings/presentation/pages/theme_settings_page.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -318,6 +320,13 @@ class _FavoritesDrawerState extends State<FavoritesDrawer> {
                   onTap: widget.onLogout,
                 ),
                 Divider(indent: 10, endIndent: 10),
+                if (kDebugMode) ...[
+                  const Divider(),
+                  const Padding(
+                    padding: EdgeInsets.all(8.0),
+                    child: QuickNotificationTest(),
+                  ),
+                ],
                 // ListTile(
                 //   leading: Icon(Icons.bug_report, color: colors.error),
                 //   title: Text('Debug User'),

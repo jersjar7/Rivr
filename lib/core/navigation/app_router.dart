@@ -4,6 +4,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:rivr/features/notifications/presentation/pages/notification_test_page.dart';
 import '../di/service_locator.dart';
 import '../../features/auth/presentation/pages/auth_page.dart';
 import '../../features/auth/presentation/pages/forgot_password_page.dart';
@@ -112,6 +113,11 @@ class AppRouter {
       case '/offline/download-current-region':
         return MaterialPageRoute(
           builder: (_) => const DownloadCurrentRegionPage(),
+        );
+
+      case '/notification-test':
+        return MaterialPageRoute(
+          builder: (context) => const NotificationTestPage(),
         );
 
       default:

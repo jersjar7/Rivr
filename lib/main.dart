@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import 'package:rivr/core/formatters/flow_value_formatter.dart';
 import 'package:rivr/core/providers/theme_provider.dart';
 import 'package:rivr/core/services/flow_units_service.dart';
+import 'package:rivr/core/services/notification_service.dart';
 import 'firebase_options.dart';
 import 'app.dart';
 import 'core/di/service_locator.dart';
@@ -111,6 +112,9 @@ Future<void> main() async {
     print("MAIN: Error initializing StreamNameService: $e");
     // Non-fatal error, continue with app startup
   }
+
+  // Initialize Notification Service AFTER Firebase
+  await NotificationService().initialize();
 
   runApp(
     MultiProvider(

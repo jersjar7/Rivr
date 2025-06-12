@@ -1,4 +1,6 @@
-// Kotlin DSL syntax for keystore properties
+// android/app/build.gradle.kts
+// Updated with notification support and core library desugaring
+
 import java.util.Properties
 import java.io.FileInputStream
 
@@ -19,11 +21,14 @@ plugins {
 }
 
 android {
-    namespace = "com.byu_hydroinformatics_lab.rivr" // Update to match Firebase
-    compileSdk = flutter.compileSdkVersion
-    ndkVersion = "27.0.12077973" // Override Flutter's default NDK version
+    namespace = "com.byu_hydroinformatics_lab.rivr"
+    compileSdk = 34 // Updated to 34 for notification support
+    ndkVersion = "27.0.12077973"
 
     compileOptions {
+        // Enable core library desugaring for flutter_local_notifications
+        isCoreLibraryDesugaringEnabled = true
+        
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
     }
@@ -33,15 +38,14 @@ android {
     }
 
     defaultConfig {
-        // Update this to match your Firebase configuration
-        // Check your google-services.json for the correct package_name
-        applicationId = "com.byu_hydroinformatics_lab.rivrapp" // Note: underscores instead of hyphens
-        // You can update the following values to match your application needs.
-        // For more information, see: https://flutter.dev/to/review-gradle-config.
-        minSdk = 30
-        targetSdk = flutter.targetSdkVersion
+        applicationId = "com.byu_hydroinformatics_lab.rivrapp"
+        minSdk = 34
+        targetSdk = 34 // Updated to 34 for notification support
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+        
+        // Enable multidex support for larger apps
+        multiDexEnabled = true
     }
 
     // Kotlin DSL signing configuration
@@ -61,20 +65,14 @@ android {
 
     buildTypes {
         getByName("debug") {
-            // Remove applicationIdSuffix to avoid Firebase mismatch
-            // applicationIdSuffix = ".dev"
             buildConfigField("String", "ENV", "\"development\"")
             isDebuggable = true
-            // Disable shrinking for debug builds
             isMinifyEnabled = false
             isShrinkResources = false
         }
         getByName("release") {
-            // Kotlin DSL syntax for signing config
             signingConfig = signingConfigs.getByName("release")
-
             buildConfigField("String", "ENV", "\"production\"")
-            // Enable both code and resource shrinking for release
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(
@@ -87,4 +85,15 @@ android {
 
 flutter {
     source = "../.."
+}
+
+dependencies {
+    // Core library desugaring for flutter_local_notifications
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.4")
+    
+    // Multidex support
+    implementation("androidx.multidex:multidex:2.0.1")
+    
+    // Kotlin standard library
+    implementation("org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.9.10")
 }

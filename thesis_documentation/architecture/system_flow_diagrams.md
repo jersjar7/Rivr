@@ -221,7 +221,7 @@ sequenceDiagram
 
 ```mermaid
 flowchart TD
-    API_CALL[NOAA API Call] --> API_SUCCESS{API Success?}
+    API_CALL[NOAA NWM API Call] --> API_SUCCESS{API Success?}
     
     API_SUCCESS -->|Yes| PROCESS_DATA[Process & Cache Data]
     API_SUCCESS -->|No| CHECK_CACHE{Cache Available?}

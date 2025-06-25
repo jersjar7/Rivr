@@ -334,7 +334,7 @@ class _HorizontalFlowTimelineState extends State<HorizontalFlowTimeline> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text('Hourly Flow Forecast', style: textTheme.titleMedium),
+              Text('Hourly Flow', style: textTheme.titleMedium),
               // Toggle button
               TextButton.icon(
                 onPressed: _toggleViewType,

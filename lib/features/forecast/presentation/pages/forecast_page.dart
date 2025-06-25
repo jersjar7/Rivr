@@ -1,4 +1,5 @@
 // lib/features/forecast/presentation/pages/forecast_page.dart
+// Task 4.4: Updated with notification handling while preserving your existing implementation
 
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -22,10 +23,19 @@ class ForecastPage extends StatefulWidget {
   final String reachId;
   final String stationName;
 
+  // Task 4.4: Add notification context parameters
+  final bool fromNotification;
+  final bool highlightFlow;
+  final Map<String, dynamic>? notificationData;
+
   const ForecastPage({
     super.key,
     required this.reachId,
     required this.stationName,
+    // Task 4.4: Default values for notification parameters
+    this.fromNotification = false,
+    this.highlightFlow = false,
+    this.notificationData,
   });
 
   @override
@@ -54,6 +64,16 @@ class _ForecastPageState extends State<ForecastPage>
 
       // Add tab change listener
       _tabController.addListener(_handleTabChange);
+
+      // Task 4.4: Log notification context if present
+      if (widget.fromNotification) {
+        debugPrint(
+          '🔔 ForecastPage opened from notification for reach: ${widget.reachId}',
+        );
+        if (widget.notificationData != null) {
+          debugPrint('📊 Notification data: ${widget.notificationData}');
+        }
+      }
     });
   }
 
@@ -255,6 +275,120 @@ class _ForecastPageState extends State<ForecastPage>
     });
   }
 
+  // Task 4.4: Build notification banner when opened from notification
+  Widget _buildNotificationBanner() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: Colors.blue.shade50,
+        border: Border(
+          bottom: BorderSide(color: Colors.blue.shade200, width: 1),
+        ),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.notifications, color: Colors.blue.shade700, size: 20),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              'Opened from notification',
+              style: TextStyle(
+                color: Colors.blue.shade700,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+          // Show notification category if available
+          if (widget.notificationData?['category'] != null)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: _getNotificationCategoryColor(),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                widget.notificationData!['category'],
+                style: const TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  // Task 4.4: Get color based on notification category
+  Color _getNotificationCategoryColor() {
+    final category =
+        widget.notificationData?['category']?.toString().toLowerCase();
+    switch (category) {
+      case 'extreme':
+        return Colors.purple;
+      case 'very high':
+      case 'high':
+        return Colors.red;
+      case 'elevated':
+        return Colors.orange;
+      case 'moderate':
+        return Colors.yellow.shade700;
+      case 'normal':
+        return Colors.green;
+      case 'low':
+        return Colors.blue;
+      default:
+        return Colors.grey;
+    }
+  }
+
+  // Task 4.4: Wrap widget with highlight if needed
+  Widget _wrapWithHighlight(Widget child, {bool isCard = false}) {
+    if (!widget.highlightFlow) return child;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.yellow.shade100,
+        border: Border.all(color: Colors.yellow.shade400, width: 2),
+        borderRadius: BorderRadius.circular(isCard ? 12 : 8),
+      ),
+      child: Column(
+        children: [
+          // Highlight indicator
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: Colors.yellow.shade200,
+              borderRadius: BorderRadius.only(
+                topLeft: Radius.circular(isCard ? 10 : 6),
+                topRight: Radius.circular(isCard ? 10 : 6),
+              ),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.star, color: Colors.yellow.shade800, size: 16),
+                const SizedBox(width: 8),
+                Text(
+                  'Flow highlighted from notification',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: Colors.yellow.shade800,
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // Original widget with padding
+          Padding(padding: const EdgeInsets.all(8), child: child),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -267,6 +401,8 @@ class _ForecastPageState extends State<ForecastPage>
           softWrap: true,
           textAlign: TextAlign.center,
         ),
+        // Task 4.4: Visual indicator in app bar when opened from notification
+        backgroundColor: widget.fromNotification ? Colors.blue.shade50 : null,
         actions: [
           AppBarUnitSelector(
             onUnitChanged: (unit) {
@@ -275,6 +411,16 @@ class _ForecastPageState extends State<ForecastPage>
               setState(() {}); // To refresh the UI with new units
             },
           ),
+          // Task 4.4: Show notification icon in app bar if from notification
+          if (widget.fromNotification)
+            Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: Icon(
+                Icons.notifications,
+                color: Colors.blue.shade700,
+                size: 20,
+              ),
+            ),
           // Add a small padding at the end
           const SizedBox(width: 8),
         ],
@@ -302,10 +448,18 @@ class _ForecastPageState extends State<ForecastPage>
             (context, status) => Column(
               children: [
                 const ConnectionStatusBanner(),
+                // Task 4.4: Add notification banner if from notification
+                if (widget.fromNotification) _buildNotificationBanner(),
                 Expanded(child: _buildPageContent()),
               ],
             ),
-        child: _buildPageContent(),
+        child: Column(
+          children: [
+            // Task 4.4: Add notification banner if from notification
+            if (widget.fromNotification) _buildNotificationBanner(),
+            Expanded(child: _buildPageContent()),
+          ],
+        ),
       ),
     );
   }
@@ -418,12 +572,15 @@ class _ForecastPageState extends State<ForecastPage>
             onRefresh: _loadLocationInfo,
           ),
 
-          // Current Flow Status Card
-          FlowStatusCard(
-            currentFlow: latestFlow,
-            returnPeriod: returnPeriod,
-            expanded: true,
-            onTap: () {},
+          // Task 4.4: Current Flow Status Card with optional highlighting
+          _wrapWithHighlight(
+            FlowStatusCard(
+              currentFlow: latestFlow,
+              returnPeriod: returnPeriod,
+              expanded: true,
+              onTap: () {},
+            ),
+            isCard: true,
           ),
 
           const SizedBox(height: 12),
@@ -521,12 +678,15 @@ class _ForecastPageState extends State<ForecastPage>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Current Flow Status Card (Smaller version)
-          FlowStatusCard(
-            currentFlow: latestFlow,
-            returnPeriod: returnPeriod,
-            expanded: true,
-            onTap: () {},
+          // Task 4.4: Current Flow Status Card with optional highlighting
+          _wrapWithHighlight(
+            FlowStatusCard(
+              currentFlow: latestFlow,
+              returnPeriod: returnPeriod,
+              expanded: true,
+              onTap: () {},
+            ),
+            isCard: true,
           ),
 
           const SizedBox(height: 12),
@@ -617,12 +777,15 @@ class _ForecastPageState extends State<ForecastPage>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Current Flow Status Card (Smallest version)
-          FlowStatusCard(
-            currentFlow: latestFlow,
-            returnPeriod: returnPeriod,
-            expanded: true,
-            onTap: () {},
+          // Task 4.4: Current Flow Status Card with optional highlighting
+          _wrapWithHighlight(
+            FlowStatusCard(
+              currentFlow: latestFlow,
+              returnPeriod: returnPeriod,
+              expanded: true,
+              onTap: () {},
+            ),
+            isCard: true,
           ),
 
           const SizedBox(height: 12),

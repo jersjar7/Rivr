@@ -22,7 +22,7 @@ plugins {
 
 android {
     namespace = "com.byu_hydroinformatics_lab.rivr"
-    compileSdk = 34 // Updated to 34 for notification support
+    compileSdk = 35 // Updated to 35 for latest plugin support
     ndkVersion = "27.0.12077973"
 
     compileOptions {
@@ -39,8 +39,8 @@ android {
 
     defaultConfig {
         applicationId = "com.byu_hydroinformatics_lab.rivrapp"
-        minSdk = 34
-        targetSdk = 34 // Updated to 34 for notification support
+        minSdk = 30
+        targetSdk = 35 // Updated to 35 for latest plugin support
         versionCode = flutter.versionCode
         versionName = flutter.versionName
         
@@ -88,8 +88,8 @@ flutter {
 }
 
 dependencies {
-    // Core library desugaring for flutter_local_notifications
-    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.4")
+    // Core library desugaring for flutter_local_notifications (updated version)
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
     
     // Multidex support
     implementation("androidx.multidex:multidex:2.0.1")

@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:rivr/core/models/location_info.dart';
+import 'package:rivr/core/navigation/app_router.dart';
 import 'package:rivr/core/network/connection_monitor.dart';
 import 'package:rivr/core/widgets/loading_indicator.dart';
 import 'package:rivr/core/widgets/empty_state.dart';
@@ -15,6 +16,7 @@ import 'package:rivr/features/forecast/presentation/widgets/app_bar_unit_selecto
 import 'package:rivr/features/forecast/presentation/widgets/flow_status_card.dart';
 import 'package:rivr/features/forecast/presentation/widgets/location_info_row.dart';
 import 'package:rivr/features/forecast/presentation/widgets/medium_range/9_day_flow_forecast_widget/daily_flow_forecast_widget.dart';
+import 'package:rivr/features/forecast/presentation/widgets/notification_banner.dart';
 import 'package:rivr/features/forecast/presentation/widgets/short_range/horizontal_flow_timeline.dart';
 import 'package:rivr/features/forecast/presentation/widgets/hydrograph/hydrograph_factory.dart';
 import 'package:rivr/features/forecast/presentation/widgets/long_range/calendar/long_range_calendar.dart';
@@ -276,48 +278,21 @@ class _ForecastPageState extends State<ForecastPage>
   }
 
   // Task 4.4: Build notification banner when opened from notification
-  Widget _buildNotificationBanner() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      decoration: BoxDecoration(
-        color: Colors.blue.shade50,
-        border: Border(
-          bottom: BorderSide(color: Colors.blue.shade200, width: 1),
-        ),
-      ),
-      child: Row(
-        children: [
-          Icon(Icons.notifications, color: Colors.blue.shade700, size: 20),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              'Opened from notification',
-              style: TextStyle(
-                color: Colors.blue.shade700,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ),
-          // Show notification category if available
-          if (widget.notificationData?['category'] != null)
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(
-                color: _getNotificationCategoryColor(),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Text(
-                widget.notificationData!['category'],
-                style: const TextStyle(
-                  fontSize: 10,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
-                ),
-              ),
-            ),
-        ],
-      ),
+  Widget? _buildNotificationBanner() {
+    if (!widget.fromNotification) return null;
+
+    return NotificationBanner(
+      notificationData: widget.notificationData,
+      onDismiss: () {
+        // Hide the banner but keep the highlighting
+        setState(() {
+          // You can add a local variable to track banner dismissal
+          // _notificationBannerDismissed = true;
+        });
+      },
+      onViewHistory: () {
+        AppRouter.navigateToNotificationHistory(context);
+      },
     );
   }
 
@@ -345,123 +320,160 @@ class _ForecastPageState extends State<ForecastPage>
   }
 
   // Task 4.4: Wrap widget with highlight if needed
-  Widget _wrapWithHighlight(Widget child, {bool isCard = false}) {
-    if (!widget.highlightFlow) return child;
+  Widget _wrapWithHighlight(
+    Widget child, {
+    bool isCard = false,
+    String? customMessage,
+  }) {
+    return FlowHighlightWrapper(
+      isHighlighted: widget.highlightFlow,
+      highlightMessage: customMessage,
+      isCard: isCard,
+      child: child,
+    );
+  }
 
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.yellow.shade100,
-        border: Border.all(color: Colors.yellow.shade400, width: 2),
-        borderRadius: BorderRadius.circular(isCard ? 12 : 8),
+  // Enhanced app bar for better notification indication:
+  AppBar _buildAppBar() {
+    return AppBar(
+      title: Text(
+        widget.stationName,
+        maxLines: 3,
+        softWrap: true,
+        textAlign: TextAlign.center,
       ),
-      child: Column(
-        children: [
-          // Highlight indicator
+      backgroundColor: widget.fromNotification ? Colors.blue.shade50 : null,
+      actions: [
+        AppBarUnitSelector(
+          onUnitChanged: (unit) {
+            setState(() {}); // Refresh UI with new units
+          },
+        ),
+        // Enhanced notification indicator
+        if (widget.fromNotification)
           Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: Colors.yellow.shade200,
-              borderRadius: BorderRadius.only(
-                topLeft: Radius.circular(isCard ? 10 : 6),
-                topRight: Radius.circular(isCard ? 10 : 6),
-              ),
-            ),
-            child: Row(
+            margin: const EdgeInsets.only(right: 8),
+            child: Stack(
               children: [
-                Icon(Icons.star, color: Colors.yellow.shade800, size: 16),
-                const SizedBox(width: 8),
-                Text(
-                  'Flow highlighted from notification',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    color: Colors.yellow.shade800,
-                    fontSize: 12,
+                IconButton(
+                  onPressed:
+                      () => AppRouter.navigateToNotificationHistory(context),
+                  icon: Icon(
+                    Icons.notifications_active,
+                    color: Colors.blue.shade700,
                   ),
+                  tooltip: 'View notification history',
                 ),
+                if (widget.notificationData?['priority'] == 'safety')
+                  Positioned(
+                    right: 8,
+                    top: 8,
+                    child: Container(
+                      width: 8,
+                      height: 8,
+                      decoration: const BoxDecoration(
+                        color: Colors.red,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                  ),
               ],
             ),
           ),
-          // Original widget with padding
-          Padding(padding: const EdgeInsets.all(8), child: child),
+        const SizedBox(width: 8),
+      ],
+      bottom: TabBar(
+        controller: _tabController,
+        labelColor: Theme.of(context).colorScheme.tertiary,
+        unselectedLabelColor:
+            Theme.of(context).brightness == Brightness.dark
+                ? Colors.white70
+                : Theme.of(context).colorScheme.surface.withValues(alpha: 0.7),
+        indicatorColor: Theme.of(context).colorScheme.tertiary,
+        tabs: const [
+          Tab(text: 'Hourly'),
+          Tab(text: 'Daily'),
+          Tab(text: 'Month'),
         ],
       ),
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(
-          widget.stationName,
-          maxLines: 3,
-          softWrap: true,
-          textAlign: TextAlign.center,
-        ),
-        // Task 4.4: Visual indicator in app bar when opened from notification
-        backgroundColor: widget.fromNotification ? Colors.blue.shade50 : null,
-        actions: [
-          AppBarUnitSelector(
-            onUnitChanged: (unit) {
-              // Optional: handle unit change, like showing a snackbar or refreshing
-              // For example:
-              setState(() {}); // To refresh the UI with new units
-            },
+  // Enhanced body layout to handle notification banner:
+  Widget _buildEnhancedBody() {
+    return ConnectionAwareWidget(
+      offlineBuilder:
+          (context, status) => Column(
+            children: [
+              const ConnectionStatusBanner(),
+              if (_buildNotificationBanner() != null)
+                _buildNotificationBanner()!,
+              Expanded(child: _buildPageContent()),
+            ],
           ),
-          // Task 4.4: Show notification icon in app bar if from notification
-          if (widget.fromNotification)
-            Padding(
-              padding: const EdgeInsets.only(right: 8),
-              child: Icon(
-                Icons.notifications,
-                color: Colors.blue.shade700,
-                size: 20,
-              ),
-            ),
-          // Add a small padding at the end
-          const SizedBox(width: 8),
+      child: Column(
+        children: [
+          if (_buildNotificationBanner() != null) _buildNotificationBanner()!,
+          Expanded(child: _buildPageContent()),
         ],
-        bottom: TabBar(
-          controller: _tabController,
-          labelColor:
-              theme.colorScheme.tertiary, // Will adapt to light/dark theme
-          unselectedLabelColor:
-              theme.brightness == Brightness.dark
-                  ? Colors
-                      .white70 // Lighter color for dark theme
-                  : theme.colorScheme.surface.withValues(
-                    alpha: 0.7,
-                  ), // Darker color for light theme
-          indicatorColor: theme.colorScheme.tertiary,
-          tabs: const [
-            Tab(text: 'Hourly'),
-            Tab(text: 'Daily'),
-            Tab(text: 'Month'),
-          ],
-        ),
-      ),
-      body: ConnectionAwareWidget(
-        offlineBuilder:
-            (context, status) => Column(
-              children: [
-                const ConnectionStatusBanner(),
-                // Task 4.4: Add notification banner if from notification
-                if (widget.fromNotification) _buildNotificationBanner(),
-                Expanded(child: _buildPageContent()),
-              ],
-            ),
-        child: Column(
-          children: [
-            // Task 4.4: Add notification banner if from notification
-            if (widget.fromNotification) _buildNotificationBanner(),
-            Expanded(child: _buildPageContent()),
-          ],
-        ),
       ),
     );
+  }
+
+  // Enhanced highlighting with custom messages for different components:
+  Widget _buildEnhancedFlowStatusCard(
+    dynamic latestFlow,
+    dynamic returnPeriod,
+  ) {
+    String? customMessage;
+
+    if (widget.notificationData != null) {
+      final category = widget.notificationData!['category'];
+      final priority = widget.notificationData!['priority'];
+
+      if (priority == 'safety') {
+        customMessage = 'Safety alert: $category flow conditions';
+      } else if (priority == 'activity') {
+        customMessage = 'Activity alert: Optimal conditions detected';
+      } else {
+        customMessage = 'Flow update: $category conditions';
+      }
+    }
+
+    return _wrapWithHighlight(
+      FlowStatusCard(
+        currentFlow: latestFlow,
+        returnPeriod: returnPeriod,
+        expanded: true,
+        onTap: () {},
+      ),
+      isCard: true,
+      customMessage: customMessage,
+    );
+  }
+
+  // Notification context logging with more details:
+  void _logNotificationContext() {
+    if (widget.fromNotification) {
+      debugPrint('🔔 ForecastPage opened from notification');
+      debugPrint('📍 Reach ID: ${widget.reachId}');
+      debugPrint('⭐ Highlight flow: ${widget.highlightFlow}');
+
+      if (widget.notificationData != null) {
+        final data = widget.notificationData!;
+        debugPrint('📊 Notification data:');
+        debugPrint('   Category: ${data['category']}');
+        debugPrint('   Priority: ${data['priority']}');
+        debugPrint('   Timestamp: ${data['timestamp']}');
+        debugPrint('   Deep link source: ${data['deepLinkSource']}');
+      }
+    }
+  }
+
+  // Usage example for your existing build method:
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(appBar: _buildAppBar(), body: _buildEnhancedBody());
   }
 
   Widget _buildPageContent() {

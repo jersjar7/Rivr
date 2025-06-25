@@ -1,4 +1,5 @@
 // lib/core/services/notification_service.dart
+// Updated to support notification_settings_page.dart
 
 import 'dart:convert';
 import 'dart:io';
@@ -57,7 +58,132 @@ class NotificationService {
     }
   }
 
-  /// Initialize local notifications plugin
+  /// PUBLIC: Request notification permissions (called by settings page)
+  /// Returns true if permissions are granted, false otherwise
+  Future<bool> requestPermissions() async {
+    debugPrint('🔐 Requesting notification permissions from settings...');
+
+    try {
+      // Request FCM permissions
+      final NotificationSettings settings = await _firebaseMessaging
+          .requestPermission(
+            alert: true,
+            announcement: false,
+            badge: true,
+            carPlay: false,
+            criticalAlert: true, // For safety alerts
+            provisional: false,
+            sound: true,
+          );
+
+      _permissionGranted =
+          settings.authorizationStatus == AuthorizationStatus.authorized ||
+          settings.authorizationStatus == AuthorizationStatus.provisional;
+
+      debugPrint('📋 Permission status: ${settings.authorizationStatus}');
+      debugPrint('🔔 Notifications enabled: $_permissionGranted');
+
+      // Request local notification permissions for Android 13+
+      if (Platform.isAndroid) {
+        final bool? granted =
+            await _localNotifications
+                .resolvePlatformSpecificImplementation<
+                  AndroidFlutterLocalNotificationsPlugin
+                >()
+                ?.requestNotificationsPermission();
+
+        debugPrint('📱 Android local notification permission: $granted');
+      }
+
+      return _permissionGranted;
+    } catch (e) {
+      debugPrint('❌ Error requesting permissions: $e');
+      return false;
+    }
+  }
+
+  /// PUBLIC: Send test notification (called by settings page)
+  Future<void> sendTestNotification({
+    String title = '🧪 Test Notification',
+    String body = 'Testing Rivr notification system',
+    String category = 'Normal',
+    String priority = 'information',
+    String? reachId = 'test-reach',
+  }) async {
+    if (!_permissionGranted) {
+      debugPrint('❌ Cannot send test notification - permissions not granted');
+      throw Exception('Notification permissions not granted');
+    }
+
+    try {
+      // Create test notification data
+      final Map<String, dynamic> testData = {
+        'reachId': reachId ?? 'test-reach',
+        'flowValue': '250.0',
+        'flowUnit': 'cfs',
+        'category': category,
+        'priority': priority,
+        'timestamp': DateTime.now().toIso8601String(),
+        'deepLink': 'rivr://reach/${reachId ?? 'test-reach'}',
+      };
+
+      // Android notification details
+      final AndroidNotificationDetails androidDetails =
+          AndroidNotificationDetails(
+            'rivr_flow_alerts',
+            'Flow Alerts',
+            channelDescription:
+                'Notifications for river flow conditions and safety alerts',
+            importance: _getNotificationImportance(priority),
+            priority: _getAndroidPriority(priority),
+            showWhen: true,
+            enableVibration: true,
+            color: _getNotificationColor(category),
+            icon: '@mipmap/ic_launcher',
+          );
+
+      // iOS notification details
+      const DarwinNotificationDetails iosDetails = DarwinNotificationDetails(
+        presentAlert: true,
+        presentBadge: true,
+        presentSound: true,
+      );
+
+      final NotificationDetails notificationDetails = NotificationDetails(
+        android: androidDetails,
+        iOS: iosDetails,
+      );
+
+      // Show test notification
+      await _localNotifications.show(
+        DateTime.now().millisecondsSinceEpoch ~/ 1000,
+        title,
+        body,
+        notificationDetails,
+        payload: json.encode(testData),
+      );
+
+      debugPrint('🧪 Test notification sent: $title');
+    } catch (e) {
+      debugPrint('❌ Error sending test notification: $e');
+      throw Exception('Failed to send test notification: $e');
+    }
+  }
+
+  /// PUBLIC: Check if notifications are enabled
+  bool get notificationsEnabled => _permissionGranted;
+
+  /// PUBLIC: Get current FCM token (useful for debugging)
+  Future<String?> getCurrentToken() async {
+    try {
+      return await _firebaseMessaging.getToken();
+    } catch (e) {
+      debugPrint('❌ Error getting FCM token: $e');
+      return null;
+    }
+  }
+
+  /// PRIVATE: Initialize local notifications plugin
   Future<void> _initializeLocalNotifications() async {
     // Android initialization
     const AndroidInitializationSettings androidInitSettings =
@@ -85,9 +211,9 @@ class NotificationService {
     debugPrint('📱 Local notifications initialized');
   }
 
-  /// Request notification permissions from the user
+  /// PRIVATE: Request notification permissions during initialization
   Future<void> _requestPermissions() async {
-    debugPrint('🔐 Requesting notification permissions...');
+    debugPrint('🔐 Requesting initial notification permissions...');
 
     // Request FCM permissions
     final NotificationSettings settings = await _firebaseMessaging
@@ -461,69 +587,6 @@ class NotificationService {
       default:
         return Colors.blue; // Default Rivr blue
     }
-  }
-
-  /// Test notification delivery (for development)
-  Future<void> sendTestNotification({
-    String title = '🧪 Test Notification',
-    String body = 'Testing Rivr notification system',
-    String category = 'Normal',
-    String priority = 'information',
-    String? reachId = 'test-reach',
-  }) async {
-    if (!_permissionGranted) {
-      debugPrint('❌ Cannot send test notification - permissions not granted');
-      return;
-    }
-
-    // Create test notification data
-    final Map<String, dynamic> testData = {
-      'reachId': reachId ?? 'test-reach',
-      'flowValue': '250.0',
-      'flowUnit': 'cfs',
-      'category': category,
-      'priority': priority,
-      'timestamp': DateTime.now().toIso8601String(),
-      'deepLink': 'rivr://reach/${reachId ?? 'test-reach'}',
-    };
-
-    // Android notification details
-    final AndroidNotificationDetails androidDetails =
-        AndroidNotificationDetails(
-          'rivr_flow_alerts',
-          'Flow Alerts',
-          channelDescription:
-              'Notifications for river flow conditions and safety alerts',
-          importance: _getNotificationImportance(priority),
-          priority: _getAndroidPriority(priority),
-          showWhen: true,
-          enableVibration: true,
-          color: _getNotificationColor(category),
-          icon: '@mipmap/ic_launcher',
-        );
-
-    // iOS notification details
-    const DarwinNotificationDetails iosDetails = DarwinNotificationDetails(
-      presentAlert: true,
-      presentBadge: true,
-      presentSound: true,
-    );
-
-    final NotificationDetails notificationDetails = NotificationDetails(
-      android: androidDetails,
-      iOS: iosDetails,
-    );
-
-    // Show test notification
-    await _localNotifications.show(
-      DateTime.now().millisecondsSinceEpoch ~/ 1000,
-      title,
-      body,
-      notificationDetails,
-      payload: json.encode(testData),
-    );
-
-    debugPrint('🧪 Test notification sent: $title');
   }
 
   /// Dispose resources

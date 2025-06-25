@@ -4,6 +4,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:rivr/core/debug/developer_tools_page.dart';
 import 'package:rivr/features/notifications/presentation/pages/notification_test_page.dart';
 import '../di/service_locator.dart';
 import '../../features/auth/presentation/pages/auth_page.dart';
@@ -45,6 +46,7 @@ class AppRouter {
   static const String safetyInfo = '/safety-info';
   static const String biometricSettings = '/biometric-settings';
   static const String forgotPassword = '/forgot-password';
+  static const String developerTools = '/dev-tools';
 
   static Route<dynamic> generateRoute(RouteSettings settings) {
     debugPrint('🧭 Navigating to: ${settings.name}');
@@ -171,11 +173,16 @@ class AppRouter {
           settings: settings,
         );
 
+      // Developer tools route (debug only)
+      case developerTools:
+        return MaterialPageRoute(builder: (_) => const DeveloperToolsPage());
+
       default:
         debugPrint('❌ Unknown route: ${settings.name}');
         return MaterialPageRoute(
           builder:
-              (_) => Scaffold(
+              (context) => Scaffold(
+                // ✅ Use 'context' instead of '_'
                 appBar: AppBar(title: const Text('Page Not Found')),
                 body: Center(
                   child: Column(
@@ -192,7 +199,7 @@ class AppRouter {
                       ElevatedButton(
                         onPressed:
                             () => Navigator.pushNamedAndRemoveUntil(
-                              _,
+                              context, // ✅ Use 'context' here instead of '_'
                               home,
                               (route) => false,
                             ),
@@ -205,7 +212,6 @@ class AppRouter {
         );
     }
   }
-
   // Task 4.4: Navigation helper methods for type safety and convenience
 
   /// Navigate to home/splash page

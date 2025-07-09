@@ -1,0 +1,655 @@
+// lib/features/simple_notifications/pages/notification_setup_page.dart
+
+import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+
+import '../models/notification_preferences.dart';
+import '../services/simple_notification_service.dart';
+import '../services/favorites_integration_service.dart';
+
+/// Simple notification setup page accessed from favorites drawer
+/// Allows users to enable notifications and select which rivers to monitor
+class NotificationSetupPage extends StatefulWidget {
+  const NotificationSetupPage({super.key});
+
+  @override
+  State<NotificationSetupPage> createState() => _NotificationSetupPageState();
+}
+
+class _NotificationSetupPageState extends State<NotificationSetupPage> {
+  final SimpleNotificationService _notificationService =
+      SimpleNotificationService();
+  final FavoritesIntegrationService _favoritesService =
+      FavoritesIntegrationService();
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+
+  // State variables
+  bool _isLoading = true;
+  bool _isSaving = false;
+  String? _userId;
+  NotificationPreferences? _preferences;
+  List<FavoriteRiver> _favoriteRivers = [];
+  Set<String> _selectedRiverIds = {};
+
+  // Settings
+  bool _notificationsEnabled = false;
+  bool _shortRangeEnabled = true;
+  bool _mediumRangeEnabled = true;
+  bool _quietHoursEnabled = false;
+  int _quietHourStart = 22;
+  int _quietHourEnd = 7;
+
+  @override
+  void initState() {
+    super.initState();
+    _initializePage();
+  }
+
+  Future<void> _initializePage() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      if (mounted) {
+        Navigator.of(context).pop();
+      }
+      return;
+    }
+
+    _userId = user.uid;
+
+    try {
+      // Initialize notification service
+      await _notificationService.initialize();
+
+      // Load existing preferences
+      await _loadPreferences();
+
+      // Load user's favorite rivers
+      await _loadFavoriteRivers();
+
+      setState(() {
+        _isLoading = false;
+      });
+    } catch (e) {
+      debugPrint('❌ Error initializing notification setup: $e');
+      setState(() {
+        _isLoading = false;
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error loading notification settings: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _loadPreferences() async {
+    if (_userId == null) return;
+
+    try {
+      final doc =
+          await _firestore
+              .collection('simpleNotificationPreferences')
+              .doc(_userId!)
+              .get();
+
+      if (doc.exists) {
+        _preferences = NotificationPreferences.fromFirestore(doc);
+        setState(() {
+          _notificationsEnabled = _preferences!.enabled;
+          _selectedRiverIds = Set.from(_preferences!.monitoredRiverIds);
+          _shortRangeEnabled = _preferences!.includeShortRange;
+          _mediumRangeEnabled = _preferences!.includeMediumRange;
+          _quietHoursEnabled = _preferences!.quietHoursEnabled;
+          _quietHourStart = _preferences!.quietHourStart;
+          _quietHourEnd = _preferences!.quietHourEnd;
+        });
+      } else {
+        // Create default preferences
+        _preferences = NotificationPreferences.defaultPreferences(_userId!);
+      }
+    } catch (e) {
+      debugPrint('❌ Error loading preferences: $e');
+    }
+  }
+
+  Future<void> _loadFavoriteRivers() async {
+    if (_userId == null) return;
+
+    try {
+      final favorites = await _favoritesService.getUserFavoriteRivers(_userId!);
+      setState(() {
+        _favoriteRivers =
+            favorites.where((river) => river.isValidForNotifications).toList();
+      });
+    } catch (e) {
+      debugPrint('❌ Error loading favorite rivers: $e');
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_isLoading) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Flow Notifications')),
+        body: const Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Flow Notifications'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.help_outline),
+            onPressed: _showHelpDialog,
+            tooltip: 'Help',
+          ),
+        ],
+      ),
+      body: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          _buildHeaderSection(),
+          const SizedBox(height: 24),
+          _buildMainToggleSection(),
+          if (_notificationsEnabled) ...[
+            const SizedBox(height: 24),
+            _buildRiverSelectionSection(),
+            const SizedBox(height: 24),
+            _buildForecastRangeSection(),
+            const SizedBox(height: 24),
+            _buildQuietHoursSection(),
+            const SizedBox(height: 24),
+            _buildTestSection(),
+          ],
+          const SizedBox(height: 24),
+          _buildSaveButton(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHeaderSection() {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  Icons.notifications_active,
+                  color: Theme.of(context).primaryColor,
+                ),
+                const SizedBox(width: 8),
+                const Text(
+                  'River Flow Notifications',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Get notified when your favorite rivers reach significant flow levels '
+              '(return periods). Monitors short and medium range forecasts only.',
+              style: TextStyle(color: Colors.grey),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMainToggleSection() {
+    return Card(
+      child: Column(
+        children: [
+          SwitchListTile(
+            title: const Text('Enable Flow Notifications'),
+            subtitle: Text(
+              _notificationsEnabled
+                  ? 'Notifications are enabled'
+                  : 'Tap to enable notifications',
+            ),
+            value: _notificationsEnabled,
+            onChanged: _onMainToggleChanged,
+          ),
+          if (!_notificationService.isReady && _notificationsEnabled)
+            Container(
+              padding: const EdgeInsets.all(16),
+              margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              decoration: BoxDecoration(
+                color: Colors.orange.shade50,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.orange.shade200),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.warning, color: Colors.orange.shade600),
+                  const SizedBox(width: 8),
+                  const Expanded(
+                    child: Text(
+                      'Notification permission required. Tap to request permission.',
+                      style: TextStyle(fontSize: 12),
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: _requestPermissions,
+                    child: const Text('Enable'),
+                  ),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRiverSelectionSection() {
+    if (_favoriteRivers.isEmpty) {
+      return Card(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            children: [
+              Icon(Icons.info_outline, color: Colors.blue.shade600, size: 48),
+              const SizedBox(height: 8),
+              const Text(
+                'No Favorite Rivers',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 4),
+              const Text(
+                'Add rivers to your favorites first to receive notifications.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Colors.grey),
+              ),
+              const SizedBox(height: 12),
+              ElevatedButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('Go to Favorites'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Select Rivers to Monitor',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Choose which favorite rivers to monitor for flow alerts:',
+              style: TextStyle(color: Colors.grey),
+            ),
+            const SizedBox(height: 12),
+            ...List.generate(_favoriteRivers.length, (index) {
+              final river = _favoriteRivers[index];
+              final isSelected = _selectedRiverIds.contains(river.riverId);
+
+              return CheckboxListTile(
+                title: Text(river.riverName),
+                subtitle:
+                    river.location != null
+                        ? Text(
+                          river.location!,
+                          style: const TextStyle(fontSize: 12),
+                        )
+                        : null,
+                value: isSelected,
+                onChanged: (value) {
+                  setState(() {
+                    if (value == true) {
+                      _selectedRiverIds.add(river.riverId);
+                    } else {
+                      _selectedRiverIds.remove(river.riverId);
+                    }
+                  });
+                },
+                dense: true,
+              );
+            }),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                TextButton(
+                  onPressed: _selectAllRivers,
+                  child: const Text('Select All'),
+                ),
+                const SizedBox(width: 8),
+                TextButton(
+                  onPressed: _deselectAllRivers,
+                  child: const Text('Select None'),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildForecastRangeSection() {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Forecast Range',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            CheckboxListTile(
+              title: const Text('Short Range (0-3 days)'),
+              subtitle: const Text('Most accurate forecasts'),
+              value: _shortRangeEnabled,
+              onChanged: (value) {
+                setState(() {
+                  _shortRangeEnabled = value ?? true;
+                });
+              },
+              dense: true,
+            ),
+            CheckboxListTile(
+              title: const Text('Medium Range (4-10 days)'),
+              subtitle: const Text('Extended forecasts'),
+              value: _mediumRangeEnabled,
+              onChanged: (value) {
+                setState(() {
+                  _mediumRangeEnabled = value ?? true;
+                });
+              },
+              dense: true,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildQuietHoursSection() {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SwitchListTile(
+              title: const Text('Quiet Hours'),
+              subtitle: const Text('Disable notifications during these hours'),
+              value: _quietHoursEnabled,
+              onChanged: (value) {
+                setState(() {
+                  _quietHoursEnabled = value;
+                });
+              },
+              dense: true,
+            ),
+            if (_quietHoursEnabled) ...[
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Expanded(
+                    child: ListTile(
+                      title: const Text('Start'),
+                      subtitle: Text(
+                        '${_quietHourStart.toString().padLeft(2, '0')}:00',
+                      ),
+                      onTap: () => _selectQuietHour(true),
+                      dense: true,
+                    ),
+                  ),
+                  Expanded(
+                    child: ListTile(
+                      title: const Text('End'),
+                      subtitle: Text(
+                        '${_quietHourEnd.toString().padLeft(2, '0')}:00',
+                      ),
+                      onTap: () => _selectQuietHour(false),
+                      dense: true,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTestSection() {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Test Notifications',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Send a test notification to make sure everything is working:',
+              style: TextStyle(color: Colors.grey),
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed:
+                    _selectedRiverIds.isNotEmpty ? _sendTestNotification : null,
+                icon: const Icon(Icons.send),
+                label: const Text('Send Test Notification'),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSaveButton() {
+    return SizedBox(
+      width: double.infinity,
+      child: ElevatedButton(
+        onPressed: _isSaving ? null : _savePreferences,
+        style: ElevatedButton.styleFrom(
+          padding: const EdgeInsets.symmetric(vertical: 16),
+        ),
+        child:
+            _isSaving
+                ? const SizedBox(
+                  height: 20,
+                  width: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+                : const Text('Save Settings'),
+      ),
+    );
+  }
+
+  // Event handlers
+
+  void _onMainToggleChanged(bool value) async {
+    if (value && !_notificationService.isReady) {
+      // Request permissions first
+      final granted = await _requestPermissions();
+      if (!granted) return;
+    }
+
+    setState(() {
+      _notificationsEnabled = value;
+    });
+  }
+
+  Future<bool> _requestPermissions() async {
+    final granted = await _notificationService.requestPermissions();
+
+    if (!granted && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Notification permission is required for flow alerts'),
+        ),
+      );
+    }
+
+    return granted;
+  }
+
+  void _selectAllRivers() {
+    setState(() {
+      _selectedRiverIds = Set.from(_favoriteRivers.map((r) => r.riverId));
+    });
+  }
+
+  void _deselectAllRivers() {
+    setState(() {
+      _selectedRiverIds.clear();
+    });
+  }
+
+  Future<void> _selectQuietHour(bool isStart) async {
+    final time = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay(
+        hour: isStart ? _quietHourStart : _quietHourEnd,
+        minute: 0,
+      ),
+      builder: (context, child) {
+        return MediaQuery(
+          data: MediaQuery.of(context).copyWith(alwaysUse24HourFormat: true),
+          child: child!,
+        );
+      },
+    );
+
+    if (time != null) {
+      setState(() {
+        if (isStart) {
+          _quietHourStart = time.hour;
+        } else {
+          _quietHourEnd = time.hour;
+        }
+      });
+    }
+  }
+
+  Future<void> _sendTestNotification() async {
+    if (_selectedRiverIds.isEmpty) return;
+
+    try {
+      final firstRiverId = _selectedRiverIds.first;
+      final river = _favoriteRivers.firstWhere(
+        (r) => r.riverId == firstRiverId,
+      );
+
+      final success = await _notificationService.sendTestNotification(
+        riverName: river.riverName,
+        testType: 'flow alert',
+      );
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              success
+                  ? 'Test notification sent!'
+                  : 'Failed to send test notification',
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error sending test: $e')));
+      }
+    }
+  }
+
+  Future<void> _savePreferences() async {
+    if (_userId == null) return;
+
+    setState(() {
+      _isSaving = true;
+    });
+
+    try {
+      final updatedPreferences = (_preferences ??
+              NotificationPreferences.defaultPreferences(_userId!))
+          .copyWith(
+            enabled: _notificationsEnabled,
+            monitoredRiverIds: _selectedRiverIds.toList(),
+            includeShortRange: _shortRangeEnabled,
+            includeMediumRange: _mediumRangeEnabled,
+            quietHoursEnabled: _quietHoursEnabled,
+            quietHourStart: _quietHourStart,
+            quietHourEnd: _quietHourEnd,
+            updatedAt: DateTime.now(),
+          );
+
+      await _firestore
+          .collection('simpleNotificationPreferences')
+          .doc(_userId!)
+          .set(updatedPreferences.toFirestore());
+
+      _preferences = updatedPreferences;
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Notification settings saved!')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error saving settings: $e')));
+      }
+    } finally {
+      setState(() {
+        _isSaving = false;
+      });
+    }
+  }
+
+  void _showHelpDialog() {
+    showDialog(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+            title: const Text('Flow Notifications Help'),
+            content: const Text(
+              'This feature monitors your favorite rivers and sends notifications when '
+              'forecasted flow levels match significant return periods (2, 5, 10, 25, 50, 100 years).\n\n'
+              '• Only short and medium range forecasts are monitored\n'
+              '• Return periods indicate statistical flood frequency\n'
+              '• Higher return periods mean more significant flows\n'
+              '• Notifications work even when the app is closed',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('Got it'),
+              ),
+            ],
+          ),
+    );
+  }
+}

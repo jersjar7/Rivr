@@ -5,7 +5,6 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:rivr/core/models/location_info.dart';
-import 'package:rivr/core/navigation/app_router.dart';
 import 'package:rivr/core/network/connection_monitor.dart';
 import 'package:rivr/core/widgets/loading_indicator.dart';
 import 'package:rivr/core/widgets/empty_state.dart';
@@ -278,23 +277,23 @@ class _ForecastPageState extends State<ForecastPage>
   }
 
   // Task 4.4: Build notification banner when opened from notification
-  Widget? _buildNotificationBanner() {
-    if (!widget.fromNotification) return null;
+  // Widget? _buildNotificationBanner() {
+  //   if (!widget.fromNotification) return null;
 
-    return NotificationBanner(
-      notificationData: widget.notificationData,
-      onDismiss: () {
-        // Hide the banner but keep the highlighting
-        setState(() {
-          // You can add a local variable to track banner dismissal
-          // _notificationBannerDismissed = true;
-        });
-      },
-      onViewHistory: () {
-        AppRouter.navigateToNotificationHistory(context);
-      },
-    );
-  }
+  //   return NotificationBanner(
+  //     notificationData: widget.notificationData,
+  //     onDismiss: () {
+  //       // Hide the banner but keep the highlighting
+  //       setState(() {
+  //         // You can add a local variable to track banner dismissal
+  //         // _notificationBannerDismissed = true;
+  //       });
+  //     },
+  //     onViewHistory: () {
+  //       AppRouter.navigateToNotificationHistory(context);
+  //     },
+  //   );
+  // }
 
   // Task 4.4: Wrap widget with highlight if needed
   Widget _wrapWithHighlight(
@@ -327,36 +326,36 @@ class _ForecastPageState extends State<ForecastPage>
           },
         ),
         // Enhanced notification indicator
-        if (widget.fromNotification)
-          Container(
-            margin: const EdgeInsets.only(right: 8),
-            child: Stack(
-              children: [
-                IconButton(
-                  onPressed:
-                      () => AppRouter.navigateToNotificationHistory(context),
-                  icon: Icon(
-                    Icons.notifications_active,
-                    color: Colors.blue.shade700,
-                  ),
-                  tooltip: 'View notification history',
-                ),
-                if (widget.notificationData?['priority'] == 'safety')
-                  Positioned(
-                    right: 8,
-                    top: 8,
-                    child: Container(
-                      width: 8,
-                      height: 8,
-                      decoration: const BoxDecoration(
-                        color: Colors.red,
-                        shape: BoxShape.circle,
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-          ),
+        // if (widget.fromNotification)
+        //   Container(
+        //     margin: const EdgeInsets.only(right: 8),
+        //     child: Stack(
+        //       children: [
+        //         IconButton(
+        //           onPressed:
+        //               () => AppRouter.navigateToNotificationHistory(context),
+        //           icon: Icon(
+        //             Icons.notifications_active,
+        //             color: Colors.blue.shade700,
+        //           ),
+        //           tooltip: 'View notification history',
+        //         ),
+        //         if (widget.notificationData?['priority'] == 'safety')
+        //           Positioned(
+        //             right: 8,
+        //             top: 8,
+        //             child: Container(
+        //               width: 8,
+        //               height: 8,
+        //               decoration: const BoxDecoration(
+        //                 color: Colors.red,
+        //                 shape: BoxShape.circle,
+        //               ),
+        //             ),
+        //           ),
+        //       ],
+        //     ),
+        //   ),
         const SizedBox(width: 8),
       ],
       bottom: TabBar(
@@ -383,14 +382,14 @@ class _ForecastPageState extends State<ForecastPage>
           (context, status) => Column(
             children: [
               const ConnectionStatusBanner(),
-              if (_buildNotificationBanner() != null)
-                _buildNotificationBanner()!,
+              // if (_buildNotificationBanner() != null)
+              //   _buildNotificationBanner()!,
               Expanded(child: _buildPageContent()),
             ],
           ),
       child: Column(
         children: [
-          if (_buildNotificationBanner() != null) _buildNotificationBanner()!,
+          // if (_buildNotificationBanner() != null) _buildNotificationBanner()!,
           Expanded(child: _buildPageContent()),
         ],
       ),

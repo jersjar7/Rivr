@@ -1,10 +1,9 @@
 // lib/core/navigation/app_router.dart
-// Updated to include Task 4.4 notification handling routes
+// Updated to replace complex notification system with simple notification system
 // while preserving existing offline capabilities and StreamNameService integration
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:rivr/core/debug/developer_tools_page.dart';
 import 'package:rivr/features/notifications/presentation/pages/notification_test_page.dart';
 import '../di/service_locator.dart';
 import '../../features/auth/presentation/pages/auth_page.dart';
@@ -21,12 +20,11 @@ import '../pages/offline_manager_page.dart';
 import '../pages/download_current_region_page.dart';
 import 'offline_routes.dart';
 
-// Task 4.4: Import new notification pages
-import '../../features/notifications/presentation/pages/notification_history_page.dart';
-import '../../features/settings/presentation/pages/notification_settings_page.dart';
+// Simple notification system imports (replacing complex notification imports)
+import '../../features/simple_notifications/pages/notification_setup_page.dart';
 
 /// Router class for handling navigation throughout the app
-/// Enhanced with Task 4.4 notification handling capabilities
+/// Updated to use simple notification system instead of complex one
 class AppRouter {
   /// Route name constants for type safety
   static const String home = '/';
@@ -40,9 +38,8 @@ class AppRouter {
       '/offline/download-current-region';
   static const String notificationTest = '/notification-test';
 
-  // Task 4.4: New notification routes
-  static const String notificationHistory = '/notifications';
-  static const String notificationSettings = '/settings/notifications';
+  // Simple notification system routes (replacing complex notification routes)
+  static const String notificationSetup = '/notifications/setup';
   static const String safetyInfo = '/safety-info';
   static const String biometricSettings = '/biometric-settings';
   static const String forgotPassword = '/forgot-password';
@@ -126,7 +123,7 @@ class AppRouter {
                 // For backward compatibility, still accept stationName if provided
                 // but the page should prefer to get it from StreamNameService
                 stationName: args['stationName'],
-                // Task 4.4: Add notification context support
+                // Add notification context support
                 fromNotification: args['fromNotification'] ?? false,
                 highlightFlow: args['highlightFlow'] ?? false,
                 notificationData: args['notificationData'],
@@ -152,17 +149,10 @@ class AppRouter {
           builder: (context) => const NotificationTestPage(),
         );
 
-      // Task 4.4: New notification routes
-      case notificationHistory:
-        final args = settings.arguments as Map<String, dynamic>?;
+      // Simple notification system route (replacing complex notification routes)
+      case notificationSetup:
         return MaterialPageRoute(
-          builder: (_) => NotificationHistoryPage(arguments: args),
-          settings: settings,
-        );
-
-      case notificationSettings:
-        return MaterialPageRoute(
-          builder: (_) => const NotificationSettingsPage(),
+          builder: (_) => const NotificationSetupPage(),
           settings: settings,
         );
 
@@ -173,9 +163,9 @@ class AppRouter {
           settings: settings,
         );
 
-      // Developer tools route (debug only)
-      case developerTools:
-        return MaterialPageRoute(builder: (_) => const DeveloperToolsPage());
+      // // Developer tools route (debug only)
+      // case developerTools:
+      //   return MaterialPageRoute(builder: (_) => const DeveloperToolsPage());
 
       default:
         debugPrint('❌ Unknown route: ${settings.name}');
@@ -212,7 +202,7 @@ class AppRouter {
         );
     }
   }
-  // Task 4.4: Navigation helper methods for type safety and convenience
+  // Navigation helper methods for type safety and convenience
 
   /// Navigate to home/splash page
   static Future<dynamic> navigateToHome(BuildContext context) {
@@ -251,7 +241,7 @@ class AppRouter {
   }
 
   /// Navigate to forecast page (your existing main content page)
-  /// Task 4.4: Enhanced to support notification context
+  /// Enhanced to support notification context
   static Future<dynamic> navigateToForecast(
     BuildContext context,
     String reachId, {
@@ -273,28 +263,12 @@ class AppRouter {
     );
   }
 
-  /// Task 4.4: Navigate to notification history
-  static Future<dynamic> navigateToNotificationHistory(
-    BuildContext context, {
-    String? filterType,
-    Map<String, dynamic>? additionalData,
-  }) {
-    return Navigator.pushNamed(
-      context,
-      notificationHistory,
-      arguments: {
-        if (filterType != null) 'filterType': filterType,
-        ...?additionalData,
-      },
-    );
+  /// Navigate to simple notification setup page (replacing complex notification settings)
+  static Future<dynamic> navigateToNotificationSetup(BuildContext context) {
+    return Navigator.pushNamed(context, notificationSetup);
   }
 
-  /// Task 4.4: Navigate to notification settings
-  static Future<dynamic> navigateToNotificationSettings(BuildContext context) {
-    return Navigator.pushNamed(context, notificationSettings);
-  }
-
-  /// Task 4.4: Navigate to safety information
+  /// Navigate to safety information
   static Future<dynamic> navigateToSafetyInfo(
     BuildContext context, {
     String? alertLevel,
@@ -334,8 +308,7 @@ class AppRouter {
       offlineManager,
       downloadCurrentRegion,
       notificationTest,
-      notificationHistory,
-      notificationSettings,
+      notificationSetup, // Simple notification system route
       safetyInfo,
       biometricSettings,
       forgotPassword,
@@ -343,13 +316,13 @@ class AppRouter {
     return validRoutes.contains(routeName);
   }
 
-  /// Task 4.4: Get route name for deep linking
+  /// Get route name for deep linking
   static String? getRouteNameForReach(String reachId) {
     // Your app uses /forecast for reach details
     return forecast;
   }
 
-  /// Task 4.4: Build arguments for reach navigation from notifications
+  /// Build arguments for reach navigation from notifications
   static Map<String, dynamic> buildForecastArgsFromNotification({
     required String reachId,
     String? stationName,
@@ -365,7 +338,49 @@ class AppRouter {
   }
 }
 
-/// Task 4.4: Placeholder SafetyInfoPage (you can replace with your own implementation)
+/// Backward compatibility methods for legacy complex notification system
+extension AppRouterLegacy on AppRouter {
+  /// Legacy method - redirects to simple notification setup
+  static Future<dynamic> navigateToNotificationSettings(BuildContext context) {
+    return AppRouter.navigateToNotificationSetup(context);
+  }
+
+  /// Legacy method - shows dialog explaining simple system doesn't have history
+  static Future<dynamic> navigateToNotificationHistory(
+    BuildContext context, {
+    String? filterType,
+    Map<String, dynamic>? additionalData,
+  }) {
+    // Show a simple dialog explaining the simple system doesn't have history
+    return showDialog(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+            title: const Text('Flow Notifications'),
+            content: const Text(
+              'Flow alerts are sent directly to your phone when your favorite rivers '
+              'reach significant levels. Check your phone\'s notification history '
+              'for past alerts, or set up notifications for your favorite rivers.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('OK'),
+              ),
+              TextButton(
+                onPressed: () {
+                  Navigator.of(context).pop();
+                  AppRouter.navigateToNotificationSetup(context);
+                },
+                child: const Text('Setup Notifications'),
+              ),
+            ],
+          ),
+    );
+  }
+}
+
+/// Safety Information Page (placeholder implementation)
 class SafetyInfoPage extends StatelessWidget {
   final Map<String, dynamic>? arguments;
 

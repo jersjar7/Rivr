@@ -37,8 +37,8 @@ class _NotificationSetupPageState extends State<NotificationSetupPage> {
   bool _shortRangeEnabled = true;
   bool _mediumRangeEnabled = true;
   bool _quietHoursEnabled = false;
-  int _quietHourStart = 22;
-  int _quietHourEnd = 7;
+  TimeOfDay _quietTimeStart = const TimeOfDay(hour: 22, minute: 0);
+  TimeOfDay _quietTimeEnd = const TimeOfDay(hour: 7, minute: 0);
 
   @override
   void initState() {
@@ -96,14 +96,34 @@ class _NotificationSetupPageState extends State<NotificationSetupPage> {
 
       if (doc.exists) {
         _preferences = NotificationPreferences.fromFirestore(doc);
+
+        // Debug: Print what we loaded from Firestore
+        debugPrint('🔍 Loaded from Firestore:');
+        debugPrint('  quietHourStart: ${_preferences!.quietHourStart}');
+        debugPrint('  quietMinuteStart: ${_preferences!.quietMinuteStart}');
+        debugPrint('  quietHourEnd: ${_preferences!.quietHourEnd}');
+        debugPrint('  quietMinuteEnd: ${_preferences!.quietMinuteEnd}');
+
         setState(() {
           _notificationsEnabled = _preferences!.enabled;
           _selectedRiverIds = Set.from(_preferences!.monitoredRiverIds);
           _shortRangeEnabled = _preferences!.includeShortRange;
           _mediumRangeEnabled = _preferences!.includeMediumRange;
           _quietHoursEnabled = _preferences!.quietHoursEnabled;
-          _quietHourStart = _preferences!.quietHourStart;
-          _quietHourEnd = _preferences!.quietHourEnd;
+          // Convert int hours and minutes to TimeOfDay objects
+          _quietTimeStart = TimeOfDay(
+            hour: _preferences!.quietHourStart,
+            minute: _preferences!.quietMinuteStart,
+          );
+          _quietTimeEnd = TimeOfDay(
+            hour: _preferences!.quietHourEnd,
+            minute: _preferences!.quietMinuteEnd,
+          );
+
+          // Debug: Print what TimeOfDay objects we created
+          debugPrint('🕐 Created TimeOfDay objects:');
+          debugPrint('  _quietTimeStart: ${_quietTimeStart.format(context)}');
+          debugPrint('  _quietTimeEnd: ${_quietTimeEnd.format(context)}');
         });
       } else {
         // Create default preferences
@@ -354,7 +374,7 @@ class _NotificationSetupPageState extends State<NotificationSetupPage> {
             ),
             const SizedBox(height: 8),
             CheckboxListTile(
-              title: const Text('Short Range (0-3 days)'),
+              title: const Text('Short Range (0-18 hours)'),
               subtitle: const Text('Most accurate forecasts'),
               value: _shortRangeEnabled,
               onChanged: (value) {
@@ -365,7 +385,7 @@ class _NotificationSetupPageState extends State<NotificationSetupPage> {
               dense: true,
             ),
             CheckboxListTile(
-              title: const Text('Medium Range (4-10 days)'),
+              title: const Text('Medium Range (2-10 days)'),
               subtitle: const Text('Extended forecasts'),
               value: _mediumRangeEnabled,
               onChanged: (value) {
@@ -406,9 +426,7 @@ class _NotificationSetupPageState extends State<NotificationSetupPage> {
                   Expanded(
                     child: ListTile(
                       title: const Text('Start'),
-                      subtitle: Text(
-                        '${_quietHourStart.toString().padLeft(2, '0')}:00',
-                      ),
+                      subtitle: Text(_quietTimeStart.format(context)),
                       onTap: () => _selectQuietHour(true),
                       dense: true,
                     ),
@@ -416,9 +434,7 @@ class _NotificationSetupPageState extends State<NotificationSetupPage> {
                   Expanded(
                     child: ListTile(
                       title: const Text('End'),
-                      subtitle: Text(
-                        '${_quietHourEnd.toString().padLeft(2, '0')}:00',
-                      ),
+                      subtitle: Text(_quietTimeEnd.format(context)),
                       onTap: () => _selectQuietHour(false),
                       dense: true,
                     ),
@@ -527,10 +543,7 @@ class _NotificationSetupPageState extends State<NotificationSetupPage> {
   Future<void> _selectQuietHour(bool isStart) async {
     final time = await showTimePicker(
       context: context,
-      initialTime: TimeOfDay(
-        hour: isStart ? _quietHourStart : _quietHourEnd,
-        minute: 0,
-      ),
+      initialTime: isStart ? _quietTimeStart : _quietTimeEnd,
       builder: (context, child) {
         return MediaQuery(
           data: MediaQuery.of(context).copyWith(alwaysUse24HourFormat: true),
@@ -542,9 +555,9 @@ class _NotificationSetupPageState extends State<NotificationSetupPage> {
     if (time != null) {
       setState(() {
         if (isStart) {
-          _quietHourStart = time.hour;
+          _quietTimeStart = time;
         } else {
-          _quietHourEnd = time.hour;
+          _quietTimeEnd = time;
         }
       });
     }
@@ -592,6 +605,15 @@ class _NotificationSetupPageState extends State<NotificationSetupPage> {
     });
 
     try {
+      // Debug: Print what we're about to save
+      debugPrint('💾 Saving preferences:');
+      debugPrint(
+        '  _quietTimeStart: ${_quietTimeStart.format(context)} (hour: ${_quietTimeStart.hour}, minute: ${_quietTimeStart.minute})',
+      );
+      debugPrint(
+        '  _quietTimeEnd: ${_quietTimeEnd.format(context)} (hour: ${_quietTimeEnd.hour}, minute: ${_quietTimeEnd.minute})',
+      );
+
       final updatedPreferences = (_preferences ??
               NotificationPreferences.defaultPreferences(_userId!))
           .copyWith(
@@ -600,10 +622,20 @@ class _NotificationSetupPageState extends State<NotificationSetupPage> {
             includeShortRange: _shortRangeEnabled,
             includeMediumRange: _mediumRangeEnabled,
             quietHoursEnabled: _quietHoursEnabled,
-            quietHourStart: _quietHourStart,
-            quietHourEnd: _quietHourEnd,
+            // Convert TimeOfDay to separate int hours and minutes for storage
+            quietHourStart: _quietTimeStart.hour,
+            quietMinuteStart: _quietTimeStart.minute,
+            quietHourEnd: _quietTimeEnd.hour,
+            quietMinuteEnd: _quietTimeEnd.minute,
             updatedAt: DateTime.now(),
           );
+
+      // Debug: Print what the model will save to Firestore
+      debugPrint('📄 Model data to save:');
+      debugPrint('  quietHourStart: ${updatedPreferences.quietHourStart}');
+      debugPrint('  quietMinuteStart: ${updatedPreferences.quietMinuteStart}');
+      debugPrint('  quietHourEnd: ${updatedPreferences.quietHourEnd}');
+      debugPrint('  quietMinuteEnd: ${updatedPreferences.quietMinuteEnd}');
 
       await _firestore
           .collection('simpleNotificationPreferences')

@@ -12,7 +12,9 @@ class NotificationPreferences {
   final bool includeMediumRange;
   final bool quietHoursEnabled;
   final int quietHourStart; // Hour in 24-hour format (e.g., 22 for 10 PM)
+  final int quietMinuteStart; // Minute (0-59)
   final int quietHourEnd; // Hour in 24-hour format (e.g., 7 for 7 AM)
+  final int quietMinuteEnd; // Minute (0-59)
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -20,50 +22,53 @@ class NotificationPreferences {
     required this.userId,
     required this.enabled,
     required this.monitoredRiverIds,
-    this.includeShortRange = true,
-    this.includeMediumRange = true,
-    this.quietHoursEnabled = false,
-    this.quietHourStart = 22, // 10 PM default
-    this.quietHourEnd = 7, // 7 AM default
+    required this.includeShortRange,
+    required this.includeMediumRange,
+    required this.quietHoursEnabled,
+    required this.quietHourStart,
+    required this.quietMinuteStart,
+    required this.quietHourEnd,
+    required this.quietMinuteEnd,
     required this.createdAt,
     required this.updatedAt,
   });
 
   /// Create default preferences for a new user
   factory NotificationPreferences.defaultPreferences(String userId) {
-    final now = DateTime.now();
     return NotificationPreferences(
       userId: userId,
-      enabled: false, // Start disabled, user must opt in
-      monitoredRiverIds: [], // No rivers monitored by default
+      enabled: false,
+      monitoredRiverIds: [],
       includeShortRange: true,
       includeMediumRange: true,
       quietHoursEnabled: false,
       quietHourStart: 22,
+      quietMinuteStart: 0,
       quietHourEnd: 7,
-      createdAt: now,
-      updatedAt: now,
+      quietMinuteEnd: 0,
+      createdAt: DateTime.now(),
+      updatedAt: DateTime.now(),
     );
   }
 
   /// Create from Firestore document
   factory NotificationPreferences.fromFirestore(
-    DocumentSnapshot<Map<String, dynamic>> snapshot,
+    DocumentSnapshot<Map<String, dynamic>> doc,
   ) {
-    final data = snapshot.data()!;
+    final data = doc.data()!;
     return NotificationPreferences(
       userId: data['userId'] as String,
       enabled: data['enabled'] as bool? ?? false,
-      monitoredRiverIds: List<String>.from(
-        data['monitoredRiverIds'] as List? ?? [],
-      ),
+      monitoredRiverIds: List<String>.from(data['monitoredRiverIds'] ?? []),
       includeShortRange: data['includeShortRange'] as bool? ?? true,
       includeMediumRange: data['includeMediumRange'] as bool? ?? true,
       quietHoursEnabled: data['quietHoursEnabled'] as bool? ?? false,
       quietHourStart: data['quietHourStart'] as int? ?? 22,
+      quietMinuteStart: data['quietMinuteStart'] as int? ?? 0,
       quietHourEnd: data['quietHourEnd'] as int? ?? 7,
-      createdAt: (data['createdAt'] as Timestamp).toDate(),
-      updatedAt: (data['updatedAt'] as Timestamp).toDate(),
+      quietMinuteEnd: data['quietMinuteEnd'] as int? ?? 0,
+      createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      updatedAt: (data['updatedAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
     );
   }
 
@@ -77,7 +82,9 @@ class NotificationPreferences {
       'includeMediumRange': includeMediumRange,
       'quietHoursEnabled': quietHoursEnabled,
       'quietHourStart': quietHourStart,
+      'quietMinuteStart': quietMinuteStart,
       'quietHourEnd': quietHourEnd,
+      'quietMinuteEnd': quietMinuteEnd,
       'createdAt': Timestamp.fromDate(createdAt),
       'updatedAt': Timestamp.fromDate(updatedAt),
     };
@@ -92,7 +99,9 @@ class NotificationPreferences {
     bool? includeMediumRange,
     bool? quietHoursEnabled,
     int? quietHourStart,
+    int? quietMinuteStart,
     int? quietHourEnd,
+    int? quietMinuteEnd,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) {
@@ -104,9 +113,11 @@ class NotificationPreferences {
       includeMediumRange: includeMediumRange ?? this.includeMediumRange,
       quietHoursEnabled: quietHoursEnabled ?? this.quietHoursEnabled,
       quietHourStart: quietHourStart ?? this.quietHourStart,
+      quietMinuteStart: quietMinuteStart ?? this.quietMinuteStart,
       quietHourEnd: quietHourEnd ?? this.quietHourEnd,
+      quietMinuteEnd: quietMinuteEnd ?? this.quietMinuteEnd,
       createdAt: createdAt ?? this.createdAt,
-      updatedAt: updatedAt ?? DateTime.now(),
+      updatedAt: updatedAt ?? this.updatedAt,
     );
   }
 
@@ -135,21 +146,36 @@ class NotificationPreferences {
     return monitoredRiverIds.contains(riverId);
   }
 
-  /// Check if notifications should be sent at this time (considering quiet hours)
+  /// Check if notifications should be sent at this time (considering quiet hours with minutes)
   bool shouldSendNotificationNow() {
     if (!enabled) return false;
     if (!quietHoursEnabled) return true;
 
     final now = DateTime.now();
-    final currentHour = now.hour;
+    final currentMinutesSinceMidnight = now.hour * 60 + now.minute;
+    final quietStartMinutes = quietHourStart * 60 + quietMinuteStart;
+    final quietEndMinutes = quietHourEnd * 60 + quietMinuteEnd;
 
-    // Handle quiet hours that cross midnight (e.g., 22 to 7)
-    if (quietHourStart > quietHourEnd) {
-      return !(currentHour >= quietHourStart || currentHour < quietHourEnd);
+    // Handle quiet hours that cross midnight (e.g., 22:30 to 7:15)
+    if (quietStartMinutes > quietEndMinutes) {
+      // Quiet period crosses midnight
+      return !(currentMinutesSinceMidnight >= quietStartMinutes ||
+          currentMinutesSinceMidnight < quietEndMinutes);
     } else {
-      // Handle quiet hours within same day (e.g., 1 to 5)
-      return !(currentHour >= quietHourStart && currentHour < quietHourEnd);
+      // Quiet period within same day (e.g., 1:00 to 5:30)
+      return !(currentMinutesSinceMidnight >= quietStartMinutes &&
+          currentMinutesSinceMidnight < quietEndMinutes);
     }
+  }
+
+  /// Get formatted quiet start time as string (HH:MM)
+  String get quietStartTimeFormatted {
+    return '${quietHourStart.toString().padLeft(2, '0')}:${quietMinuteStart.toString().padLeft(2, '0')}';
+  }
+
+  /// Get formatted quiet end time as string (HH:MM)
+  String get quietEndTimeFormatted {
+    return '${quietHourEnd.toString().padLeft(2, '0')}:${quietMinuteEnd.toString().padLeft(2, '0')}';
   }
 
   /// Get number of monitored rivers
@@ -185,7 +211,9 @@ class NotificationPreferences {
         other.includeMediumRange == includeMediumRange &&
         other.quietHoursEnabled == quietHoursEnabled &&
         other.quietHourStart == quietHourStart &&
-        other.quietHourEnd == quietHourEnd;
+        other.quietMinuteStart == quietMinuteStart &&
+        other.quietHourEnd == quietHourEnd &&
+        other.quietMinuteEnd == quietMinuteEnd;
   }
 
   @override
@@ -198,7 +226,9 @@ class NotificationPreferences {
       includeMediumRange,
       quietHoursEnabled,
       quietHourStart,
+      quietMinuteStart,
       quietHourEnd,
+      quietMinuteEnd,
     );
   }
 }

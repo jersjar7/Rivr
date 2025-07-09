@@ -296,29 +296,6 @@ class _ForecastPageState extends State<ForecastPage>
     );
   }
 
-  // Task 4.4: Get color based on notification category
-  Color _getNotificationCategoryColor() {
-    final category =
-        widget.notificationData?['category']?.toString().toLowerCase();
-    switch (category) {
-      case 'extreme':
-        return Colors.purple;
-      case 'very high':
-      case 'high':
-        return Colors.red;
-      case 'elevated':
-        return Colors.orange;
-      case 'moderate':
-        return Colors.yellow.shade700;
-      case 'normal':
-        return Colors.green;
-      case 'low':
-        return Colors.blue;
-      default:
-        return Colors.grey;
-    }
-  }
-
   // Task 4.4: Wrap widget with highlight if needed
   Widget _wrapWithHighlight(
     Widget child, {
@@ -418,56 +395,6 @@ class _ForecastPageState extends State<ForecastPage>
         ],
       ),
     );
-  }
-
-  // Enhanced highlighting with custom messages for different components:
-  Widget _buildEnhancedFlowStatusCard(
-    dynamic latestFlow,
-    dynamic returnPeriod,
-  ) {
-    String? customMessage;
-
-    if (widget.notificationData != null) {
-      final category = widget.notificationData!['category'];
-      final priority = widget.notificationData!['priority'];
-
-      if (priority == 'safety') {
-        customMessage = 'Safety alert: $category flow conditions';
-      } else if (priority == 'activity') {
-        customMessage = 'Activity alert: Optimal conditions detected';
-      } else {
-        customMessage = 'Flow update: $category conditions';
-      }
-    }
-
-    return _wrapWithHighlight(
-      FlowStatusCard(
-        currentFlow: latestFlow,
-        returnPeriod: returnPeriod,
-        expanded: true,
-        onTap: () {},
-      ),
-      isCard: true,
-      customMessage: customMessage,
-    );
-  }
-
-  // Notification context logging with more details:
-  void _logNotificationContext() {
-    if (widget.fromNotification) {
-      debugPrint('🔔 ForecastPage opened from notification');
-      debugPrint('📍 Reach ID: ${widget.reachId}');
-      debugPrint('⭐ Highlight flow: ${widget.highlightFlow}');
-
-      if (widget.notificationData != null) {
-        final data = widget.notificationData!;
-        debugPrint('📊 Notification data:');
-        debugPrint('   Category: ${data['category']}');
-        debugPrint('   Priority: ${data['priority']}');
-        debugPrint('   Timestamp: ${data['timestamp']}');
-        debugPrint('   Deep link source: ${data['deepLinkSource']}');
-      }
-    }
   }
 
   // Usage example for your existing build method:

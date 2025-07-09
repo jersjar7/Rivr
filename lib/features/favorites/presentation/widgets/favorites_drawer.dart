@@ -7,6 +7,7 @@ import 'package:rivr/features/forecast/presentation/widgets/unit_selector_widget
 import 'package:rivr/features/settings/presentation/pages/theme_settings_page.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../../features/auth/presentation/providers/auth_provider.dart';
+import '../../../../core/navigation/app_router.dart';
 
 class FavoritesDrawer extends StatefulWidget {
   final Function() onLogout;
@@ -153,47 +154,217 @@ class _FavoritesDrawerState extends State<FavoritesDrawer> {
                   ],
                 ),
 
-                // ── Notifications & Alerts Section ──────────────────────────
+                // ── Enhanced Notifications & Alerts Section ──────────────────────────
                 ExpansionTile(
                   initiallyExpanded:
                       _expandedSections['notifications'] ?? false,
                   onExpansionChanged:
                       (expanded) => _toggleSection('notifications'),
                   leading: Icon(
-                    Icons.notifications_none,
+                    Icons.notifications_active,
                     color: colors.primary,
                   ),
 
-                  // Title row with a subtle “Coming Soon” on the right
-                  title: Column(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                  // Title with Demo Mode badge
+                  title: Row(
                     children: [
-                      Text(
-                        'Notifications & Alerts',
-                        style: textTheme.titleSmall?.copyWith(
-                          fontWeight: FontWeight.bold,
+                      Expanded(
+                        child: Text(
+                          'Notifications & Alerts',
+                          style: textTheme.titleSmall?.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                       ),
-                      Text(
-                        'Coming Soon',
-                        style: textTheme.labelSmall?.copyWith(
-                          color: colors.onSurface.withOpacity(0.6),
-                        ),
-                      ),
+                      // Container(
+                      //   padding: const EdgeInsets.symmetric(
+                      //     horizontal: 8,
+                      //     vertical: 2,
+                      //   ),
+                      //   decoration: BoxDecoration(
+                      //     color: Colors.green.shade100,
+                      //     borderRadius: BorderRadius.circular(12),
+                      //     border: Border.all(color: Colors.green.shade300),
+                      //   ),
+                      //   child: Row(
+                      //     mainAxisSize: MainAxisSize.min,
+                      //     children: [
+                      //       Icon(
+                      //         Icons.circle,
+                      //         color: Colors.green.shade600,
+                      //         size: 8,
+                      //       ),
+                      //       const SizedBox(width: 4),
+                      //       Text(
+                      //         'Demo Ready',
+                      //         style: textTheme.labelSmall?.copyWith(
+                      //           color: Colors.green.shade700,
+                      //           fontWeight: FontWeight.w600,
+                      //         ),
+                      //       ),
+                      //     ],
+                      //   ),
+                      // ),
                     ],
                   ),
 
-                  // One inert child just to show the feature name
+                  // Enhanced children with working functionality
                   children: [
+                    // 1. Notification Settings - WORKING ✅
                     ListTile(
                       contentPadding: const EdgeInsets.only(
                         left: 72,
                         right: 16,
                       ),
-                      title: Text('Flow Level Notifications'),
-                      // no trailing arrow, no onTap
+                      leading: Icon(
+                        Icons.check_circle,
+                        color: Colors.green.shade600,
+                        size: 20,
+                      ),
+                      title: const Text('Notification Settings'),
+                      subtitle: const Text('Configure alerts & preferences'),
+                      trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+                      onTap: () {
+                        AppRouter.navigateToNotificationSettings(context);
+                      },
                     ),
+
+                    // 2. Notification History - WORKING ✅
+                    ListTile(
+                      contentPadding: const EdgeInsets.only(
+                        left: 72,
+                        right: 16,
+                      ),
+                      leading: Icon(
+                        Icons.check_circle,
+                        color: Colors.green.shade600,
+                        size: 20,
+                      ),
+                      title: const Text('Notification History'),
+                      subtitle: const Text('View recent alerts'),
+                      trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: colors.primary.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Text(
+                              'Test',
+                              style: textTheme.labelSmall?.copyWith(
+                                color: colors.primary,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          const Icon(Icons.arrow_forward_ios, size: 16),
+                        ],
+                      ),
+                      onTap: () {
+                        AppRouter.navigateToNotificationHistory(context);
+                      },
+                    ),
+
+                    // 3. Quick Alert Demo - IN DEVELOPMENT 🚧
+                    ListTile(
+                      contentPadding: const EdgeInsets.only(
+                        left: 72,
+                        right: 16,
+                      ),
+                      leading: Icon(
+                        Icons.construction,
+                        color: Colors.orange.shade600,
+                        size: 20,
+                      ),
+                      title: const Text('Quick Alert Setup'),
+                      subtitle: const Text('Demo: Custom threshold alerts'),
+                      trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+                      onTap: () {
+                        // TODO: Create quick_alert_demo_page.dart
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: const Text(
+                              'Quick Alert Setup - Coming in next development phase',
+                            ),
+                            backgroundColor: Colors.orange.shade600,
+                            action: SnackBarAction(
+                              label: 'OK',
+                              textColor: Colors.white,
+                              onPressed: () {},
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+
+                    // 4. Test Notifications - WORKING ✅
+                    ListTile(
+                      contentPadding: const EdgeInsets.only(
+                        left: 72,
+                        right: 16,
+                      ),
+                      leading: Icon(
+                        Icons.check_circle,
+                        color: Colors.green.shade600,
+                        size: 20,
+                      ),
+                      title: const Text('Test Notifications'),
+                      subtitle: const Text('Send demo alerts'),
+                      trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.science, color: colors.primary, size: 16),
+                          const SizedBox(width: 8),
+                          const Icon(Icons.arrow_forward_ios, size: 16),
+                        ],
+                      ),
+                      onTap: () {
+                        AppRouter.navigateToNotificationTest(context);
+                      },
+                    ),
+
+                    // // Progress Summary
+                    // Container(
+                    //   margin: const EdgeInsets.only(
+                    //     left: 72,
+                    //     right: 16,
+                    //     top: 8,
+                    //     bottom: 4,
+                    //   ),
+                    //   padding: const EdgeInsets.all(8),
+                    //   decoration: BoxDecoration(
+                    //     color: colors.primary.withOpacity(0.05),
+                    //     borderRadius: BorderRadius.circular(8),
+                    //     border: Border.all(
+                    //       color: colors.primary.withOpacity(0.2),
+                    //     ),
+                    //   ),
+                    //   child: Row(
+                    //     children: [
+                    //       Icon(
+                    //         Icons.info_outline,
+                    //         color: colors.primary,
+                    //         size: 16,
+                    //       ),
+                    //       const SizedBox(width: 8),
+                    //       Expanded(
+                    //         child: Text(
+                    //           'Thesis Progress: 3 features working • 1 in development',
+                    //           style: textTheme.labelSmall?.copyWith(
+                    //             color: colors.primary,
+                    //             fontWeight: FontWeight.w500,
+                    //           ),
+                    //         ),
+                    //       ),
+                    //     ],
+                    //   ),
+                    // ),
                   ],
                 ),
 
@@ -203,7 +374,7 @@ class _FavoritesDrawerState extends State<FavoritesDrawer> {
                   onExpansionChanged: (expanded) => _toggleSection('data'),
                   leading: Icon(Icons.storage, color: colors.primary),
 
-                  // Title + “Coming Soon”
+                  // Title + "Coming Soon"
                   title: Column(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -223,7 +394,7 @@ class _FavoritesDrawerState extends State<FavoritesDrawer> {
                     ],
                   ),
 
-                  // Inert “Clear Cache” tile
+                  // Inert "Clear Cache" tile
                   children: [
                     ListTile(
                       contentPadding: const EdgeInsets.only(
@@ -320,18 +491,46 @@ class _FavoritesDrawerState extends State<FavoritesDrawer> {
                   onTap: widget.onLogout,
                 ),
                 Divider(indent: 10, endIndent: 10),
+
+                // Development Tools (Debug Mode Only)
                 if (kDebugMode) ...[
                   const Divider(),
-                  const Padding(
-                    padding: EdgeInsets.all(8.0),
-                    child: QuickNotificationTest(),
+                  Padding(
+                    padding: const EdgeInsets.all(8.0),
+                    child: Column(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: Colors.grey.shade100,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: Colors.grey.shade300),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.code,
+                                color: Colors.grey.shade600,
+                                size: 16,
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                'Development Tools',
+                                style: textTheme.labelSmall?.copyWith(
+                                  color: Colors.grey.shade600,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        const QuickNotificationTest(),
+                      ],
+                    ),
                   ),
                 ],
-                // ListTile(
-                //   leading: Icon(Icons.bug_report, color: colors.error),
-                //   title: Text('Debug User'),
-                //   onTap: _debugUser,
-                // ),
+
                 // ── SPONSORS LOGO GRID ───────────────────────────────────────
                 Padding(
                   padding: const EdgeInsets.symmetric(
@@ -394,26 +593,4 @@ class _FavoritesDrawerState extends State<FavoritesDrawer> {
       ),
     );
   }
-
-  // void _debugUser() {
-  //   final authProvider = Provider.of<AuthProvider>(context, listen: false);
-  //   final user = authProvider.currentUser;
-
-  //   print('=== USER DEBUG ===');
-  //   print('User exists: ${user != null}');
-  //   if (user != null) {
-  //     print('UID: ${user.uid}');
-  //     print('Email: ${user.email}');
-  //     print(
-  //       'FirstName: "${user.firstName}" (${user.firstName?.length ?? 0} chars)',
-  //     );
-  //     print(
-  //       'LastName: "${user.lastName}" (${user.lastName?.length ?? 0} chars)',
-  //     );
-  //     print(
-  //       'Profession: "${user.profession}" (${user.profession?.length ?? 0} chars)',
-  //     );
-  //   }
-  //   print('==================');
-  // }
 }

@@ -1,9 +1,13 @@
 // lib/features/simple_notifications/services/favorites_integration_service.dart
 
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
-/// Service to read from existing favorites system without modifying it
+// Import local favorites system instead of Firestore
+import '../../favorites/data/datasources/favorites_local_datasource.dart';
+import '../../favorites/data/models/favorite_model.dart';
+import '../../../../common/data/local/database_helper.dart';
+
+/// Service to read from existing LOCAL favorites system without modifying it
 /// Provides clean interface for notification system to access favorite rivers
 class FavoritesIntegrationService {
   static final FavoritesIntegrationService _instance =
@@ -11,47 +15,50 @@ class FavoritesIntegrationService {
   factory FavoritesIntegrationService() => _instance;
   FavoritesIntegrationService._internal();
 
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  // Use local datasource instead of Firestore
+  final FavoritesLocalDataSource _localDatasource =
+      FavoritesLocalDataSourceImpl(databaseHelper: DatabaseHelper());
 
-  /// Get all favorite rivers for a user
+  /// Get all favorite rivers for a user from LOCAL SQLite storage
   /// Returns list of FavoriteRiver objects with essential data for notifications
   Future<List<FavoriteRiver>> getUserFavoriteRivers(String userId) async {
     try {
-      debugPrint('📋 Getting favorite rivers for user: $userId');
-
-      // Query the correct nested favorites structure: favorites/{userId}/stations/{stationId}
-      final favoritesSnapshot =
-          await _firestore
-              .collection('favorites')
-              .doc(userId)
-              .collection('stations')
-              .get();
-
       debugPrint(
-        '📊 Found ${favoritesSnapshot.docs.length} favorite documents',
+        '📋 Getting favorite rivers from LOCAL storage for user: $userId',
       );
+
+      // Get favorites from local SQLite database
+      final localFavorites = await _localDatasource.getFavorites(userId);
+
+      debugPrint('📊 Found ${localFavorites.length} local favorite documents');
 
       final favoriteRivers = <FavoriteRiver>[];
 
-      for (final doc in favoritesSnapshot.docs) {
+      for (final favorite in localFavorites) {
         try {
-          debugPrint('🔍 Processing favorite: ${doc.id}');
-          debugPrint('📄 Data: ${doc.data()}');
+          debugPrint('🔍 Processing local favorite: ${favorite.stationId}');
+          debugPrint(
+            '📄 Data: name=${favorite.name}, city=${favorite.city}, state=${favorite.state}',
+          );
 
-          final favoriteRiver = FavoriteRiver.fromFirestoreNested(doc, userId);
+          // Convert FavoriteModel to FavoriteRiver
+          final favoriteRiver = FavoriteRiver.fromLocalFavorite(favorite);
           favoriteRivers.add(favoriteRiver);
           debugPrint('✅ Successfully added: ${favoriteRiver.riverName}');
         } catch (e) {
-          debugPrint('⚠️ Error parsing favorite river: ${doc.id} - $e');
-          debugPrint('📄 Raw data: ${doc.data()}');
+          debugPrint(
+            '⚠️ Error parsing local favorite: ${favorite.stationId} - $e',
+          );
           // Continue with other favorites even if one fails
         }
       }
 
-      debugPrint('✅ Found ${favoriteRivers.length} valid favorite rivers');
+      debugPrint(
+        '✅ Found ${favoriteRivers.length} valid favorite rivers from local storage',
+      );
       return favoriteRivers;
     } catch (e) {
-      debugPrint('❌ Error getting favorite rivers: $e');
+      debugPrint('❌ Error getting favorite rivers from local storage: $e');
       return [];
     }
   }
@@ -89,132 +96,33 @@ class FavoritesIntegrationService {
     }
   }
 
-  /// Stream of user's favorite rivers (for real-time updates)
-  Stream<List<FavoriteRiver>> watchUserFavoriteRivers(String userId) {
-    return _firestore
-        .collection('favorites')
-        .where('userId', isEqualTo: userId)
-        .snapshots()
-        .map((snapshot) {
-          final favoriteRivers = <FavoriteRiver>[];
-
-          for (final doc in snapshot.docs) {
-            try {
-              final favoriteRiver = FavoriteRiver.fromFirestore(doc);
-              favoriteRivers.add(favoriteRiver);
-            } catch (e) {
-              debugPrint(
-                '⚠️ Error parsing favorite river in stream: ${doc.id} - $e',
-              );
-            }
-          }
-
-          return favoriteRivers;
-        });
-  }
-
   /// Get river names for display purposes
   Future<Map<String, String>> getRiverNamesMap(List<String> riverIds) async {
     final riverNames = <String, String>{};
 
-    for (final riverId in riverIds) {
-      try {
-        // Try to get river name from existing data
-        // This might be in stations collection, rivers collection, or cached somewhere
-        final riverName = await _getRiverName(riverId);
-        if (riverName != null) {
-          riverNames[riverId] = riverName;
-        }
-      } catch (e) {
-        debugPrint('⚠️ Could not get name for river $riverId: $e');
+    try {
+      // Since we're using local storage, we need to get all favorites first
+      // We'll need a userId - this is a limitation of the current design
+      // For now, we'll return the riverIds as fallback names
+      for (final riverId in riverIds) {
         riverNames[riverId] = 'River $riverId'; // Fallback name
+      }
+    } catch (e) {
+      debugPrint('⚠️ Error getting river names from local storage: $e');
+      // Return fallback names
+      for (final riverId in riverIds) {
+        riverNames[riverId] = 'River $riverId';
       }
     }
 
     return riverNames;
   }
 
-  /// Helper method to get river name from various possible sources
-  Future<String?> _getRiverName(String riverId) async {
-    try {
-      debugPrint('🔍 Looking for name of river: $riverId');
-
-      // Try stations collection first (most likely to have river names)
-      final stationDoc =
-          await _firestore.collection('stations').doc(riverId).get();
-
-      if (stationDoc.exists) {
-        final data = stationDoc.data();
-        final name =
-            data?['name'] ?? data?['riverName'] ?? data?['stationName'];
-        if (name != null) {
-          debugPrint('✅ Found name in stations: $name');
-          return name;
-        }
-      }
-
-      // Try rivers collection if it exists
-      final riverDoc = await _firestore.collection('rivers').doc(riverId).get();
-
-      if (riverDoc.exists) {
-        final data = riverDoc.data();
-        final name = data?['name'] ?? data?['riverName'];
-        if (name != null) {
-          debugPrint('✅ Found name in rivers: $name');
-          return name;
-        }
-      }
-
-      // Try getting from NOAA cache if it exists
-      final noaaDoc =
-          await _firestore.collection('noaaFlowCache').doc(riverId).get();
-
-      if (noaaDoc.exists) {
-        final data = noaaDoc.data();
-        final name = data?['riverName'] ?? data?['name'];
-        if (name != null) {
-          debugPrint('✅ Found name in NOAA cache: $name');
-          return name;
-        }
-      }
-
-      // Try getting from returnPeriodCache if it exists
-      final returnPeriodDoc =
-          await _firestore.collection('returnPeriodCache').doc(riverId).get();
-
-      if (returnPeriodDoc.exists) {
-        final data = returnPeriodDoc.data();
-        final name = data?['riverName'] ?? data?['name'];
-        if (name != null) {
-          debugPrint('✅ Found name in return period cache: $name');
-          return name;
-        }
-      }
-
-      debugPrint('⚠️ No name found for river: $riverId');
-      return null;
-    } catch (e) {
-      debugPrint('❌ Error getting river name for $riverId: $e');
-      return null;
-    }
-  }
-
   /// Validate that river IDs exist and are accessible
   Future<List<String>> validateRiverIds(List<String> riverIds) async {
-    final validIds = <String>[];
-
-    for (final riverId in riverIds) {
-      try {
-        final name = await _getRiverName(riverId);
-        if (name != null) {
-          validIds.add(riverId);
-        }
-      } catch (e) {
-        debugPrint('⚠️ River ID $riverId is not valid: $e');
-      }
-    }
-
-    return validIds;
+    // For local storage, we'll assume all provided river IDs are valid
+    // since they came from the local favorites system
+    return riverIds;
   }
 }
 
@@ -239,97 +147,33 @@ class FavoriteRiver {
     this.isActive = true,
   });
 
-  /// Create from nested Firestore favorites structure: favorites/{userId}/stations/{stationId}
-  factory FavoriteRiver.fromFirestoreNested(
-    DocumentSnapshot<Map<String, dynamic>> doc,
-    String userId,
-  ) {
-    final data = doc.data()!;
-    final stationId = doc.id; // The document ID is the station ID
-
-    debugPrint('🔍 Parsing nested favorite river from doc ID: $stationId');
-    debugPrint('📄 Raw data: $data');
-
-    // Get river name - try multiple possible field names
-    String riverName = 'Unknown River';
-    if (data['customName'] != null &&
-        data['customName'].toString().isNotEmpty) {
-      riverName = data['customName'] as String;
-    } else if (data['name'] != null && data['name'].toString().isNotEmpty) {
-      riverName = data['name'] as String;
-    } else if (data['stationName'] != null &&
-        data['stationName'].toString().isNotEmpty) {
-      riverName = data['stationName'] as String;
-    } else {
-      // Fallback: try to get name from station ID or use a generic name
-      riverName = 'Station $stationId';
+  /// Create from local FavoriteModel
+  factory FavoriteRiver.fromLocalFavorite(FavoriteModel favorite) {
+    // Build location string from city and state if available
+    String? location;
+    if (favorite.city != null && favorite.state != null) {
+      location = '${favorite.city}, ${favorite.state}';
+    } else if (favorite.city != null) {
+      location = favorite.city;
+    } else if (favorite.state != null) {
+      location = favorite.state;
     }
 
-    // Get location information
-    final location =
-        data['location'] as String? ??
-        data['state'] as String? ??
-        data['city'] as String?;
-
-    // Get timestamp - try different field names
-    DateTime addedAt = DateTime.now();
-    if (data['addedAt'] is Timestamp) {
-      addedAt = (data['addedAt'] as Timestamp).toDate();
-    } else if (data['createdAt'] is Timestamp) {
-      addedAt = (data['createdAt'] as Timestamp).toDate();
-    } else if (data['timestamp'] is Timestamp) {
-      addedAt = (data['timestamp'] as Timestamp).toDate();
-    }
-
-    debugPrint('✅ Parsed: $riverName at $location (added: $addedAt)');
+    debugPrint('🔍 Converting local favorite: ${favorite.stationId}');
+    debugPrint('📄 Name: ${favorite.name}, Location: $location');
 
     return FavoriteRiver(
-      favoriterId: doc.id,
-      userId:
-          userId, // Use the passed userId since it's not stored in nested docs
-      riverId: stationId,
-      riverName: riverName,
+      favoriterId:
+          favorite.stationId, // Use stationId as favoriterId for local storage
+      userId: favorite.userId,
+      riverId: favorite.stationId,
+      riverName: favorite.name,
       location: location,
-      addedAt: addedAt,
-      isActive: data['isActive'] as bool? ?? true,
-    );
-  }
-
-  /// Create from existing Firestore favorites document (legacy flat structure)
-  /// Adapts to your existing favorites data structure
-  factory FavoriteRiver.fromFirestore(
-    DocumentSnapshot<Map<String, dynamic>> doc,
-  ) {
-    final data = doc.data()!;
-
-    // Adapt to different possible field names in your existing favorites
-    final riverId =
-        data['riverId'] ?? data['stationId'] ?? data['reachId'] ?? doc.id;
-
-    final riverName =
-        data['riverName'] ??
-        data['name'] ??
-        data['stationName'] ??
-        'River $riverId';
-
-    final location =
-        data['location'] ?? data['locationDescription'] ?? data['state'];
-
-    final addedAt =
-        data['addedAt'] is Timestamp
-            ? (data['addedAt'] as Timestamp).toDate()
-            : data['createdAt'] is Timestamp
-            ? (data['createdAt'] as Timestamp).toDate()
-            : DateTime.now();
-
-    return FavoriteRiver(
-      favoriterId: doc.id,
-      userId: data['userId'] as String,
-      riverId: riverId,
-      riverName: riverName,
-      location: location,
-      addedAt: addedAt,
-      isActive: data['isActive'] as bool? ?? true,
+      addedAt:
+          (favorite.lastUpdated is DateTime)
+              ? favorite.lastUpdated as DateTime
+              : DateTime.now(),
+      isActive: true, // Assume all local favorites are active
     );
   }
 

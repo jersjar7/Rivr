@@ -166,6 +166,7 @@ class _NotificationSetupPageState extends State<NotificationSetupPage> {
           ],
           const SizedBox(height: 24),
           _buildSaveButton(),
+          const SizedBox(height: 30),
         ],
       ),
     );

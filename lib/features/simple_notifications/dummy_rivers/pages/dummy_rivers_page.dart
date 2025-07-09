@@ -1,7 +1,11 @@
+// lib/features/simple_notifications/dummy_rivers/pages/dummy_rivers_page.dart
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/dummy_rivers_provider.dart';
+import '../providers/dummy_river_forecast_provider.dart';
 import '../widgets/dummy_river_card.dart';
+import '../pages/dummy_river_forecast_page.dart';
 import 'create_dummy_river_page.dart';
 
 class DummyRiversPage extends StatefulWidget {
@@ -203,7 +207,7 @@ class _DummyRiversPageState extends State<DummyRiversPage> {
               final river = provider.rivers[index];
               return DummyRiverCard(
                 river: river,
-                onTap: () => _selectRiver(river),
+                onTap: () => _navigateToForecastPage(river),
                 onEdit: () => _editRiver(river),
                 onDelete: () => _deleteRiver(river),
                 onDuplicate: () => _duplicateRiver(river),
@@ -322,14 +326,26 @@ class _DummyRiversPageState extends State<DummyRiversPage> {
     );
   }
 
-  void _selectRiver(river) {
+  void _navigateToForecastPage(river) {
+    // Select the river in the provider
     final provider = context.read<DummyRiversProvider>();
     provider.selectRiver(river);
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Selected: ${river.name}'),
-        duration: const Duration(seconds: 2),
+    // Navigate to forecast management page with required providers
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder:
+            (context) => MultiProvider(
+              providers: [
+                ChangeNotifierProvider<DummyRiverForecastProvider>(
+                  create: (_) => DummyRiverForecastProvider(),
+                ),
+                ChangeNotifierProvider<DummyRiverForecastFormProvider>(
+                  create: (_) => DummyRiverForecastFormProvider(),
+                ),
+              ],
+              child: DummyRiverForecastPage(dummyRiver: river),
+            ),
       ),
     );
   }

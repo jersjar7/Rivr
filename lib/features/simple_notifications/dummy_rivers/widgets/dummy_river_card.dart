@@ -1,5 +1,10 @@
+// lib/features/simple_notifications/dummy_rivers/widgets/dummy_river_card.dart
+
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../models/dummy_river.dart';
+import '../pages/dummy_river_forecast_page.dart';
+import '../providers/dummy_river_forecast_provider.dart';
 
 class DummyRiverCard extends StatelessWidget {
   final DummyRiver river;
@@ -22,7 +27,7 @@ class DummyRiverCard extends StatelessWidget {
     return Card(
       elevation: 2,
       child: InkWell(
-        onTap: onTap,
+        onTap: () => _navigateToForecastManagement(context),
         borderRadius: BorderRadius.circular(12),
         child: Padding(
           padding: const EdgeInsets.all(16),
@@ -250,6 +255,31 @@ class DummyRiverCard extends StatelessWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  void _navigateToForecastManagement(BuildContext context) {
+    // Use custom callback if provided, otherwise navigate to forecast page
+    if (onTap != null) {
+      onTap!();
+      return;
+    }
+
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder:
+            (context) => MultiProvider(
+              providers: [
+                ChangeNotifierProvider<DummyRiverForecastProvider>(
+                  create: (_) => DummyRiverForecastProvider(),
+                ),
+                ChangeNotifierProvider<DummyRiverForecastFormProvider>(
+                  create: (_) => DummyRiverForecastFormProvider(),
+                ),
+              ],
+              child: DummyRiverForecastPage(dummyRiver: river),
+            ),
       ),
     );
   }

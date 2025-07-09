@@ -1,14 +1,12 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:rivr/core/services/flow_units_service.dart';
-import 'package:rivr/features/favorites/presentation/widgets/quick_notigication_test.dart';
 import 'package:rivr/features/forecast/presentation/widgets/unit_selector_widget.dart';
 import 'package:rivr/features/settings/presentation/pages/theme_settings_page.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../../features/auth/presentation/providers/auth_provider.dart';
-// Import the simple notification widget
-import '../../../../features/simple_notifications/widgets/notification_toggle_widget.dart';
+import '../../../../core/navigation/app_router.dart';
+// Remove notification widget import - using ExpansionTile instead
 
 class FavoritesDrawer extends StatefulWidget {
   final Function() onLogout;
@@ -20,12 +18,13 @@ class FavoritesDrawer extends StatefulWidget {
 }
 
 class _FavoritesDrawerState extends State<FavoritesDrawer> {
-  // Track which sections are expanded
+  // Track which sections are expanded - add notifications back
   final Map<String, bool> _expandedSections = {
     'measurement': false,
-    'data': false,
+    'notifications': false, // Added back for ExpansionTile
     'help': false,
     'feedback': false,
+    // Removed 'data' - Data Management section deleted
   };
 
   void _toggleSection(String section) {
@@ -154,50 +153,58 @@ class _FavoritesDrawerState extends State<FavoritesDrawer> {
                   ],
                 ),
 
-                // ── Simple Flow Notifications ──────────────────────────────────
-                // Replace complex notification system with simple toggle widget
-                NotificationToggleWidget(
-                  onNavigateToSetup: () {
-                    // Close drawer when navigating to setup
-                    Navigator.of(context).pop();
-                  },
-                ),
-
-                // ── Data Management Section ────────────────────────────────
+                // ── Flow Notifications Section (ExpansionTile) ──────────────────
                 ExpansionTile(
-                  initiallyExpanded: _expandedSections['data'] ?? false,
-                  onExpansionChanged: (expanded) => _toggleSection('data'),
-                  leading: Icon(Icons.storage, color: colors.primary),
-
-                  // Title + "Coming Soon"
-                  title: Column(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Data Management',
-                        style: textTheme.titleSmall?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      Text(
-                        'Coming Soon',
-                        style: textTheme.labelSmall?.copyWith(
-                          color: colors.onSurface.withValues(alpha: 0.6),
-                        ),
-                      ),
-                    ],
+                  initiallyExpanded:
+                      _expandedSections['notifications'] ?? false,
+                  onExpansionChanged:
+                      (expanded) => _toggleSection('notifications'),
+                  leading: Icon(
+                    Icons.notifications_active,
+                    color: colors.primary,
                   ),
-
-                  // Inert "Clear Cache" tile
+                  title: Text(
+                    'Flow Notifications',
+                    style: textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
                   children: [
                     ListTile(
                       contentPadding: const EdgeInsets.only(
                         left: 72,
                         right: 16,
                       ),
-                      title: Text('Clear Cache'),
-                      // no trailing arrow, no onTap
+                      leading: Icon(
+                        Icons.settings,
+                        color: colors.primary,
+                        size: 20,
+                      ),
+                      title: Text('Setup Notifications'),
+
+                      trailing: Icon(Icons.arrow_forward_ios, size: 16),
+                      onTap: () {
+                        // Close drawer
+                        Navigator.of(context).pop();
+                        // Navigate to notification setup
+                        AppRouter.navigateToNotificationSetup(context);
+                      },
+                    ),
+                    ListTile(
+                      contentPadding: const EdgeInsets.only(
+                        left: 72,
+                        right: 16,
+                      ),
+                      leading: Icon(
+                        Icons.info_outline,
+                        color: colors.onSurface.withValues(alpha: 0.6),
+                        size: 20,
+                      ),
+                      title: Text('How It Works'),
+                      trailing: Icon(Icons.arrow_forward_ios, size: 16),
+                      onTap: () {
+                        _showNotificationInfoDialog(context);
+                      },
                     ),
                   ],
                 ),
@@ -287,45 +294,6 @@ class _FavoritesDrawerState extends State<FavoritesDrawer> {
                 ),
                 Divider(indent: 10, endIndent: 10),
 
-                // Development Tools (Debug Mode Only)
-                if (kDebugMode) ...[
-                  const Divider(),
-                  Padding(
-                    padding: const EdgeInsets.all(8.0),
-                    child: Column(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: Colors.grey.shade100,
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: Colors.grey.shade300),
-                          ),
-                          child: Row(
-                            children: [
-                              Icon(
-                                Icons.code,
-                                color: Colors.grey.shade600,
-                                size: 16,
-                              ),
-                              const SizedBox(width: 8),
-                              Text(
-                                'Development Tools',
-                                style: textTheme.labelSmall?.copyWith(
-                                  color: Colors.grey.shade600,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        const QuickNotificationTest(),
-                      ],
-                    ),
-                  ),
-                ],
-
                 // ── SPONSORS LOGO GRID ───────────────────────────────────────
                 Padding(
                   padding: const EdgeInsets.symmetric(
@@ -386,6 +354,64 @@ class _FavoritesDrawerState extends State<FavoritesDrawer> {
           ),
         ],
       ),
+    );
+  }
+
+  /// Show information dialog about how notifications work
+  void _showNotificationInfoDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+            title: Row(
+              children: [
+                Icon(
+                  Icons.notifications_active,
+                  color: Theme.of(context).primaryColor,
+                ),
+                const SizedBox(width: 8),
+                const Text('Flow Notifications'),
+              ],
+            ),
+            content: const Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'How it works:',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+                SizedBox(height: 8),
+                Text('• Add rivers to your favorites'),
+                Text('• Enable notifications for selected rivers'),
+                Text('• Get alerts when forecasted flows match return periods'),
+                Text('• Only short & medium range forecasts monitored'),
+                SizedBox(height: 12),
+                Text(
+                  'Return periods indicate statistical flood frequency:',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+                SizedBox(height: 4),
+                Text('• 2-year: Moderate flow'),
+                Text('• 10-year: Major flow'),
+                Text('• 50+ year: Extreme flow'),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('Got it'),
+              ),
+              FilledButton(
+                onPressed: () {
+                  Navigator.of(context).pop();
+                  Navigator.of(context).pop(); // Close drawer
+                  AppRouter.navigateToNotificationSetup(context);
+                },
+                child: const Text('Setup Now'),
+              ),
+            ],
+          ),
     );
   }
 }

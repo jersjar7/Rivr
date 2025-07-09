@@ -3,10 +3,14 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:provider/provider.dart';
+import 'package:rivr/features/simple_notifications/dummy_rivers/pages/dummy_rivers_page.dart';
 
 import '../models/notification_preferences.dart';
 import '../services/simple_notification_service.dart';
 import '../services/favorites_integration_service.dart';
+import '../dummy_rivers/providers/dummy_rivers_provider.dart';
+import '../dummy_rivers/models/dummy_river.dart';
 
 /// Simple notification setup page accessed from favorites drawer
 /// Allows users to enable notifications and select which rivers to monitor
@@ -30,6 +34,7 @@ class _NotificationSetupPageState extends State<NotificationSetupPage> {
   String? _userId;
   NotificationPreferences? _preferences;
   List<FavoriteRiver> _favoriteRivers = [];
+  List<DummyRiver> _dummyRivers = [];
   Set<String> _selectedRiverIds = {};
 
   // Settings
@@ -66,6 +71,9 @@ class _NotificationSetupPageState extends State<NotificationSetupPage> {
 
       // Load user's favorite rivers
       await _loadFavoriteRivers();
+
+      // Load dummy rivers
+      await _loadDummyRivers();
 
       setState(() {
         _isLoading = false;
@@ -145,6 +153,20 @@ class _NotificationSetupPageState extends State<NotificationSetupPage> {
       });
     } catch (e) {
       debugPrint('❌ Error loading favorite rivers: $e');
+    }
+  }
+
+  Future<void> _loadDummyRivers() async {
+    try {
+      final dummyRiversProvider = context.read<DummyRiversProvider>();
+      await dummyRiversProvider.loadDummyRivers();
+
+      setState(() {
+        _dummyRivers = dummyRiversProvider.rivers;
+      });
+    } catch (e) {
+      // Dummy rivers provider might not be available - that's okay
+      debugPrint('ℹ️ Dummy rivers not available: $e');
     }
   }
 
@@ -270,7 +292,9 @@ class _NotificationSetupPageState extends State<NotificationSetupPage> {
   }
 
   Widget _buildRiverSelectionSection() {
-    if (_favoriteRivers.isEmpty) {
+    final totalRivers = _favoriteRivers.length + _dummyRivers.length;
+
+    if (totalRivers == 0) {
       return Card(
         child: Padding(
           padding: const EdgeInsets.all(16),
@@ -279,12 +303,12 @@ class _NotificationSetupPageState extends State<NotificationSetupPage> {
               Icon(Icons.info_outline, color: Colors.blue.shade600, size: 48),
               const SizedBox(height: 8),
               const Text(
-                'No Favorite Rivers',
+                'No Rivers Available',
                 style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 4),
               const Text(
-                'Add rivers to your favorites first to receive notifications.',
+                'Add rivers to your favorites or create dummy rivers for testing.',
                 textAlign: TextAlign.center,
                 style: TextStyle(color: Colors.grey),
               ),
@@ -311,36 +335,149 @@ class _NotificationSetupPageState extends State<NotificationSetupPage> {
             ),
             const SizedBox(height: 8),
             const Text(
-              'Choose which favorite rivers to monitor for flow alerts:',
+              'Choose which rivers to monitor for flow alerts:',
               style: TextStyle(color: Colors.grey),
             ),
             const SizedBox(height: 12),
-            ...List.generate(_favoriteRivers.length, (index) {
-              final river = _favoriteRivers[index];
-              final isSelected = _selectedRiverIds.contains(river.riverId);
 
-              return CheckboxListTile(
-                title: Text(river.riverName),
-                subtitle:
-                    river.location != null
-                        ? Text(
-                          river.location!,
-                          style: const TextStyle(fontSize: 12),
-                        )
-                        : null,
-                value: isSelected,
-                onChanged: (value) {
-                  setState(() {
-                    if (value == true) {
-                      _selectedRiverIds.add(river.riverId);
-                    } else {
-                      _selectedRiverIds.remove(river.riverId);
-                    }
-                  });
-                },
-                dense: true,
-              );
-            }),
+            // Favorite Rivers Section
+            if (_favoriteRivers.isNotEmpty) ...[
+              Row(
+                children: [
+                  Icon(Icons.favorite, color: Colors.red, size: 16),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Favorite Rivers',
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              ...List.generate(_favoriteRivers.length, (index) {
+                final river = _favoriteRivers[index];
+                final isSelected = _selectedRiverIds.contains(river.riverId);
+
+                return CheckboxListTile(
+                  title: Text(river.riverName),
+                  subtitle:
+                      river.location != null
+                          ? Text(
+                            river.location!,
+                            style: const TextStyle(fontSize: 12),
+                          )
+                          : null,
+                  value: isSelected,
+                  onChanged: (value) {
+                    setState(() {
+                      if (value == true) {
+                        _selectedRiverIds.add(river.riverId);
+                      } else {
+                        _selectedRiverIds.remove(river.riverId);
+                      }
+                    });
+                  },
+                  dense: true,
+                );
+              }),
+            ],
+
+            // Dummy Rivers Section
+            if (_dummyRivers.isNotEmpty) ...[
+              if (_favoriteRivers.isNotEmpty) const SizedBox(height: 16),
+              Row(
+                children: [
+                  Icon(Icons.science, color: Colors.orange, size: 16),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Test Rivers',
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: 2,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.orange.shade100,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      'TESTING',
+                      style: TextStyle(
+                        fontSize: 9,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.orange.shade800,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              ...List.generate(_dummyRivers.length, (index) {
+                final river = _dummyRivers[index];
+                final isSelected = _selectedRiverIds.contains(river.id);
+
+                return CheckboxListTile(
+                  title: Row(
+                    children: [
+                      Expanded(child: Text(river.name)),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Theme.of(context).colorScheme.primaryContainer,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Text(
+                          river.unit.toUpperCase(),
+                          style: TextStyle(
+                            fontSize: 9,
+                            fontWeight: FontWeight.bold,
+                            color:
+                                Theme.of(
+                                  context,
+                                ).colorScheme.onPrimaryContainer,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  subtitle: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (river.description.isNotEmpty)
+                        Text(
+                          river.description,
+                          style: const TextStyle(fontSize: 11),
+                        ),
+                      Text(
+                        '${river.returnPeriods.length} return period${river.returnPeriods.length == 1 ? '' : 's'}',
+                        style: TextStyle(fontSize: 10, color: Colors.grey[600]),
+                      ),
+                    ],
+                  ),
+                  value: isSelected,
+                  onChanged: (value) {
+                    setState(() {
+                      if (value == true) {
+                        _selectedRiverIds.add(river.id);
+                      } else {
+                        _selectedRiverIds.remove(river.id);
+                      }
+                    });
+                  },
+                  dense: true,
+                );
+              }),
+            ],
+
             const SizedBox(height: 8),
             Row(
               children: [
@@ -353,6 +490,13 @@ class _NotificationSetupPageState extends State<NotificationSetupPage> {
                   onPressed: _deselectAllRivers,
                   child: const Text('Select None'),
                 ),
+                const Spacer(),
+                if (_dummyRivers.isNotEmpty)
+                  TextButton.icon(
+                    onPressed: () => _navigateToDummyRivers(),
+                    icon: const Icon(Icons.science, size: 16),
+                    label: const Text('Manage'),
+                  ),
               ],
             ),
           ],
@@ -530,7 +674,10 @@ class _NotificationSetupPageState extends State<NotificationSetupPage> {
 
   void _selectAllRivers() {
     setState(() {
-      _selectedRiverIds = Set.from(_favoriteRivers.map((r) => r.riverId));
+      _selectedRiverIds = <String>{
+        ..._favoriteRivers.map((r) => r.riverId),
+        ..._dummyRivers.map((r) => r.id),
+      };
     });
   }
 
@@ -538,6 +685,12 @@ class _NotificationSetupPageState extends State<NotificationSetupPage> {
     setState(() {
       _selectedRiverIds.clear();
     });
+  }
+
+  void _navigateToDummyRivers() {
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (context) => const DummyRiversPage()));
   }
 
   Future<void> _selectQuietHour(bool isStart) async {
@@ -568,12 +721,24 @@ class _NotificationSetupPageState extends State<NotificationSetupPage> {
 
     try {
       final firstRiverId = _selectedRiverIds.first;
-      final river = _favoriteRivers.firstWhere(
-        (r) => r.riverId == firstRiverId,
-      );
+
+      // Check if it's a favorite river or dummy river
+      String riverName;
+      final favoriteRiver =
+          _favoriteRivers.where((r) => r.riverId == firstRiverId).firstOrNull;
+      final dummyRiver =
+          _dummyRivers.where((r) => r.id == firstRiverId).firstOrNull;
+
+      if (favoriteRiver != null) {
+        riverName = favoriteRiver.riverName;
+      } else if (dummyRiver != null) {
+        riverName = '${dummyRiver.name} (Test)';
+      } else {
+        riverName = 'Selected River';
+      }
 
       final success = await _notificationService.sendTestNotification(
-        riverName: river.riverName,
+        riverName: riverName,
         testType: 'flow alert',
       );
 
@@ -674,7 +839,8 @@ class _NotificationSetupPageState extends State<NotificationSetupPage> {
               '• Only short and medium range forecasts are monitored\n'
               '• Return periods indicate statistical flood frequency\n'
               '• Higher return periods mean more significant flows\n'
-              '• Notifications work even when the app is closed',
+              '• Notifications work even when the app is closed\n\n'
+              'Test rivers are for development purposes only and should not be used in production.',
             ),
             actions: [
               TextButton(

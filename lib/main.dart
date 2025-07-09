@@ -7,6 +7,7 @@ import 'package:rivr/core/formatters/flow_value_formatter.dart';
 import 'package:rivr/core/providers/theme_provider.dart';
 import 'package:rivr/core/services/flow_units_service.dart';
 import 'package:rivr/core/services/notification_service.dart';
+import 'package:rivr/features/simple_notifications/dummy_rivers/providers/dummy_rivers_provider.dart';
 import 'firebase_options.dart';
 import 'app.dart';
 import 'core/di/service_locator.dart';
@@ -144,6 +145,14 @@ Future<void> main() async {
         // ThemeProvider
         ChangeNotifierProvider<ThemeProvider>(
           create: (_) => sl<ThemeProvider>(),
+        ),
+
+        // Add these new providers for dummy rivers
+        ChangeNotifierProvider<DummyRiversProvider>(
+          create: (_) => DummyRiversProvider(),
+        ),
+        ChangeNotifierProvider<DummyRiverFormProvider>(
+          create: (_) => DummyRiverFormProvider(),
         ),
       ],
       child: const RivrApp(),

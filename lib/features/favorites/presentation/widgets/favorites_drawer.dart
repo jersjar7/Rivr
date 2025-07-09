@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:rivr/core/services/flow_units_service.dart';
 import 'package:rivr/features/forecast/presentation/widgets/unit_selector_widget.dart';
 import 'package:rivr/features/settings/presentation/pages/theme_settings_page.dart';
+import 'package:rivr/features/simple_notifications/dummy_rivers/pages/dummy_rivers_page.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../../features/auth/presentation/providers/auth_provider.dart';
 import '../../../../core/navigation/app_router.dart';
@@ -204,6 +205,33 @@ class _FavoritesDrawerState extends State<FavoritesDrawer> {
                       trailing: Icon(Icons.arrow_forward_ios, size: 16),
                       onTap: () {
                         _showNotificationInfoDialog(context);
+                      },
+                    ),
+                    ListTile(
+                      contentPadding: const EdgeInsets.only(
+                        left: 72,
+                        right: 16,
+                      ),
+                      leading: Icon(
+                        Icons.science,
+                        color: Colors.orange,
+                        size: 20,
+                      ),
+                      title: Text('Dummy Rivers'),
+                      subtitle: Text(
+                        'Test notification system',
+                        style: TextStyle(fontSize: 11, color: Colors.grey[600]),
+                      ),
+                      trailing: Icon(Icons.arrow_forward_ios, size: 16),
+                      onTap: () {
+                        // Close drawer
+                        Navigator.of(context).pop();
+                        // Navigate to dummy rivers page
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (context) => const DummyRiversPage(),
+                          ),
+                        );
                       },
                     ),
                   ],

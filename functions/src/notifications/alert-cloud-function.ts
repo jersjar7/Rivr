@@ -9,9 +9,9 @@ import {
   StreamflowForecast,
 } from "../noaa/noaa-service";
 
-// Don't initialize here - it's already initialized in index.ts
-const db = admin.firestore();
-const messaging = admin.messaging();
+// Firebase Admin is initialized in index.ts
+// Note: db and messaging are accessed inside functions
+// to avoid module-level initialization
 
 // Environment configuration
 const SCALE_FACTOR = parseFloat(
@@ -80,7 +80,7 @@ async function getEnabledUsers(): Promise<Array<{
   try {
     const users: Array<{userId: string; fcmToken: string}> = [];
 
-    const usersSnapshot = await db
+    const usersSnapshot = await admin.firestore()
       .collection("users")
       .where("notificationsEnabled", "==", true)
       .get();
@@ -114,7 +114,7 @@ async function checkUserFavorites(
 ): Promise<number> {
   try {
     // Get user's favorites
-    const favoritesSnapshot = await db
+    const favoritesSnapshot = await admin.firestore()
       .collection("favorites")
       .where("userId", "==", user.userId)
       .get();
@@ -268,7 +268,7 @@ async function getReturnPeriods(
 ): Promise<Record<number, number> | null> {
   try {
     // Check cache first
-    const cacheDoc = await db
+    const cacheDoc = await admin.firestore()
       .collection("returnPeriodCache")
       .doc(reachId)
       .get();
@@ -301,7 +301,7 @@ async function getReturnPeriods(
 
     if (returnPeriodData) {
       // Cache the data
-      await db.collection("returnPeriodCache").doc(reachId).set({
+      await admin.firestore().collection("returnPeriodCache").doc(reachId).set({
         ...returnPeriodData.flowValues,
         cachedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
@@ -367,14 +367,14 @@ async function sendNotification(
       },
     };
 
-    await messaging.send(message);
+    await admin.messaging().send(message);
 
     console.log(
       `📱 Notification sent to user ${user.userId} for reach: ${reachName}`
     );
 
     // Log notification to database
-    await db.collection("notificationLog").add({
+    await admin.firestore().collection("notificationLog").add({
       userId: user.userId,
       reachId: reachId,
       reachName: reachName,
@@ -388,7 +388,7 @@ async function sendNotification(
     console.error("Error sending notification:", error);
 
     // Log failed notification
-    await db.collection("notificationLog").add({
+    await admin.firestore().collection("notificationLog").add({
       userId: user.userId,
       reachId: reachId,
       type: "flow_alert",
@@ -407,7 +407,11 @@ async function sendNotification(
  */
 async function getReachName(reachId: string): Promise<string> {
   try {
-    const reachDoc = await db.collection("reaches").doc(reachId).get();
+    const reachDoc = await admin
+      .firestore()
+      .collection("reaches")
+      .doc(reachId)
+      .get();
     if (reachDoc.exists) {
       return reachDoc.data()?.name || `Reach ${reachId}`;
     }

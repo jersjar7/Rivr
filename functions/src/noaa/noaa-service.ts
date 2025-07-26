@@ -309,8 +309,8 @@ export class NOAAService {
 
   /**
    * Extract latest flow value (current conditions)
-   * @param {NOAAStreamflowResponse["shortRange"]} shortRange - Short range data
-   * @returns {{flow: number; validTime: string}} Latest flow and time
+   * @param {Object} shortRange - Short range data from NOAA response
+   * @return {Object} Latest flow and time data
    */
   private extractLatestFlow(
     shortRange?: NOAAStreamflowResponse["shortRange"]
@@ -501,9 +501,9 @@ export class NOAAService {
 
   /**
    * Split array into chunks
-   * @param {T[]} array - Array to chunk
+   * @param {Array} array - Array to chunk
    * @param {number} chunkSize - Size of each chunk
-   * @returns {T[][]} Array of chunks
+   * @return {Array} Array of chunks
    */
   private chunkArray<T>(array: T[], chunkSize: number): T[][] {
     const chunks: T[][] = [];

@@ -9,12 +9,7 @@ import {
   StreamflowForecast,
 } from "../noaa/noaa-service";
 
-
-// Initialize Firebase Admin if not already initialized
-if (!admin.apps.length) {
-  admin.initializeApp();
-}
-
+// Don't initialize here - it's already initialized in index.ts
 const db = admin.firestore();
 const messaging = admin.messaging();
 

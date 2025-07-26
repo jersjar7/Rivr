@@ -3,7 +3,7 @@
 
 import * as admin from "firebase-admin";
 import * as logger from "firebase-functions/logger";
-import axios, {AxiosResponse} from "axios";
+import axios, {AxiosResponse, isAxiosError} from "axios";
 
 // Types based on existing Rivr data models
 export interface StreamflowData {
@@ -74,6 +74,28 @@ interface ReturnPeriodResponse {
   return_period_100: number;
 }
 
+interface CachedStreamflowData {
+  reachId: string;
+  currentFlow: number;
+  unit: "CFS" | "CMS";
+  validTime: string;
+  retrievedAt: admin.firestore.Timestamp;
+  source: "NOAA_NWM";
+  forecast?: StreamflowForecast[];
+  returnPeriod?: {
+    reachId: string;
+    flowValues: {[year: number]: number};
+    unit: "CFS" | "CMS";
+    retrievedAt: admin.firestore.Timestamp;
+  };
+  flowCategory?: FlowCategory;
+  previousFlow?: number;
+  changePercent?: number;
+}
+
+/**
+ * NOAA Service for fetching streamflow and forecast data
+ */
 export class NOAAService {
   // Configuration based on existing Rivr environment
   private readonly config = {
@@ -87,7 +109,12 @@ export class NOAAService {
 
   private readonly db = admin.firestore();
 
-  // Main method for fetching flow data (single reach)
+  /**
+   * Main method for fetching flow data (single reach)
+   * @param {string} reachId - The reach identifier
+   * @param {boolean} includeForecast - Whether to include forecast data
+   * @return {Promise<StreamflowData | null>} Streamflow data or null
+   */
   async fetchStreamflowData(
     reachId: string,
     includeForecast = true
@@ -103,7 +130,10 @@ export class NOAAService {
       }
 
       // Fetch from NOAA API
-      const streamflowData = await this.fetchFromNOAA(reachId, includeForecast);
+      const streamflowData = await this.fetchFromNOAA(
+        reachId,
+        includeForecast
+      );
       if (!streamflowData) {
         return null;
       }
@@ -142,7 +172,11 @@ export class NOAAService {
     }
   }
 
-  // Batch processing for multiple reaches (for notifications)
+  /**
+   * Batch processing for multiple reaches (for notifications)
+   * @param {string[]} reachIds - Array of reach identifiers
+   * @return {Promise<StreamflowData[]>} Array of streamflow data
+   */
   async fetchMultipleReaches(reachIds: string[]): Promise<StreamflowData[]> {
     logger.info(`Fetching data for ${reachIds.length} reaches`);
 
@@ -151,12 +185,14 @@ export class NOAAService {
 
     for (let i = 0; i < batches.length; i++) {
       const batch = batches[i];
-      logger.info(`Processing batch ${i + 1}/${batches.length}: ${batch.length} reaches`);
+      logger.info(
+        `Processing batch ${i + 1}/${batches.length}: ${batch.length} reaches`
+      );
 
       // Process batch in parallel
       const batchPromises = batch.map(async (reachId) => {
         try {
-          return await this.fetchStreamflowData(reachId, false); // Skip forecast for batch
+          return await this.fetchStreamflowData(reachId, false);
         } catch (error) {
           logger.warn(`Failed to fetch data for reach ${reachId}:`, error);
           return null;
@@ -180,35 +216,53 @@ export class NOAAService {
       }
     }
 
-    logger.info(`Successfully fetched data for ${results.length}/${reachIds.length} reaches`);
+    logger.info(
+      "Successfully fetched data for ${results.length}/${reachIds.length} " +
+      "reaches"
+    );
     return results;
   }
 
-  // Fetch from NOAA API (ported from existing ForecastRemoteDataSource)
+  /**
+   * Fetch from NOAA API (ported from existing ForecastRemoteDataSource)
+   * @param {string} reachId - The reach identifier
+   * @param {boolean} includeForecast - Whether to include forecast data
+   * @return {Promise<StreamflowData | null>} Streamflow data or null
+   */
   private async fetchFromNOAA(
     reachId: string,
     includeForecast: boolean
   ): Promise<StreamflowData | null> {
-    const url = `${this.config.forecastBaseUrl}/reaches/${reachId}/streamflow`;
+    const url = "${this.config.forecastBaseUrl}/reaches/${reachId}/" +
+      "streamflow";
 
     try {
-      const response: AxiosResponse<NOAAStreamflowResponse> = await axios.get(url, {
-        timeout: this.config.timeout,
-        params: includeForecast ? {series: "short_range"} : undefined,
-        headers: {
-          "Content-Type": "application/json",
-          "User-Agent": "Rivr-Thesis-Research/1.0",
-        },
-      });
+      const response: AxiosResponse<NOAAStreamflowResponse> = await axios.get(
+        url,
+        {
+          timeout: this.config.timeout,
+          params: includeForecast ? {series: "short_range"} : undefined,
+          headers: {
+            "Content-Type": "application/json",
+            "User-Agent": "Rivr-Thesis-Research/1.0",
+          },
+        }
+      );
 
       if (response.status === 200) {
-        return this.transformNOAAResponse(response.data, reachId, includeForecast);
+        return this.transformNOAAResponse(
+          response.data,
+          reachId,
+          includeForecast
+        );
       }
 
-      logger.warn(`NOAA API returned status ${response.status} for reach ${reachId}`);
+      logger.warn(
+        `NOAA API returned status ${response.status} for reach ${reachId}`
+      );
       return null;
     } catch (error) {
-      if (axios.isAxiosError(error)) {
+      if (isAxiosError(error)) {
         if (error.response?.status === 404) {
           logger.info(`Reach ${reachId} not found in NOAA database`);
         } else {
@@ -221,7 +275,13 @@ export class NOAAService {
     }
   }
 
-  // Transform NOAA response (based on existing ForecastModel.fromApiJson)
+  /**
+   * Transform NOAA response (based on existing ForecastModel.fromApiJson)
+   * @param {NOAAStreamflowResponse} response - NOAA API response
+   * @param {string} reachId - The reach identifier
+   * @param {boolean} includeForecast - Whether to include forecast data
+   * @return {StreamflowData} Transformed streamflow data
+   */
   private transformNOAAResponse(
     response: NOAAStreamflowResponse,
     reachId: string,
@@ -247,9 +307,14 @@ export class NOAAService {
     return streamflowData;
   }
 
-  // Extract latest flow value (current conditions)
-  private extractLatestFlow(shortRange?: NOAAStreamflowResponse["shortRange"]):
-    {flow: number; validTime: string} {
+  /**
+   * Extract latest flow value (current conditions)
+   * @param {NOAAStreamflowResponse["shortRange"]} shortRange - Short range data
+   * @returns {{flow: number; validTime: string}} Latest flow and time
+   */
+  private extractLatestFlow(
+    shortRange?: NOAAStreamflowResponse["shortRange"]
+  ): {flow: number; validTime: string} {
     // Try series data first (mean forecast)
     if (shortRange?.series?.data && shortRange.series.data.length > 0) {
       const latest = shortRange.series.data[0]; // First entry is latest
@@ -258,8 +323,11 @@ export class NOAAService {
 
     // Fall back to member data
     for (let i = 1; i <= 6; i++) {
-      const memberKey = `member${i}` as keyof NOAAStreamflowResponse["shortRange"];
-      const memberData = (shortRange?.[memberKey] as { data: Array<{ validTime: string; flow: number }> } | undefined)?.data;
+      const memberKey = `member${i}` as
+        keyof NOAAStreamflowResponse["shortRange"];
+      const memberData = (shortRange?.[memberKey] as {
+        data: Array<{validTime: string; flow: number}>
+      } | undefined)?.data;
       if (memberData && memberData.length > 0) {
         const latest = memberData[0];
         return {flow: latest.flow, validTime: latest.validTime};
@@ -269,8 +337,14 @@ export class NOAAService {
     throw new Error("No flow data found in NOAA response");
   }
 
-  // Extract forecast array (based on existing implementation)
-  private extractAllForecasts(response: NOAAStreamflowResponse): StreamflowForecast[] {
+  /**
+   * Extract forecast array (based on existing implementation)
+   * @param {NOAAStreamflowResponse} response - NOAA API response
+   * @return {StreamflowForecast[]} Array of forecast data
+   */
+  private extractAllForecasts(
+    response: NOAAStreamflowResponse
+  ): StreamflowForecast[] {
     const forecasts: StreamflowForecast[] = [];
 
     // Short range forecasts
@@ -298,8 +372,11 @@ export class NOAAService {
     // Long range forecasts (ensemble members)
     if (response.longRange) {
       for (let i = 1; i <= 4; i++) {
-        const memberKey = `member${i}` as keyof NOAAStreamflowResponse["longRange"];
-        const memberData = (response.longRange[memberKey] as { data: Array<{ validTime: string; flow: number }> } | undefined)?.data;
+        const memberKey = `member${i}` as
+          keyof NOAAStreamflowResponse["longRange"];
+        const memberData = (response.longRange[memberKey] as {
+          data: Array<{validTime: string; flow: number}>
+        } | undefined)?.data;
         if (memberData) {
           memberData.forEach((item) => {
             forecasts.push({
@@ -316,21 +393,166 @@ export class NOAAService {
     return forecasts;
   }
 
-  // Fetch return period data (ported from existing implementation)
-  private async fetchReturnPeriod(reachId: string): Promise<ReturnPeriodData | null> {
+  /**
+   * Flow categorization (based on existing ReturnPeriod.getFlowCategory)
+   * @param {number} flow - Current flow value
+   * @param {ReturnPeriodData} returnPeriod - Return period data
+   * @return {FlowCategory} Flow category
+   */
+  private categorizeFlow(
+    flow: number,
+    returnPeriod: ReturnPeriodData
+  ): FlowCategory {
+    // Convert flow to same unit as return period (CMS)
+    const flowInCMS = flow * 0.028317; // CFS to CMS conversion
+
+    const rp = returnPeriod.flowValues;
+
+    if (flowInCMS < (rp[2] ?? Infinity)) {
+      return "Low";
+    } else if (flowInCMS < (rp[5] ?? Infinity)) {
+      return "Normal";
+    } else if (flowInCMS < (rp[10] ?? Infinity)) {
+      return "Moderate";
+    } else if (flowInCMS < (rp[25] ?? Infinity)) {
+      return "Elevated";
+    } else if (flowInCMS < (rp[50] ?? Infinity)) {
+      return "High";
+    } else if (flowInCMS < (rp[100] ?? Infinity)) {
+      return "Very High";
+    } else {
+      return "Extreme";
+    }
+  }
+
+  /**
+   * Calculate percentage change
+   * @param {number} current - Current flow value
+   * @param {number} previous - Previous flow value
+   * @return {number} Percentage change
+   */
+  private calculateChangePercent(current: number, previous: number): number {
+    if (previous === 0) return 0;
+    return Math.round(((current - previous) / previous) * 10000) / 100;
+  }
+
+  /**
+   * Get cached data for a reach
+   * @param {string} reachId - The reach identifier
+   * @return {Promise<StreamflowData | null>} Cached data or null
+   */
+  private async getCachedData(reachId: string): Promise<StreamflowData | null> {
+    try {
+      const doc = await this.db.collection("noaaFlowCache").doc(reachId).get();
+      if (doc.exists) {
+        const data = doc.data() as CachedStreamflowData;
+        return {
+          ...data,
+          retrievedAt: data.retrievedAt?.toDate(),
+          returnPeriod: data.returnPeriod ? {
+            ...data.returnPeriod,
+            retrievedAt: data.returnPeriod.retrievedAt?.toDate(),
+          } : undefined,
+        };
+      }
+    } catch (error) {
+      logger.warn(`Error reading cache for ${reachId}:`, error);
+    }
+    return null;
+  }
+
+  /**
+   * Check if cached data is still valid
+   * @param {StreamflowData} cachedData - Cached streamflow data
+   * @return {boolean} True if cache is valid
+   */
+  private isCacheValid(cachedData: StreamflowData): boolean {
+    const cacheAge = Date.now() - cachedData.retrievedAt.getTime();
+    const maxAge = 30 * 60 * 1000; // 30 minutes
+    return cacheAge < maxAge;
+  }
+
+  /**
+   * Cache streamflow data in Firestore
+   * @param {StreamflowData} data - Streamflow data to cache
+   * @return {Promise<void>} Promise that resolves when cached
+   */
+  private async cacheStreamflowData(data: StreamflowData): Promise<void> {
+    try {
+      const cacheDoc = {
+        ...data,
+        retrievedAt: admin.firestore.Timestamp.fromDate(data.retrievedAt),
+        expiresAt: admin.firestore.Timestamp.fromDate(
+          new Date(Date.now() + 30 * 60 * 1000)
+        ),
+        returnPeriod: data.returnPeriod ? {
+          ...data.returnPeriod,
+          retrievedAt: admin.firestore.Timestamp.fromDate(
+            data.returnPeriod.retrievedAt
+          ),
+        } : undefined,
+      };
+
+      await this.db.collection("noaaFlowCache").doc(data.reachId).set(cacheDoc);
+    } catch (error) {
+      logger.error(`Error caching data for ${data.reachId}:`, error);
+    }
+  }
+
+  /**
+   * Split array into chunks
+   * @param {T[]} array - Array to chunk
+   * @param {number} chunkSize - Size of each chunk
+   * @returns {T[][]} Array of chunks
+   */
+  private chunkArray<T>(array: T[], chunkSize: number): T[][] {
+    const chunks: T[][] = [];
+    for (let i = 0; i < array.length; i += chunkSize) {
+      chunks.push(array.slice(i, i + chunkSize));
+    }
+    return chunks;
+  }
+
+  /**
+   * Delay execution for specified milliseconds
+   * @param {number} ms - Milliseconds to delay
+   * @return {Promise<void>} Promise that resolves after delay
+   */
+  private delay(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+  /**
+   * Get current streamflow data for a single reach (simple method)
+   * @param {string} reachId - The reach identifier
+   * @return {Promise<StreamflowData | null>} Current streamflow data
+   */
+  async getCurrentStreamflow(reachId: string): Promise<StreamflowData | null> {
+    return await this.fetchStreamflowData(reachId, false);
+  }
+
+  /**
+   * Fetch return period data (made public for notification system)
+   * @param {string} reachId - The reach identifier
+   * @return {Promise<ReturnPeriodData | null>} Return period data or null
+   */
+  async fetchReturnPeriod(reachId: string): Promise<ReturnPeriodData | null> {
     const url = `${this.config.returnPeriodBaseUrl}/return-period`;
 
     try {
-      const response: AxiosResponse<ReturnPeriodResponse> = await axios.get(url, {
-        timeout: this.config.timeout,
-        params: {
-          comids: reachId,
-          key: this.config.apiKey,
-        },
-        headers: {
-          "Content-Type": "application/json",
-        },
-      });
+      const response: AxiosResponse<ReturnPeriodResponse> = await axios.get(
+        url,
+        {
+          timeout: this.config.timeout,
+          params: {
+            comids: reachId,
+            key: this.config.apiKey,
+          },
+          headers: {
+            "Content-Type": "application/json",
+          },
+        }
+      );
 
       if (response.status === 200) {
         return {
@@ -355,97 +577,10 @@ export class NOAAService {
     }
   }
 
-  // Flow categorization (based on existing ReturnPeriod.getFlowCategory)
-  private categorizeFlow(flow: number, returnPeriod: ReturnPeriodData): FlowCategory {
-    // Convert flow to same unit as return period (CMS)
-    const flowInCMS = flow * 0.028317; // CFS to CMS conversion
-
-    const rp = returnPeriod.flowValues;
-
-    if (flowInCMS < (rp[2] ?? Infinity)) {
-      return "Low";
-    } else if (flowInCMS < (rp[5] ?? Infinity)) {
-      return "Normal";
-    } else if (flowInCMS < (rp[10] ?? Infinity)) {
-      return "Moderate";
-    } else if (flowInCMS < (rp[25] ?? Infinity)) {
-      return "Elevated";
-    } else if (flowInCMS < (rp[50] ?? Infinity)) {
-      return "High";
-    } else if (flowInCMS < (rp[100] ?? Infinity)) {
-      return "Very High";
-    } else {
-      return "Extreme";
-    }
-  }
-
-  // Calculate percentage change
-  private calculateChangePercent(current: number, previous: number): number {
-    if (previous === 0) return 0;
-    return Math.round(((current - previous) / previous) * 10000) / 100;
-  }
-
-  // Caching methods
-  private async getCachedData(reachId: string): Promise<StreamflowData | null> {
-    try {
-      const doc = await this.db.collection("noaaFlowCache").doc(reachId).get();
-      if (doc.exists) {
-        const data = doc.data() as any;
-        return {
-          ...data,
-          retrievedAt: data.retrievedAt?.toDate(),
-          returnPeriod: data.returnPeriod ? {
-            ...data.returnPeriod,
-            retrievedAt: data.returnPeriod.retrievedAt?.toDate(),
-          } : undefined,
-        };
-      }
-    } catch (error) {
-      logger.warn(`Error reading cache for ${reachId}:`, error);
-    }
-    return null;
-  }
-
-  private isCacheValid(cachedData: StreamflowData): boolean {
-    const cacheAge = Date.now() - cachedData.retrievedAt.getTime();
-    const maxAge = 30 * 60 * 1000; // 30 minutes
-    return cacheAge < maxAge;
-  }
-
-  private async cacheStreamflowData(data: StreamflowData): Promise<void> {
-    try {
-      const cacheDoc = {
-        ...data,
-        retrievedAt: admin.firestore.Timestamp.fromDate(data.retrievedAt),
-        expiresAt: admin.firestore.Timestamp.fromDate(
-          new Date(Date.now() + 30 * 60 * 1000)
-        ),
-        returnPeriod: data.returnPeriod ? {
-          ...data.returnPeriod,
-          retrievedAt: admin.firestore.Timestamp.fromDate(data.returnPeriod.retrievedAt),
-        } : undefined,
-      };
-
-      await this.db.collection("noaaFlowCache").doc(data.reachId).set(cacheDoc);
-    } catch (error) {
-      logger.error(`Error caching data for ${data.reachId}:`, error);
-    }
-  }
-
-  // Utility methods
-  private chunkArray<T>(array: T[], chunkSize: number): T[][] {
-    const chunks: T[][] = [];
-    for (let i = 0; i < array.length; i += chunkSize) {
-      chunks.push(array.slice(i, i + chunkSize));
-    }
-    return chunks;
-  }
-
-  private delay(ms: number): Promise<void> {
-    return new Promise((resolve) => setTimeout(resolve, ms));
-  }
-
-  // Public method to get user's monitored reaches (for scheduled notifications)
+  /**
+   * Get user's monitored reaches (for scheduled notifications)
+   * @return {Promise<string[]>} Array of reach IDs
+   */
   async getUserMonitoredReaches(): Promise<string[]> {
     try {
       // Get all active user thresholds
@@ -468,3 +603,4 @@ export class NOAAService {
     }
   }
 }
+

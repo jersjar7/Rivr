@@ -1,63 +1,59 @@
-// functions/src/index.ts - Clean version for simplified notification system
+// functions/src/index.ts - Simple notification system
 
 import * as admin from "firebase-admin";
 import * as logger from "firebase-functions/logger";
-
-// v2 HTTP & Callable triggers
 import {
   onRequest,
   onCall,
   HttpsError,
   CallableRequest,
 } from "firebase-functions/v2/https";
+import {NOAAService} from "./noaa/noaa-service";
 
-import {
-  onSchedule,
-  ScheduledEvent,
-} from "firebase-functions/v2/scheduler";
+// ===== SIMPLE NOTIFICATION SYSTEM =====
+import {checkFlowNotifications} from "./notifications/alert-cloud-function";
 
-import {NOAAService, StreamflowData} from "./noaa/noaa-service";
-
-// ===== SIMPLIFIED NOTIFICATION SYSTEM =====
-// Import the simplified notification function
-import {
-  checkFlowNotifications,
-} from "./notifications/alert-cloud-function";
-
-// Export the simplified notification function
+// Export the notification function
 export {checkFlowNotifications};
 
 // Initialize Firebase Admin SDK
 admin.initializeApp();
 
-// ===== BASIC SETUP FUNCTIONS FOR TESTING =====
+// ===== BASIC TESTING FUNCTIONS =====
 
-// Health check
+/**
+ * Health check endpoint
+ */
 export const healthCheck = onRequest((req, res) => {
   res.json({
     status: "healthy",
     timestamp: new Date().toISOString(),
     project: "rivr-official",
     version: "1.0.0",
+    environment: {
+      scaleFactor: process.env.NOTIFICATION_SCALE_FACTOR || "1",
+      checkFrequency: process.env.NOTIFICATION_CHECK_FREQUENCY_MINUTES || "360",
+    },
   });
 });
 
-// Test database connection
-export const testDatabase = onRequest(async (req, res) => {
+/**
+ * Test NOAA connection
+ */
+export const testNoaaConnection = onRequest(async (req, res) => {
   try {
-    const db = admin.firestore();
-    const testDocRef = await db.collection("test").add({
-      message: "Cloud Functions connected successfully",
-      timestamp: admin.firestore.FieldValue.serverTimestamp(),
-    });
-    const docSnap = await testDocRef.get();
+    const noaaService = new NOAAService();
+    const testSiteId = "23021904";
+    // Test current data fetch
+    const currentData = await noaaService.getCurrentStreamflow(testSiteId);
     res.json({
       status: "success",
-      docId: testDocRef.id,
-      data: docSnap.data(),
+      testSite: testSiteId,
+      currentFlow: currentData,
+      timestamp: new Date().toISOString(),
     });
   } catch (error) {
-    logger.error("Database test failed:", error);
+    logger.error("NOAA test failed:", error);
     res.status(500).json({
       status: "error",
       message: error instanceof Error ? error.message : "Unknown error",
@@ -65,213 +61,72 @@ export const testDatabase = onRequest(async (req, res) => {
   }
 });
 
-// ===== DATA CACHING (Keep for forecast data) =====
-
-// Simplified flow monitoring - just cache data, notifications handled separately
-export const cacheFlowData = onSchedule({
-  schedule: "every 60 minutes", // Cache data less frequently
-  timeZone: "America/Denver",
-}, async (event: ScheduledEvent): Promise<void> => {
-  logger.info("Flow data caching triggered:", event);
-
-  try {
-    const noaaService = new NOAAService();
-
-    // Get all monitored reaches from favorites (simplified approach)
-    const monitoredReaches = await getMonitoredReachesFromFavorites();
-    logger.info(`Caching data for ${monitoredReaches.length} reaches`);
-
-    if (monitoredReaches.length === 0) {
-      logger.info("No reaches to cache - no favorites found");
-      return;
-    }
-
-    // Fetch and cache flow data
-    const flowDataResults = await noaaService.fetchMultipleReaches(
-      monitoredReaches
-    );
-    logger.info(
-      `Successfully cached data for ${flowDataResults.length} reaches`
-    );
-
-    // Log summary for thesis metrics
-    await logMonitoringSummary(flowDataResults);
-
-    logger.info("Flow data caching completed successfully");
-  } catch (error) {
-    logger.error("Flow data caching error:", error);
-    await recordMonitoringError(error);
-  }
-});
-
 /**
- * Helper function to get reaches from all user favorites
- * @return {Promise<string[]>} Array of reach IDs
+ * Manual notification trigger for testing
  */
-async function getMonitoredReachesFromFavorites(): Promise<string[]> {
-  try {
-    const db = admin.firestore();
-    const favoritesSnapshot = await db.collection("favorites").get();
-
-    const reachIds = new Set<string>();
-    favoritesSnapshot.docs.forEach((doc) => {
-      const favorite = doc.data();
-      if (favorite.reachId) {
-        reachIds.add(favorite.reachId);
-      }
-    });
-
-    return Array.from(reachIds);
-  } catch (error) {
-    logger.error("Error getting monitored reaches from favorites:", error);
-    return [];
-  }
-}
-
-// ===== EXISTING NOAA API INTEGRATION FUNCTIONS =====
-
-// Get current flow data for Flutter app (compatible with existing models)
-export const getCurrentFlowData = onCall(
-  async (request: CallableRequest<{
-    reachId: string;
-    includeForecast?: boolean;
-  }>): Promise<{
-    success: boolean;
-    data?: Record<string, unknown>; // Compatible with existing Dart models
-    error?: string;
-  }> => {
-    if (!request.auth) {
-      throw new HttpsError("unauthenticated", "Must be authenticated");
-    }
-
-    const {reachId, includeForecast = false} = request.data;
-
+export const triggerNotificationTest = onCall(
+  async (request: CallableRequest) => {
     try {
-      const noaaService = new NOAAService();
-      const flowData = await noaaService.fetchStreamflowData(
-        reachId,
-        includeForecast
-      );
+      if (!request.auth) {
+        throw new HttpsError("unauthenticated", "Must be authenticated");
+      }
+      const userId = request.auth.uid;
+      logger.info(`Manual notification test for user: ${userId}`);
+      // Check if user has notifications enabled
+      const userDoc = await admin.firestore()
+        .collection("users")
+        .doc(userId)
+        .get();
 
-      if (!flowData) {
-        return {success: false, error: "No data available"};
+      if (!userDoc.exists) {
+        throw new HttpsError("not-found", "User document not found");
+      }
+      const userData = userDoc.data();
+      if (!userData?.notificationsEnabled) {
+        return {
+          success: false,
+          message: "Notifications are disabled for this user",
+        };
+      }
+      if (!userData?.fcmToken) {
+        return {
+          success: false,
+          message: "No FCM token found for this user",
+        };
       }
 
-      // Transform to format compatible with existing Dart models
-      const compatibleData = transformToFlutterFormat(flowData);
+      // Send test notification
+      await admin.messaging().send({
+        token: userData.fcmToken,
+        notification: {
+          title: "🧪 Test Notification",
+          body: "Your Rivr notifications are working correctly!",
+        },
+        data: {
+          type: "test",
+          timestamp: new Date().toISOString(),
+        },
+      });
 
-      return {success: true, data: compatibleData};
+      return {
+        success: true,
+        message: "Test notification sent successfully",
+        userId: userId,
+        timestamp: new Date().toISOString(),
+      };
     } catch (error) {
-      logger.error(`Error fetching flow data for ${reachId}:`, error);
-      throw new HttpsError("internal", "Failed to fetch flow data");
+      logger.error("Manual trigger failed:", error);
+      throw new HttpsError(
+        "internal",
+        error instanceof Error ? error.message : "Unknown error"
+      );
     }
   }
 );
 
-// ===== UTILITY FUNCTIONS =====
-
 /**
- * Transform Cloud Functions data to Flutter-compatible format
- * @param {StreamflowData} flowData - The flow data to transform
- * @return {Record<string, unknown>} Transformed data compatible with Flutter
+ * Update FCM token
  */
-function transformToFlutterFormat(
-  flowData: StreamflowData
-): Record<string, unknown> {
-  return {
-    // Compatible with existing ForecastModel structure
-    reachId: flowData.reachId,
-    validTime: flowData.validTime,
-    flow: flowData.currentFlow,
-    unit: flowData.unit,
-    retrievedAt: flowData.retrievedAt.toISOString(),
-    source: flowData.source,
-
-    // Additional notification-specific data
-    flowCategory: flowData.flowCategory,
-    changePercent: flowData.changePercent,
-    previousFlow: flowData.previousFlow,
-
-    // Forecast data (if available)
-    forecast: flowData.forecast?.map((f) => ({
-      validTime: f.validTime,
-      flow: f.flow,
-      forecastType: f.forecastType,
-      member: f.member,
-    })),
-
-    // Return period data (if available)
-    returnPeriod: flowData.returnPeriod ? {
-      reachId: flowData.returnPeriod.reachId,
-      flowValues: flowData.returnPeriod.flowValues,
-      unit: flowData.returnPeriod.unit,
-      retrievedAt: flowData.returnPeriod.retrievedAt.toISOString(),
-    } : undefined,
-  };
-}
-
-/**
- * Log monitoring summary for thesis metrics
- * @param {StreamflowData[]} flowDataResults - Array of flow data results
- * @return {Promise<void>} Promise that resolves when logging is complete
- */
-async function logMonitoringSummary(
-  flowDataResults: StreamflowData[]
-): Promise<void> {
-  try {
-    const db = admin.firestore();
-
-    const summary = {
-      timestamp: admin.firestore.FieldValue.serverTimestamp(),
-      totalReaches: flowDataResults.length,
-      successfulFetches: flowDataResults.length,
-      flowCategories: flowDataResults.reduce((acc, data) => {
-        const category = data.flowCategory || "Unknown";
-        acc[category] = (acc[category] || 0) + 1;
-        return acc;
-      }, {} as Record<string, number>),
-      significantChanges: flowDataResults.filter((data) =>
-        Math.abs(data.changePercent || 0) > 20
-      ).length,
-      averageFlow: flowDataResults.reduce((sum, data) =>
-        sum + data.currentFlow, 0
-      ) / flowDataResults.length,
-    };
-
-    await db.collection("thesis_metrics")
-      .doc("monitoring_summaries")
-      .collection("daily")
-      .add(summary);
-
-  } catch (error) {
-    logger.error("Error logging monitoring summary:", error);
-  }
-}
-
-/**
- * Record monitoring errors for thesis analysis
- * @param {unknown} error - The error to record
- * @return {Promise<void>} Promise that resolves when error is recorded
- */
-async function recordMonitoringError(error: unknown): Promise<void> {
-  try {
-    const db = admin.firestore();
-    await db.collection("thesis_metrics")
-      .doc("monitoring_errors")
-      .collection("errors")
-      .add({
-        timestamp: admin.firestore.FieldValue.serverTimestamp(),
-        error: error instanceof Error ? error.message : String(error),
-        stack: error instanceof Error ? error.stack : undefined,
-      });
-  } catch (logError) {
-    logger.error("Error recording monitoring error:", logError);
-  }
-}
-
-// ===== USER MANAGEMENT FUNCTIONS =====
-
-// Update FCM token (v2)
 export const updateFCMToken = onCall(
   async (request: CallableRequest<{token: string}>):
     Promise<{success: boolean}> => {
@@ -283,65 +138,9 @@ export const updateFCMToken = onCall(
       fcmToken: token,
       tokenUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
     });
+    logger.info(`FCM token updated for user: ${request.auth.uid}`);
     return {success: true};
   }
+
 );
 
-// Manual function to initialize user preferences
-export const manualInitializeUserPreferences = onCall(
-  async (request: CallableRequest): Promise<{success: boolean}> => {
-    if (!request.auth) {
-      throw new HttpsError("unauthenticated", "Must be authenticated");
-    }
-
-    const db = admin.firestore();
-    const userId = request.auth.uid;
-
-    // Check if user document already exists
-    const existingUser = await db.collection("users").doc(userId).get();
-
-    if (!existingUser.exists) {
-      // Create basic user document with notification settings
-      await db.collection("users").doc(userId).set({
-        notificationsEnabled: true, // Default to enabled for simplified system
-        fcmToken: null, // Will be updated when app gets token
-        createdAt: admin.firestore.FieldValue.serverTimestamp(),
-        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-      });
-    } else {
-      // Update existing user to have notification settings if missing
-      const userData = existingUser.data();
-      if (userData && userData.notificationsEnabled === undefined) {
-        await db.collection("users").doc(userId).update({
-          notificationsEnabled: true,
-          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-        });
-      }
-    }
-
-    logger.info(`Initialized simplified user settings for ${userId}`);
-    return {success: true};
-  }
-);
-
-// ===== THESIS-SPECIFIC FUNCTIONS =====
-
-// Record metrics (v2)
-export const recordThesisMetrics = onCall(
-  async (
-    request: CallableRequest<{eventType: string; metadata: unknown}>
-  ): Promise<{success: boolean}> => {
-    if (!request.auth) {
-      throw new HttpsError("unauthenticated", "Must be authenticated");
-    }
-    const {data} = request;
-    const db = admin.firestore();
-    await db.collection("thesis_metrics").add({
-      userId: request.auth.uid,
-      eventType: data.eventType,
-      metadata: data.metadata,
-      timestamp: admin.firestore.FieldValue.serverTimestamp(),
-    });
-    return {success: true};
-  }
-);

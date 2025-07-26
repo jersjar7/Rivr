@@ -1,10 +1,9 @@
 // lib/core/navigation/app_router.dart
-// Updated to replace complex notification system with simple notification system
-// while preserving existing offline capabilities and StreamNameService integration
+// Updated to work with simplified notification system
+// Removed complex notification imports and invalid paths
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:rivr/features/notifications/presentation/pages/notification_test_page.dart';
 import '../di/service_locator.dart';
 import '../../features/auth/presentation/pages/auth_page.dart';
 import '../../features/auth/presentation/pages/forgot_password_page.dart';
@@ -16,15 +15,13 @@ import '../../features/map/presentation/providers/station_provider.dart';
 import '../../features/splash/presentation/pages/splash_page.dart';
 import '../../features/forecast/presentation/pages/forecast_page.dart';
 import '../../features/settings/presentation/pages/biometric_settings_page.dart';
+import '../../features/settings/presentation/pages/notification_settings_page.dart';
 import '../pages/offline_manager_page.dart';
 import '../pages/download_current_region_page.dart';
 import 'offline_routes.dart';
 
-// Simple notification system imports (replacing complex notification imports)
-import '../../features/simple_notifications/pages/notification_setup_page.dart';
-
 /// Router class for handling navigation throughout the app
-/// Updated to use simple notification system instead of complex one
+/// Updated to use simplified notification system
 class AppRouter {
   /// Route name constants for type safety
   static const String home = '/';
@@ -36,14 +33,11 @@ class AppRouter {
   static const String offlineManager = '/offline_manager';
   static const String downloadCurrentRegion =
       '/offline/download-current-region';
-  static const String notificationTest = '/notification-test';
 
-  // Simple notification system routes (replacing complex notification routes)
-  static const String notificationSetup = '/notifications/setup';
-  static const String safetyInfo = '/safety-info';
+  // Simplified notification routes
+  static const String notificationSettings = '/settings/notifications';
   static const String biometricSettings = '/biometric-settings';
   static const String forgotPassword = '/forgot-password';
-  static const String developerTools = '/dev-tools';
 
   static Route<dynamic> generateRoute(RouteSettings settings) {
     debugPrint('🧭 Navigating to: ${settings.name}');
@@ -144,28 +138,12 @@ class AppRouter {
           builder: (_) => const DownloadCurrentRegionPage(),
         );
 
-      case notificationTest:
+      // Simplified notification settings route
+      case notificationSettings:
         return MaterialPageRoute(
-          builder: (context) => const NotificationTestPage(),
-        );
-
-      // Simple notification system route (replacing complex notification routes)
-      case notificationSetup:
-        return MaterialPageRoute(
-          builder: (_) => const NotificationSetupPage(),
+          builder: (_) => const NotificationSettingsPage(),
           settings: settings,
         );
-
-      case safetyInfo:
-        final args = settings.arguments as Map<String, dynamic>?;
-        return MaterialPageRoute(
-          builder: (_) => SafetyInfoPage(arguments: args),
-          settings: settings,
-        );
-
-      // // Developer tools route (debug only)
-      // case developerTools:
-      //   return MaterialPageRoute(builder: (_) => const DeveloperToolsPage());
 
       default:
         debugPrint('❌ Unknown route: ${settings.name}');
@@ -189,7 +167,7 @@ class AppRouter {
                       ElevatedButton(
                         onPressed:
                             () => Navigator.pushNamedAndRemoveUntil(
-                              context, // ✅ Use 'context' here instead of '_'
+                              context,
                               home,
                               (route) => false,
                             ),
@@ -202,6 +180,7 @@ class AppRouter {
         );
     }
   }
+
   // Navigation helper methods for type safety and convenience
 
   /// Navigate to home/splash page
@@ -240,7 +219,7 @@ class AppRouter {
     );
   }
 
-  /// Navigate to forecast page (your existing main content page)
+  /// Navigate to forecast page
   /// Enhanced to support notification context
   static Future<dynamic> navigateToForecast(
     BuildContext context,
@@ -263,32 +242,9 @@ class AppRouter {
     );
   }
 
-  /// Navigate to simple notification setup page (replacing complex notification settings)
-  static Future<dynamic> navigateToNotificationSetup(BuildContext context) {
-    return Navigator.pushNamed(context, notificationSetup);
-  }
-
-  /// Navigate to safety information
-  static Future<dynamic> navigateToSafetyInfo(
-    BuildContext context, {
-    String? alertLevel,
-    String? reachId,
-    Map<String, dynamic>? alertData,
-  }) {
-    return Navigator.pushNamed(
-      context,
-      safetyInfo,
-      arguments: {
-        if (alertLevel != null) 'alertLevel': alertLevel,
-        if (reachId != null) 'reachId': reachId,
-        if (alertData != null) 'alertData': alertData,
-      },
-    );
-  }
-
-  /// Navigate to notification test page (existing)
-  static Future<dynamic> navigateToNotificationTest(BuildContext context) {
-    return Navigator.pushNamed(context, notificationTest);
+  /// Navigate to simplified notification settings
+  static Future<dynamic> navigateToNotificationSettings(BuildContext context) {
+    return Navigator.pushNamed(context, notificationSettings);
   }
 
   /// Navigate to offline manager
@@ -307,9 +263,7 @@ class AppRouter {
       authSuccess,
       offlineManager,
       downloadCurrentRegion,
-      notificationTest,
-      notificationSetup, // Simple notification system route
-      safetyInfo,
+      notificationSettings,
       biometricSettings,
       forgotPassword,
     ];
@@ -318,7 +272,7 @@ class AppRouter {
 
   /// Get route name for deep linking
   static String? getRouteNameForReach(String reachId) {
-    // Your app uses /forecast for reach details
+    // App uses /forecast for reach details
     return forecast;
   }
 
@@ -338,20 +292,14 @@ class AppRouter {
   }
 }
 
-/// Backward compatibility methods for legacy complex notification system
+/// Legacy support for notification history (shows simple dialog)
 extension AppRouterLegacy on AppRouter {
-  /// Legacy method - redirects to simple notification setup
-  static Future<dynamic> navigateToNotificationSettings(BuildContext context) {
-    return AppRouter.navigateToNotificationSetup(context);
-  }
-
   /// Legacy method - shows dialog explaining simple system doesn't have history
   static Future<dynamic> navigateToNotificationHistory(
     BuildContext context, {
     String? filterType,
     Map<String, dynamic>? additionalData,
   }) {
-    // Show a simple dialog explaining the simple system doesn't have history
     return showDialog(
       context: context,
       builder:
@@ -360,7 +308,7 @@ extension AppRouterLegacy on AppRouter {
             content: const Text(
               'Flow alerts are sent directly to your phone when your favorite rivers '
               'reach significant levels. Check your phone\'s notification history '
-              'for past alerts, or set up notifications for your favorite rivers.',
+              'for past alerts, or configure notifications in settings.',
             ),
             actions: [
               TextButton(
@@ -370,105 +318,12 @@ extension AppRouterLegacy on AppRouter {
               TextButton(
                 onPressed: () {
                   Navigator.of(context).pop();
-                  AppRouter.navigateToNotificationSetup(context);
+                  AppRouter.navigateToNotificationSettings(context);
                 },
-                child: const Text('Setup Notifications'),
+                child: const Text('Open Settings'),
               ),
             ],
           ),
-    );
-  }
-}
-
-/// Safety Information Page (placeholder implementation)
-class SafetyInfoPage extends StatelessWidget {
-  final Map<String, dynamic>? arguments;
-
-  const SafetyInfoPage({super.key, this.arguments});
-
-  @override
-  Widget build(BuildContext context) {
-    final alertLevel = arguments?['alertLevel'] ?? 'general';
-    final reachId = arguments?['reachId'];
-    final alertData = arguments?['alertData'];
-
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Safety Information'),
-        backgroundColor: Colors.red.shade100,
-      ),
-      body: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.red.shade50,
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.red.shade200),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Icon(Icons.warning, color: Colors.red.shade700),
-                      const SizedBox(width: 8),
-                      Text(
-                        'Alert Level: ${alertLevel.toUpperCase()}',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          color: Colors.red.shade700,
-                        ),
-                      ),
-                    ],
-                  ),
-                  if (reachId != null) ...[
-                    const SizedBox(height: 8),
-                    Text('Location: $reachId'),
-                  ],
-                  if (alertData != null) ...[
-                    const SizedBox(height: 8),
-                    Text('Details: ${alertData.toString()}'),
-                  ],
-                ],
-              ),
-            ),
-            const SizedBox(height: 24),
-            const Text(
-              'Important Safety Guidelines:',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 16),
-            const Text(
-              '• Always check current conditions before entering the water',
-            ),
-            const Text(
-              '• Never rely solely on notifications for safety decisions',
-            ),
-            const Text('• Be aware of changing weather and water conditions'),
-            const Text(
-              '• Inform others of your planned activities and timeline',
-            ),
-            const Text('• Carry appropriate safety equipment'),
-            const SizedBox(height: 24),
-            if (reachId != null)
-              ElevatedButton(
-                onPressed: () {
-                  Navigator.of(context).pop();
-                  AppRouter.navigateToForecast(
-                    context,
-                    reachId,
-                    fromNotification: true,
-                  );
-                },
-                child: const Text('View Current Conditions'),
-              ),
-          ],
-        ),
-      ),
     );
   }
 }

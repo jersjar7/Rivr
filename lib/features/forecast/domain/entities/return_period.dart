@@ -42,6 +42,65 @@ class ReturnPeriod {
     return value; // Fallback (should never reach here)
   }
 
+  // ===== NEW SCALE FACTOR METHODS FOR NOTIFICATIONS =====
+
+  /// Get scaled flow threshold for notification system
+  /// Used by cloud functions to trigger notifications with scaled thresholds
+  double? getScaledFlowForYear(
+    int year,
+    double scaleFactor, {
+    FlowUnit? toUnit,
+  }) {
+    final originalValue = getFlowForYear(year, toUnit: toUnit);
+    if (originalValue == null) return null;
+
+    // Apply scale factor - divide to make thresholds easier to trigger
+    return originalValue / scaleFactor;
+  }
+
+  /// Check if flow exceeds scaled threshold
+  /// Returns true if flow > (return_period / scale_factor)
+  bool checkScaledThreshold(
+    double flow,
+    int year,
+    double scaleFactor, {
+    FlowUnit fromUnit = FlowUnit.cfs,
+  }) {
+    final scaledThreshold = getScaledFlowForYear(year, scaleFactor);
+    if (scaledThreshold == null) return false;
+
+    // Convert flow to same unit as stored thresholds if needed
+    double comparableFlow = flow;
+    if (fromUnit != unit) {
+      comparableFlow =
+          fromUnit == FlowUnit.cfs && unit == FlowUnit.cms
+              ? flow *
+                  FlowUnit
+                      .cfsToFcmsFactor // Convert CFS to CMS
+              : flow * FlowUnit.cmsToFcsFactor; // Convert CMS to CFS
+    }
+
+    return comparableFlow > scaledThreshold;
+  }
+
+  /// Get which return period is exceeded by flow (with scale factor)
+  /// Returns the lowest year threshold that is exceeded, or null if none
+  int? getExceededScaledReturnPeriod(
+    double flow,
+    double scaleFactor, {
+    FlowUnit fromUnit = FlowUnit.cfs,
+  }) {
+    // Check return periods from lowest to highest
+    for (final year in [5, 10, 25, 50, 100]) {
+      if (checkScaledThreshold(flow, year, scaleFactor, fromUnit: fromUnit)) {
+        return year;
+      }
+    }
+    return null;
+  }
+
+  // ===== EXISTING METHODS (UNCHANGED FOR DISPLAY) =====
+
   bool isStale() {
     // Return periods rarely change, so we consider them stale after 30 days
     final now = DateTime.now();

@@ -1,13 +1,17 @@
+// lib/features/favorites/presentation/widgets/favorites_drawer.dart
+// Updated to work with simplified notification system
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart' hide AuthProvider;
 import 'package:rivr/core/services/flow_units_service.dart';
 import 'package:rivr/features/forecast/presentation/widgets/unit_selector_widget.dart';
 import 'package:rivr/features/settings/presentation/pages/theme_settings_page.dart';
-import 'package:rivr/features/simple_notifications/dummy_rivers/pages/dummy_rivers_page.dart';
+import 'package:rivr/features/settings/presentation/pages/notification_settings_page.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../../features/auth/presentation/providers/auth_provider.dart';
-import '../../../../core/navigation/app_router.dart';
-// Remove notification widget import - using ExpansionTile instead
 
 class FavoritesDrawer extends StatefulWidget {
   final Function() onLogout;
@@ -19,19 +23,77 @@ class FavoritesDrawer extends StatefulWidget {
 }
 
 class _FavoritesDrawerState extends State<FavoritesDrawer> {
-  // Track which sections are expanded - add notifications back
+  // Track which sections are expanded
   final Map<String, bool> _expandedSections = {
     'measurement': false,
-    'notifications': false, // Added back for ExpansionTile
+    'notifications': false,
+    'data': false,
     'help': false,
     'feedback': false,
-    // Removed 'data' - Data Management section deleted
   };
+
+  // Track notification status
+  bool _notificationsEnabled = false;
+  bool _isLoadingNotificationStatus = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadNotificationStatus();
+  }
 
   void _toggleSection(String section) {
     setState(() {
       _expandedSections[section] = !(_expandedSections[section] ?? false);
     });
+  }
+
+  Future<void> _loadNotificationStatus() async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      debugPrint('🔔 Loading notification status for user: ${user?.uid}');
+
+      if (user != null) {
+        final userDoc =
+            await FirebaseFirestore.instance
+                .collection('users')
+                .doc(user.uid)
+                .get();
+
+        debugPrint('🔔 User document exists: ${userDoc.exists}');
+
+        if (userDoc.exists) {
+          final userData = userDoc.data();
+          final notificationStatus = userData?['notificationsEnabled'] ?? false;
+          debugPrint(
+            '🔔 Notification status from Firestore: $notificationStatus',
+          );
+
+          setState(() {
+            _notificationsEnabled = notificationStatus;
+            _isLoadingNotificationStatus = false;
+          });
+        } else {
+          debugPrint('🔔 User document does not exist, defaulting to false');
+          setState(() {
+            _notificationsEnabled = false;
+            _isLoadingNotificationStatus = false;
+          });
+        }
+      } else {
+        debugPrint('🔔 No authenticated user found');
+        setState(() {
+          _notificationsEnabled = false;
+          _isLoadingNotificationStatus = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('❌ Error loading notification status: $e');
+      setState(() {
+        _notificationsEnabled = false;
+        _isLoadingNotificationStatus = false;
+      });
+    }
   }
 
   @override
@@ -50,14 +112,9 @@ class _FavoritesDrawerState extends State<FavoritesDrawer> {
           // Static User Profile Header
           UserAccountsDrawerHeader(
             decoration: BoxDecoration(color: colors.primary),
-
-            // 1) Remove the avatar
             currentAccountPicture: null,
-
-            // 2) Two‐line name, but let the Column shrink to fit
             accountName: Column(
-              mainAxisSize:
-                  MainAxisSize.min, // ← key: only as tall as its children
+              mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
@@ -76,8 +133,6 @@ class _FavoritesDrawerState extends State<FavoritesDrawer> {
                 ),
               ],
             ),
-
-            // 3) Profession in place of email
             accountEmail: Text(
               user?.profession ?? 'River Explorer',
               style: textTheme.titleMedium?.copyWith(
@@ -154,21 +209,50 @@ class _FavoritesDrawerState extends State<FavoritesDrawer> {
                   ],
                 ),
 
-                // ── Flow Notifications Section (ExpansionTile) ──────────────────
+                // ── Flow Notifications Section ──────────────────────────
                 ExpansionTile(
                   initiallyExpanded:
                       _expandedSections['notifications'] ?? false,
                   onExpansionChanged:
                       (expanded) => _toggleSection('notifications'),
                   leading: Icon(
-                    Icons.notifications_active,
-                    color: colors.primary,
+                    _notificationsEnabled
+                        ? Icons.notifications
+                        : Icons.notifications_off,
+                    color:
+                        _notificationsEnabled ? colors.primary : colors.outline,
                   ),
-                  title: Text(
-                    'Flow Notifications',
-                    style: textTheme.titleSmall?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
+                  title: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Flow Notifications',
+                        style: textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      if (_isLoadingNotificationStatus)
+                        Text(
+                          'Loading...',
+                          style: textTheme.labelSmall?.copyWith(
+                            color: colors.onSurface.withOpacity(0.6),
+                          ),
+                        )
+                      else
+                        Text(
+                          _notificationsEnabled ? 'Enabled' : 'Disabled',
+                          style: textTheme.labelSmall?.copyWith(
+                            color:
+                                _notificationsEnabled
+                                    ? Colors.green
+                                    : colors.onSurface.withOpacity(0.6),
+                            fontWeight:
+                                _notificationsEnabled
+                                    ? FontWeight.bold
+                                    : FontWeight.normal,
+                          ),
+                        ),
+                    ],
                   ),
                   children: [
                     ListTile(
@@ -181,14 +265,22 @@ class _FavoritesDrawerState extends State<FavoritesDrawer> {
                         color: colors.primary,
                         size: 20,
                       ),
-                      title: Text('Setup Notifications'),
-
+                      title: Text('Notification Settings'),
+                      subtitle: Text(
+                        'Configure alerts for your favorite rivers',
+                      ),
                       trailing: Icon(Icons.arrow_forward_ios, size: 16),
-                      onTap: () {
-                        // Close drawer
-                        Navigator.of(context).pop();
-                        // Navigate to notification setup
-                        AppRouter.navigateToNotificationSetup(context);
+                      onTap: () async {
+                        // Navigate to notification settings
+                        await Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder:
+                                (context) => const NotificationSettingsPage(),
+                          ),
+                        );
+
+                        // Always reload status when returning from settings
+                        _loadNotificationStatus();
                       },
                     ),
                     ListTile(
@@ -198,38 +290,68 @@ class _FavoritesDrawerState extends State<FavoritesDrawer> {
                       ),
                       leading: Icon(
                         Icons.info_outline,
-                        color: colors.onSurface.withValues(alpha: 0.6),
+                        color: colors.outline,
                         size: 20,
                       ),
                       title: Text('How It Works'),
-                      trailing: Icon(Icons.arrow_forward_ios, size: 16),
+                      subtitle: Text(
+                        'Alerts when forecasts exceed return periods',
+                      ),
                       onTap: () {
-                        _showNotificationInfoDialog(context);
+                        _showHowItWorksDialog();
                       },
                     ),
+                  ],
+                ),
+
+                // ── Data Management Section ────────────────────────────────
+                ExpansionTile(
+                  initiallyExpanded: _expandedSections['data'] ?? false,
+                  onExpansionChanged: (expanded) => _toggleSection('data'),
+                  leading: Icon(Icons.storage, color: colors.primary),
+                  title: Text(
+                    'Data & Offline',
+                    style: textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  children: [
                     ListTile(
                       contentPadding: const EdgeInsets.only(
                         left: 72,
                         right: 16,
                       ),
-                      leading: Icon(
-                        Icons.science,
-                        color: Colors.orange,
-                        size: 20,
-                      ),
-                      title: Text('Dummy Rivers'),
-                      subtitle: Text(
-                        'Test notification system',
-                        style: TextStyle(fontSize: 11, color: Colors.grey[600]),
-                      ),
+                      title: Text('Offline Manager'),
                       trailing: Icon(Icons.arrow_forward_ios, size: 16),
                       onTap: () {
-                        // Close drawer
-                        Navigator.of(context).pop();
-                        // Navigate to dummy rivers page
-                        Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (context) => const DummyRiversPage(),
+                        Navigator.of(context).pushNamed('/offline_manager');
+                      },
+                    ),
+                  ],
+                ),
+
+                // ── Help & Support Section ────────────────────────────────
+                ExpansionTile(
+                  initiallyExpanded: _expandedSections['help'] ?? false,
+                  onExpansionChanged: (expanded) => _toggleSection('help'),
+                  leading: Icon(Icons.help_outline, color: colors.primary),
+                  title: Text(
+                    'Help & Support',
+                    style: textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  children: [
+                    ListTile(
+                      contentPadding: const EdgeInsets.only(
+                        left: 72,
+                        right: 16,
+                      ),
+                      title: Text('User Guide'),
+                      onTap: () {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('User guide coming soon'),
                           ),
                         );
                       },
@@ -237,48 +359,13 @@ class _FavoritesDrawerState extends State<FavoritesDrawer> {
                   ],
                 ),
 
-                // Help & Information Section (Expandable)
-                ExpansionTile(
-                  initiallyExpanded: _expandedSections['help'] ?? false,
-                  onExpansionChanged: (expanded) => _toggleSection('help'),
-                  leading: Icon(Icons.help_outline, color: colors.primary),
-                  title: Text(
-                    'Help & Information',
-                    style: textTheme.titleSmall?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  children: [
-                    ListTile(
-                      contentPadding: const EdgeInsets.only(
-                        left: 72,
-                        right: 16,
-                      ),
-                      title: Text('About the App'),
-                      trailing: Icon(Icons.arrow_forward_ios, size: 16),
-                      onTap: () async {
-                        final uri = Uri.parse(
-                          'https://docs.ciroh.org/docuhub-staging/docs/products/Mobile%20Apps/RIVR/',
-                        );
-                        if (!await launchUrl(
-                          uri,
-                          mode: LaunchMode.externalApplication,
-                        )) {
-                          // optional: handle failure, e.g. show a SnackBar or log
-                          print('Could not launch $uri');
-                        }
-                      },
-                    ),
-                  ],
-                ),
-
-                // Feedback & Support Section (Expandable)
+                // ── Feedback Section ───────────────────────────────────────
                 ExpansionTile(
                   initiallyExpanded: _expandedSections['feedback'] ?? false,
                   onExpansionChanged: (expanded) => _toggleSection('feedback'),
-                  leading: Icon(Icons.feedback_outlined, color: colors.primary),
+                  leading: Icon(Icons.feedback, color: colors.primary),
                   title: Text(
-                    'Feedback & Support',
+                    'Feedback',
                     style: textTheme.titleSmall?.copyWith(
                       fontWeight: FontWeight.bold,
                     ),
@@ -289,94 +376,35 @@ class _FavoritesDrawerState extends State<FavoritesDrawer> {
                         left: 72,
                         right: 16,
                       ),
-                      title: Text('Report a Bug or\nRequest a Feature'),
-                      trailing: Icon(Icons.arrow_forward_ios, size: 16),
+                      title: Text('Send Feedback'),
                       onTap: () async {
-                        final uri = Uri.parse(
-                          'https://github.com/jersjar7/Rivr/issues',
+                        final Uri emailUri = Uri(
+                          scheme: 'mailto',
+                          path: 'feedback@rivr.app',
+                          query: 'subject=Rivr App Feedback',
                         );
-                        if (!await launchUrl(
-                          uri,
-                          mode: LaunchMode.externalApplication,
-                        )) {
-                          // optional: handle failure, e.g. show a SnackBar or log
-                          print('Could not launch $uri');
+                        if (await canLaunchUrl(emailUri)) {
+                          await launchUrl(emailUri);
                         }
                       },
                     ),
                   ],
                 ),
 
-                // Log Out Button (Always visible)
-                Divider(indent: 10, endIndent: 10),
+                const Divider(),
+
+                // Static Auth Section
                 ListTile(
-                  leading: Icon(Icons.exit_to_app, color: colors.error),
+                  leading: Icon(Icons.logout, color: colors.error),
                   title: Text(
-                    'Log Out',
-                    style: TextStyle(
+                    'Sign Out',
+                    style: textTheme.titleSmall?.copyWith(
                       color: colors.error,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
                   onTap: widget.onLogout,
                 ),
-                Divider(indent: 10, endIndent: 10),
-
-                // ── SPONSORS LOGO GRID ───────────────────────────────────────
-                Padding(
-                  padding: const EdgeInsets.symmetric(
-                    vertical: 16.0,
-                    horizontal: 24.0,
-                  ),
-                  child: Column(
-                    children: [
-                      // Row 1: single BYU SVG centered
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Image.asset(
-                            'assets/img/sponsors/BYU MonogramWordmark_navy@2x.png',
-                            height: 130,
-                          ),
-                        ],
-                      ),
-                      // Row 2: two logos
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                        children: [
-                          Image.asset(
-                            'assets/img/sponsors/NOAA-logo.png',
-                            height: 80,
-                          ),
-                          Image.asset(
-                            'assets/img/sponsors/ciroh_logo.png',
-                            height: 80,
-                          ),
-                        ],
-                      ),
-
-                      const SizedBox(height: 12),
-
-                      // Row 3: two more logos
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                        children: [
-                          Image.asset(
-                            'assets/img/sponsors/Office_of_Water_Prediction_Logo.png',
-                            height: 80,
-                          ),
-                          Image.asset(
-                            'assets/img/sponsors/University-of-Alabama-Logo.png',
-                            height: 70,
-                          ),
-                        ],
-                      ),
-
-                      const SizedBox(height: 2),
-                    ],
-                  ),
-                ),
-                // ─────────────────────────────────────────────────────────────
               ],
             ),
           ),
@@ -385,61 +413,70 @@ class _FavoritesDrawerState extends State<FavoritesDrawer> {
     );
   }
 
-  /// Show information dialog about how notifications work
-  void _showNotificationInfoDialog(BuildContext context) {
+  void _showHowItWorksDialog() {
     showDialog(
       context: context,
       builder:
           (context) => AlertDialog(
-            title: Row(
-              children: [
-                Icon(
-                  Icons.notifications_active,
-                  color: Theme.of(context).primaryColor,
-                ),
-                const SizedBox(width: 8),
-                const Text('Flow Notifications'),
-              ],
-            ),
-            content: const Column(
+            title: Text('How Flow Notifications Work'),
+            content: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  'How it works:',
-                  style: TextStyle(fontWeight: FontWeight.bold),
+                _buildInfoRow(
+                  '🎯',
+                  'Favorites Only',
+                  'Notifications are sent only for rivers in your favorites list',
                 ),
-                SizedBox(height: 8),
-                Text('• Add rivers to your favorites'),
-                Text('• Enable notifications for selected rivers'),
-                Text('• Get alerts when forecasted flows match return periods'),
-                Text('• Only short & medium range forecasts monitored'),
                 SizedBox(height: 12),
-                Text(
-                  'Return periods indicate statistical flood frequency:',
-                  style: TextStyle(fontWeight: FontWeight.bold),
+                _buildInfoRow(
+                  '📊',
+                  'Return Period Alerts',
+                  'Get notified when forecasts exceed return period thresholds',
                 ),
-                SizedBox(height: 4),
-                Text('• 2-year: Moderate flow'),
-                Text('• 10-year: Major flow'),
-                Text('• 50+ year: Extreme flow'),
+                SizedBox(height: 12),
+                _buildInfoRow(
+                  '⏰',
+                  'Smart Timing',
+                  'Automatically checks short and medium range forecasts',
+                ),
+                SizedBox(height: 12),
+                _buildInfoRow(
+                  '📱',
+                  'Background Monitoring',
+                  'Works even when the app is closed',
+                ),
               ],
             ),
             actions: [
               TextButton(
                 onPressed: () => Navigator.of(context).pop(),
-                child: const Text('Got it'),
-              ),
-              FilledButton(
-                onPressed: () {
-                  Navigator.of(context).pop();
-                  Navigator.of(context).pop(); // Close drawer
-                  AppRouter.navigateToNotificationSetup(context);
-                },
-                child: const Text('Setup Now'),
+                child: Text('Got it'),
               ),
             ],
           ),
+    );
+  }
+
+  Widget _buildInfoRow(String emoji, String title, String description) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(emoji, style: TextStyle(fontSize: 16)),
+        SizedBox(width: 8),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(title, style: TextStyle(fontWeight: FontWeight.bold)),
+              Text(
+                description,
+                style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }

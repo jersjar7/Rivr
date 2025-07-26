@@ -1,7 +1,4 @@
-// Temporary fix for functions/src/index.ts
-// Comment out the auth functions that are failing to deploy
-
-// functions/src/index.ts - Temporarily disable auth functions
+// functions/src/index.ts - Updated with simplified notification system
 
 import * as admin from "firebase-admin";
 import * as logger from "firebase-functions/logger";
@@ -27,9 +24,14 @@ import {
 
 import {NOAAService, StreamflowData} from "./noaa/noaa-service";
 
-// v1 Auth triggers + types - COMMENTED OUT TEMPORARILY
-// import {auth} from "firebase-functions/v1";
-// import type {UserRecord} from "firebase-admin/auth";
+// ===== SIMPLIFIED NOTIFICATION SYSTEM =====
+// Import the simplified notification function from existing file
+import {
+  checkFlowNotifications
+} from "./notifications/alert-cloud-function";
+
+// Export the simplified notification function
+export {checkFlowNotifications};
 
 // Initialize Firebase Admin SDK
 admin.initializeApp();
@@ -85,85 +87,63 @@ export const testScheduledFunction = onSchedule(
   }
 );
 
-// ===== ENHANCED NOAA INTEGRATION FUNCTIONS =====
+// ===== SIMPLIFIED DATA CACHING (Keep for forecast data) =====
 
-// Enhanced flow monitoring with NOAA service
-export const monitorFlowConditions = onSchedule({
-  schedule: "every 30 minutes",
+// Simplified flow monitoring - just cache data, notifications handled separately
+export const cacheFlowData = onSchedule({
+  schedule: "every 60 minutes", // Cache data less frequently
   timeZone: "America/Denver",
 }, async (event: ScheduledEvent): Promise<void> => {
-  logger.info("Flow monitoring triggered:", event);
+  logger.info("Flow data caching triggered:", event);
   
   try {
     const noaaService = new NOAAService();
     
-    // 1. Get all monitored reaches from user thresholds
-    const monitoredReaches = await noaaService.getUserMonitoredReaches();
-    logger.info(`Monitoring ${monitoredReaches.length} reaches`);
+    // Get all monitored reaches from favorites (simplified approach)
+    const monitoredReaches = await getMonitoredReachesFromFavorites();
+    logger.info(`Caching data for ${monitoredReaches.length} reaches`);
     
     if (monitoredReaches.length === 0) {
-      logger.info("No reaches to monitor - no active user thresholds");
+      logger.info("No reaches to cache - no favorites found");
       return;
     }
     
-    // 2. Fetch current flow data for all monitored reaches
+    // Fetch and cache flow data
     const flowDataResults = await noaaService.fetchMultipleReaches(monitoredReaches);
-    logger.info(`Successfully fetched data for ${flowDataResults.length} reaches`);
+    logger.info(`Successfully cached data for ${flowDataResults.length} reaches`);
     
-    // 3. Log summary for thesis metrics
+    // Log summary for thesis metrics
     await logMonitoringSummary(flowDataResults);
     
-    // 4. Trigger threshold evaluation (this will be implemented in Phase 4)
-    for (const flowData of flowDataResults) {
-      // This will trigger the processThresholdUpdates function via Firestore
-      // The data is already cached by the NOAA service
-      logger.info(`Updated data for reach ${flowData.reachId}: ${flowData.currentFlow} ${flowData.unit}`);
-    }
-    
-    logger.info("Flow monitoring completed successfully");
+    logger.info("Flow data caching completed successfully");
   } catch (error) {
-    logger.error("Flow monitoring error:", error);
-    // Record error for thesis analysis
+    logger.error("Flow data caching error:", error);
     await recordMonitoringError(error);
   }
 });
 
-// Enhanced threshold processing with NOAA data
-export const processThresholdUpdates = onDocumentWritten(
-  "noaaFlowCache/{stationId}",
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  async (event: FirestoreEvent<any, {stationId: string}>): Promise<void> => {
-    const stationId = event.params.stationId;
+// Helper function to get reaches from all user favorites
+async function getMonitoredReachesFromFavorites(): Promise<string[]> {
+  try {
+    const db = admin.firestore();
+    const favoritesSnapshot = await db.collection('favorites').get();
     
-    logger.info(`Processing threshold updates for station: ${stationId}`);
-    
-    try {
-      // Get the updated flow data
-      const flowData = event.data?.after?.data();
-      if (!flowData) {
-        logger.warn(`No flow data found for station: ${stationId}`);
-        return;
+    const reachIds = new Set<string>();
+    favoritesSnapshot.docs.forEach(doc => {
+      const favorite = doc.data();
+      if (favorite.reachId) {
+        reachIds.add(favorite.reachId);
       }
-      
-      // TODO: Phase 4 - Implement threshold evaluation logic here
-      // 1. Query user thresholds for this station
-      // 2. Evaluate if any thresholds are exceeded
-      // 3. Generate notifications for triggered thresholds
-      
-      logger.info(`Flow data received for ${stationId}:`, {
-        currentFlow: flowData.currentFlow,
-        unit: flowData.unit,
-        flowCategory: flowData.flowCategory,
-        changePercent: flowData.changePercent,
-      });
-      
-    } catch (error) {
-      logger.error(`Error processing thresholds for ${stationId}:`, error);
-    }
+    });
+    
+    return Array.from(reachIds);
+  } catch (error) {
+    logger.error("Error getting monitored reaches from favorites:", error);
+    return [];
   }
-);
+}
 
-// ===== NEW NOAA API INTEGRATION FUNCTIONS =====
+// ===== EXISTING NOAA API INTEGRATION FUNCTIONS (Keep for app compatibility) =====
 
 // Test NOAA service integration
 export const testNOAAIntegration = onCall(
@@ -370,6 +350,95 @@ async function recordMonitoringError(error: any): Promise<void> {
   }
 }
 
+// ===== USER MANAGEMENT FUNCTIONS =====
+
+// Test notification (v2)
+export const sendTestNotification = onCall(
+  async (request: CallableRequest):
+    Promise<{success: boolean; message: string}> => {
+    if (!request.auth) {
+      throw new HttpsError("unauthenticated", "Must be authenticated");
+    }
+    logger.info(`Test notification by ${request.auth.uid}`);
+    return {success: true, message: "Placeholder sent"};
+  }
+);
+
+// Update FCM token (v2)
+export const updateFCMToken = onCall(
+  async (request: CallableRequest<{token: string}>):
+    Promise<{success: boolean}> => {
+    if (!request.auth) {
+      throw new HttpsError("unauthenticated", "Must be authenticated");
+    }
+    const {token} = request.data;
+    await admin.firestore().collection("users").doc(request.auth.uid).update({
+      fcmToken: token,
+      tokenUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+    return {success: true};
+  }
+);
+
+// Manual function to initialize user preferences
+export const manualInitializeUserPreferences = onCall(
+  async (request: CallableRequest): Promise<{success: boolean}> => {
+    if (!request.auth) {
+      throw new HttpsError("unauthenticated", "Must be authenticated");
+    }
+
+    const db = admin.firestore();
+    const userId = request.auth.uid;
+
+    // Check if user document already exists
+    const existingUser = await db.collection("users").doc(userId).get();
+
+    if (!existingUser.exists) {
+      // Create basic user document with notification settings
+      await db.collection("users").doc(userId).set({
+        notificationsEnabled: true, // Default to enabled for simplified system
+        fcmToken: null, // Will be updated when app gets token
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+    } else {
+      // Update existing user to have notification settings if missing
+      const userData = existingUser.data();
+      if (userData && userData.notificationsEnabled === undefined) {
+        await db.collection("users").doc(userId).update({
+          notificationsEnabled: true,
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+      }
+    }
+
+    logger.info(`Initialized simplified user settings for ${userId}`);
+    return {success: true};
+  }
+);
+
+// ===== THESIS-SPECIFIC FUNCTIONS =====
+
+// Record metrics (v2)
+export const recordThesisMetrics = onCall(
+  async (
+    request: CallableRequest<{eventType: string; metadata: any}>
+  ): Promise<{success: boolean}> => {
+    if (!request.auth) {
+      throw new HttpsError("unauthenticated", "Must be authenticated");
+    }
+    const {data} = request;
+    const db = admin.firestore();
+    await db.collection("thesis_metrics").add({
+      userId: request.auth.uid,
+      eventType: data.eventType,
+      metadata: data.metadata,
+      timestamp: admin.firestore.FieldValue.serverTimestamp(),
+    });
+    return {success: true};
+  }
+);
+
 // ===== COMPATIBILITY TESTING FUNCTIONS =====
 
 // Test compatibility with existing Flutter app
@@ -414,135 +483,5 @@ export const testFlutterCompatibility = onCall(
         details: {error: error instanceof Error ? error.message : String(error)},
       };
     }
-  }
-);
-
-// ===== USER MANAGEMENT FUNCTIONS - TEMPORARILY DISABLED =====
-
-/*
-// TEMPORARILY COMMENTED OUT - These functions are failing to deploy
-// We'll fix them after the core notification system is working
-
-// Initialize preferences on user creation (v1)
-export const initializeUserPreferences = auth.user().onCreate(
-  async (user: UserRecord): Promise<void> => {
-    const db = admin.firestore();
-    await db.collection("notificationPreferences").doc(user.uid).set({
-      emergencyAlerts: true,
-      activityAlerts: false,
-      informationAlerts: false,
-      frequency: "realtime",
-      quietHours: {enabled: false, start: "22:00", end: "07:00"},
-      createdAt: admin.firestore.FieldValue.serverTimestamp(),
-      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-    });
-    logger.info(`Initialized preferences for user ${user.uid}`);
-  }
-);
-
-// Cleanup on user deletion (v1)
-export const cleanupUserData = auth.user().onDelete(
-  async (user: UserRecord): Promise<void> => {
-    const db = admin.firestore();
-    const batch = db.batch();
-    batch.delete(db.collection("notificationPreferences").doc(user.uid));
-    const thrSnap = await db
-      .collection("userThresholds")
-      .doc(user.uid)
-      .collection("thresholds")
-      .get();
-    thrSnap.docs.forEach((doc) => batch.delete(doc.ref));
-    await batch.commit();
-    logger.info(`Cleaned up data for user ${user.uid}`);
-  }
-);
-*/
-
-// ===== THESIS-SPECIFIC FUNCTIONS =====
-
-// Record metrics (v2)
-export const recordThesisMetrics = onCall(
-  async (
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    request: CallableRequest<{eventType: string; metadata: any}>
-  ): Promise<{success: boolean}> => {
-    if (!request.auth) {
-      throw new HttpsError("unauthenticated", "Must be authenticated");
-    }
-    const {data} = request;
-    const db = admin.firestore();
-    await db.collection("thesis_metrics").add({
-      userId: request.auth.uid,
-      eventType: data.eventType,
-      metadata: data.metadata,
-      timestamp: admin.firestore.FieldValue.serverTimestamp(),
-    });
-    return {success: true};
-  }
-);
-
-// Test notification (v2)
-export const sendTestNotification = onCall(
-  async (request: CallableRequest):
-    Promise<{success: boolean; message: string}> => {
-    if (!request.auth) {
-      throw new HttpsError("unauthenticated", "Must be authenticated");
-    }
-    logger.info(`Test notification by ${request.auth.uid}`);
-    return {success: true, message: "Placeholder sent"};
-  }
-);
-
-// Update FCM token (v2)
-export const updateFCMToken = onCall(
-  async (request: CallableRequest<{token: string}>):
-    Promise<{success: boolean}> => {
-    if (!request.auth) {
-      throw new HttpsError("unauthenticated", "Must be authenticated");
-    }
-    const {token} = request.data;
-    await admin.firestore().collection("users").doc(request.auth.uid).update({
-      fcmToken: token,
-      tokenUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
-    });
-    return {success: true};
-  }
-);
-
-// ===== MANUAL USER SETUP FUNCTION (Replacement for auth triggers) =====
-
-// Manual function to initialize user preferences when auth triggers fail
-export const manualInitializeUserPreferences = onCall(
-  async (request: CallableRequest): Promise<{success: boolean}> => {
-    if (!request.auth) {
-      throw new HttpsError("unauthenticated", "Must be authenticated");
-    }
-
-    const db = admin.firestore();
-    const userId = request.auth.uid;
-
-    // Check if preferences already exist
-    const existingPrefs = await db
-      .collection("notificationPreferences")
-      .doc(userId)
-      .get();
-
-    if (existingPrefs.exists) {
-      return {success: true}; // Already initialized
-    }
-
-    // Create default preferences
-    await db.collection("notificationPreferences").doc(userId).set({
-      emergencyAlerts: true,
-      activityAlerts: false,
-      informationAlerts: false,
-      frequency: "realtime",
-      quietHours: {enabled: false, start: "22:00", end: "07:00"},
-      createdAt: admin.firestore.FieldValue.serverTimestamp(),
-      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-    });
-
-    logger.info(`Manually initialized preferences for user ${userId}`);
-    return {success: true};
   }
 );

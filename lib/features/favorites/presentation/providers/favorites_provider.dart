@@ -3,6 +3,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:rivr/core/services/notification_shadow_service.dart';
 import '../../domain/entities/favorite.dart';
 import '../../domain/usecases/add_favorite.dart';
 import '../../domain/usecases/get_favorites.dart';
@@ -35,6 +36,9 @@ class FavoritesProvider with ChangeNotifier {
   // Helper managers for different aspects of favorites functionality
   late final FavoritesDataManager _dataManager;
   late final FavoritesPersistenceManager _persistenceManager;
+
+  // Services for notification on favorite rivers
+  final NotificationShadowService _shadowService = NotificationShadowService();
 
   // State
   FavoritesStatus _status = FavoritesStatus.initial;
@@ -168,6 +172,9 @@ class FavoritesProvider with ChangeNotifier {
 
             // Cache favorites for offline use
             _persistenceManager.cacheFavorites(userId, _favorites);
+
+            // 📤 ADD THIS ONE LINE: Push to Firestore for notifications
+            _shadowService.pushFavoritesToFirestore(userId, _favorites);
           } else {
             // If no change in data, just update the status if needed
             if (_status != FavoritesStatus.loaded) {
@@ -291,7 +298,7 @@ class FavoritesProvider with ChangeNotifier {
       'DEBUG: addFavoriteFromStation called with lat=$lat, lon=$lon, city=$city, state=$state',
     );
 
-    return _dataManager.addFavorite(
+    final result = await _dataManager.addFavorite(
       userId,
       stationId,
       displayName: displayName,
@@ -300,9 +307,16 @@ class FavoritesProvider with ChangeNotifier {
       lat: lat,
       lon: lon,
       elevation: elevation,
-      city: city, // Pass city to data manager
-      state: state, // Pass state to data manager
+      city: city,
+      state: state,
     );
+
+    // 📤 ADD THIS: If successful, push to Firestore
+    if (result) {
+      _shadowService.pushFavoritesToFirestore(userId, _favorites);
+    }
+
+    return result;
   }
 
   // Remove a favorite

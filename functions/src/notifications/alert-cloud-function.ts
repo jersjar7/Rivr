@@ -1,7 +1,7 @@
 // functions/src/notifications/alert-cloud-function.ts
 // SUPER SIMPLE notification system - just one toggle, favorites only
 
-import * as functions from "firebase-functions/v1";
+import {onSchedule} from "firebase-functions/v2/scheduler";
 import * as admin from "firebase-admin";
 import {
   NOAAService,
@@ -24,10 +24,12 @@ const CHECK_FREQUENCY =
  * Main Cloud Function: Check Flow Notifications
  * Super simple: Check favorite rivers for users with notifications enabled
  */
-export const checkFlowNotifications = functions.pubsub
-  .schedule(`every ${CHECK_FREQUENCY} minutes`)
-  .timeZone("America/Denver")
-  .onRun(async () => {
+export const checkFlowNotifications = onSchedule(
+  {
+    schedule: `every ${CHECK_FREQUENCY} minutes`,
+    timeZone: "America/Denver",
+  },
+  async (_event) => {
     console.log(
       `🌊 Starting notification check (scale factor: ${SCALE_FACTOR})...`
     );
@@ -41,7 +43,7 @@ export const checkFlowNotifications = functions.pubsub
 
       if (enabledUsers.length === 0) {
         console.log("📱 No users with notifications enabled");
-        return {success: true, message: "No enabled users"};
+        return;
       }
 
       let totalNotifications = 0;
@@ -58,12 +60,7 @@ export const checkFlowNotifications = functions.pubsub
 
       console.log(`📱 Total notifications sent: ${totalNotifications}`);
 
-      return {
-        success: true,
-        notificationsSent: totalNotifications,
-        scaleFactor: SCALE_FACTOR,
-        enabledUsers: enabledUsers.length,
-      };
+      // Function completes successfully - no return value needed
     } catch (error) {
       console.error("❌ Error in notification check:", error);
       throw error;

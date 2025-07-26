@@ -16,10 +16,10 @@ export interface NoaaApiResponse {
 }
 
 export interface NoaaDataPoint {
-  validTime: string;             // ISO 8601 timestamp
+  validTime: string; // ISO 8601 timestamp
   flow: number;
-  forecast_type?: 'analysis' | 'short_range' | 'medium_range' | 'long_range';
-  member?: string;               // For ensemble forecasts
+  forecast_type?: "analysis" | "short_range" | "medium_range" | "long_range";
+  member?: string; // For ensemble forecasts
 }
 
 /**

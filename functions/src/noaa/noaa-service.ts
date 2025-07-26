@@ -34,7 +34,7 @@ export interface ReturnPeriodData {
   retrievedAt: Date;
 }
 
-export type FlowCategory = 
+export type FlowCategory =
   "Low" | "Normal" | "Moderate" | "Elevated" | "High" | "Very High" | "Extreme";
 
 // NOAA API response interfaces (based on existing Rivr implementation)
@@ -89,7 +89,7 @@ export class NOAAService {
 
   // Main method for fetching flow data (single reach)
   async fetchStreamflowData(
-    reachId: string, 
+    reachId: string,
     includeForecast = true
   ): Promise<StreamflowData | null> {
     try {
@@ -114,7 +114,7 @@ export class NOAAService {
         if (returnPeriodData) {
           streamflowData.returnPeriod = returnPeriodData;
           streamflowData.flowCategory = this.categorizeFlow(
-            streamflowData.currentFlow, 
+            streamflowData.currentFlow,
             returnPeriodData
           );
         }
@@ -127,7 +127,7 @@ export class NOAAService {
       if (cachedData) {
         streamflowData.previousFlow = cachedData.currentFlow;
         streamflowData.changePercent = this.calculateChangePercent(
-          streamflowData.currentFlow, 
+          streamflowData.currentFlow,
           cachedData.currentFlow
         );
       }
@@ -145,7 +145,7 @@ export class NOAAService {
   // Batch processing for multiple reaches (for notifications)
   async fetchMultipleReaches(reachIds: string[]): Promise<StreamflowData[]> {
     logger.info(`Fetching data for ${reachIds.length} reaches`);
-    
+
     const results: StreamflowData[] = [];
     const batches = this.chunkArray(reachIds, this.config.batchSize);
 
@@ -164,7 +164,7 @@ export class NOAAService {
       });
 
       const batchResults = await Promise.allSettled(batchPromises);
-      
+
       // Extract successful results
       batchResults.forEach((result, index) => {
         if (result.status === "fulfilled" && result.value) {
@@ -186,11 +186,11 @@ export class NOAAService {
 
   // Fetch from NOAA API (ported from existing ForecastRemoteDataSource)
   private async fetchFromNOAA(
-    reachId: string, 
+    reachId: string,
     includeForecast: boolean
   ): Promise<StreamflowData | null> {
     const url = `${this.config.forecastBaseUrl}/reaches/${reachId}/streamflow`;
-    
+
     try {
       const response: AxiosResponse<NOAAStreamflowResponse> = await axios.get(url, {
         timeout: this.config.timeout,
@@ -229,7 +229,7 @@ export class NOAAService {
   ): StreamflowData {
     // Extract current flow from short range data
     const currentFlowData = this.extractLatestFlow(response.shortRange);
-    
+
     const streamflowData: StreamflowData = {
       reachId,
       currentFlow: currentFlowData.flow,
@@ -248,9 +248,8 @@ export class NOAAService {
   }
 
   // Extract latest flow value (current conditions)
-  private extractLatestFlow(shortRange?: NOAAStreamflowResponse["shortRange"]): 
+  private extractLatestFlow(shortRange?: NOAAStreamflowResponse["shortRange"]):
     {flow: number; validTime: string} {
-    
     // Try series data first (mean forecast)
     if (shortRange?.series?.data && shortRange.series.data.length > 0) {
       const latest = shortRange.series.data[0]; // First entry is latest
@@ -276,7 +275,7 @@ export class NOAAService {
 
     // Short range forecasts
     if (response.shortRange?.series?.data) {
-      response.shortRange.series.data.forEach(item => {
+      response.shortRange.series.data.forEach((item) => {
         forecasts.push({
           validTime: item.validTime,
           flow: item.flow,
@@ -285,9 +284,9 @@ export class NOAAService {
       });
     }
 
-    // Medium range forecasts  
+    // Medium range forecasts
     if (response.mediumRange?.series?.data) {
-      response.mediumRange.series.data.forEach(item => {
+      response.mediumRange.series.data.forEach((item) => {
         forecasts.push({
           validTime: item.validTime,
           flow: item.flow,
@@ -302,7 +301,7 @@ export class NOAAService {
         const memberKey = `member${i}` as keyof NOAAStreamflowResponse["longRange"];
         const memberData = (response.longRange[memberKey] as { data: Array<{ validTime: string; flow: number }> } | undefined)?.data;
         if (memberData) {
-          memberData.forEach(item => {
+          memberData.forEach((item) => {
             forecasts.push({
               validTime: item.validTime,
               flow: item.flow,
@@ -320,7 +319,7 @@ export class NOAAService {
   // Fetch return period data (ported from existing implementation)
   private async fetchReturnPeriod(reachId: string): Promise<ReturnPeriodData | null> {
     const url = `${this.config.returnPeriodBaseUrl}/return-period`;
-    
+
     try {
       const response: AxiosResponse<ReturnPeriodResponse> = await axios.get(url, {
         timeout: this.config.timeout,
@@ -360,9 +359,9 @@ export class NOAAService {
   private categorizeFlow(flow: number, returnPeriod: ReturnPeriodData): FlowCategory {
     // Convert flow to same unit as return period (CMS)
     const flowInCMS = flow * 0.028317; // CFS to CMS conversion
-    
+
     const rp = returnPeriod.flowValues;
-    
+
     if (flowInCMS < (rp[2] ?? Infinity)) {
       return "Low";
     } else if (flowInCMS < (rp[5] ?? Infinity)) {
@@ -443,7 +442,7 @@ export class NOAAService {
   }
 
   private delay(ms: number): Promise<void> {
-    return new Promise(resolve => setTimeout(resolve, ms));
+    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
   // Public method to get user's monitored reaches (for scheduled notifications)
@@ -455,7 +454,7 @@ export class NOAAService {
         .get();
 
       const reachIds = new Set<string>();
-      thresholds.docs.forEach(doc => {
+      thresholds.docs.forEach((doc) => {
         const data = doc.data();
         if (data.stationId) {
           reachIds.add(data.stationId);

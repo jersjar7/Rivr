@@ -377,6 +377,9 @@ class FavoritesProvider with ChangeNotifier {
           // Update cache
           _persistenceManager.cacheFavorites(userId, _favorites);
 
+          // 📤 ADD THIS ONE LINE: Update Firestore after deletion
+          _shadowService.pushFavoritesToFirestore(userId, _favorites);
+
           // Clean up the recently deleted after some time
           _scheduleRecentlyDeletedCleanup(stationId);
         },
@@ -386,6 +389,11 @@ class FavoritesProvider with ChangeNotifier {
     } finally {
       _isProcessing = false;
     }
+  }
+
+  // Add this ONE new method for initial setup
+  Future<void> setupNotifications(String userId) async {
+    await _shadowService.initializeNotifications(userId, _favorites);
   }
 
   // Schedule cleanup of recently deleted item

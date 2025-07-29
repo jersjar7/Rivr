@@ -722,6 +722,14 @@ class _FavoritesPageState extends State<FavoritesPage>
   }
 
   Future<void> debugFCMSetup() async {
+    // Add this at the very beginning of your debugFCMSetup() function:
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      debugPrint('👤 Currently logged in as: ${user.uid}');
+    } else {
+      debugPrint('❌ No user logged in!');
+      return;
+    }
     try {
       debugPrint('🔍 Testing FCM setup...');
 

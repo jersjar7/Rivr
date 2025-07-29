@@ -65,7 +65,7 @@ interface NOAAStreamflowResponse {
 }
 
 interface ReturnPeriodResponse {
-  comid: string;
+  feature_id: number;  // Changed from 'comid' to 'feature_id'
   return_period_2: number;
   return_period_5: number;
   return_period_10: number;
@@ -543,7 +543,8 @@ export class NOAAService {
     const url = `${this.config.returnPeriodBaseUrl}/return-period`;
 
     try {
-      const response: AxiosResponse<ReturnPeriodResponse> = await axios.get(
+      // The API returns an ARRAY of objects, so we need to type it correctly
+      const response: AxiosResponse<ReturnPeriodResponse[]> = await axios.get(
         url,
         {
           timeout: this.config.timeout,
@@ -557,25 +558,33 @@ export class NOAAService {
         }
       );
 
-      if (response.status === 200) {
+      if (response.status === 200 && response.data.length > 0) {
+        // Access the first (and usually only) object in the array
+        const data = response.data[0];
+        
         return {
           reachId,
           flowValues: {
-            2: response.data.return_period_2,
-            5: response.data.return_period_5,
-            10: response.data.return_period_10,
-            25: response.data.return_period_25,
-            50: response.data.return_period_50,
-            100: response.data.return_period_100,
+            2: data.return_period_2,
+            5: data.return_period_5,
+            10: data.return_period_10,
+            25: data.return_period_25,
+            50: data.return_period_50,
+            100: data.return_period_100,
           },
           unit: "CMS", // Return period API returns CMS
           retrievedAt: new Date(),
         };
       }
 
+      logger.warn(`No return period data found for reach ${reachId}`);
       return null;
     } catch (error) {
-      logger.warn(`Failed to fetch return period for reach ${reachId}:`, error);
+      if (isAxiosError(error)) {
+        logger.error(`Return period API error for reach ${reachId}:`, error.message);
+      } else {
+        logger.error(`Network error fetching return periods for reach ${reachId}:`, error);
+      }
       return null;
     }
   }

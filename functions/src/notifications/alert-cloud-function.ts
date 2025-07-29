@@ -152,16 +152,18 @@ async function checkUserFavorites(
 
     // Check each favorite station
     for (const favorite of favorites) {
-      // Skip if stationId is not valid
-      if (!favorite.stationId ||
-          (typeof favorite.stationId !== "number" &&
-           typeof favorite.stationId !== "string")) {
-        console.log("⚠️ Invalid stationId for favorite: " +
-          `${JSON.stringify(favorite)}`);
+      // Use reachId instead of stationId (matches the cached data structure)
+      const reachId = favorite.reachId || favorite.stationId;
+      // Skip if reachId is not valid
+      if (!reachId ||
+          (typeof reachId !== "number" &&
+           typeof reachId !== "string")) {
+        console.log("⚠️ Invalid reachId for favorite: " +
+          "${JSON.stringify(favorite)}");
         continue;
       }
 
-      const stationId = favorite.stationId as number;
+      const stationId = reachId as number;
       const riverName = (favorite.name as string) ||
         (favorite.originalApiName as string) || "Unknown River";
 

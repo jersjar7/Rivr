@@ -99,9 +99,12 @@ interface CachedStreamflowData {
 export class NOAAService {
   // Configuration based on existing Rivr environment
   private readonly config = {
-    forecastBaseUrl: "https://api.water.noaa.gov/nwps/v1",
-    returnPeriodBaseUrl: "https://nwm-api-updt-9f6idmxh.uc.gateway.dev",
-    apiKey: "AIzaSyArCbLaEevrqrVPJDzu2OioM_kNmCBtsx8",
+    forecastBaseUrl: process.env.FORECAST_BASE_URL ||
+      "https://api.water.noaa.gov/nwps/v1",
+    returnPeriodBaseUrl: process.env.RETURN_BASE_URL ||
+      "https://nwm-api-updt-9f6idmxh.uc.gateway.dev",
+    apiKey: process.env.API_KEY ||
+      "AIzaSyArCbLaEevrqrVPJDzu2OioM_kNmCBtsx8",
     timeout: 30000,
     retryAttempts: 3,
     batchSize: 5, // Process reaches in batches
@@ -217,7 +220,7 @@ export class NOAAService {
     }
 
     logger.info(
-      "Successfully fetched data for ${results.length}/${reachIds.length} " +
+      `Successfully fetched data for ${results.length}/${reachIds.length} ` +
       "reaches"
     );
     return results;
@@ -233,8 +236,8 @@ export class NOAAService {
     reachId: string,
     includeForecast: boolean
   ): Promise<StreamflowData | null> {
-    const url = "${this.config.forecastBaseUrl}/reaches/${reachId}/" +
-      "streamflow";
+    // FIXED: Use template literal backticks instead of regular quotes
+    const url = `${this.config.forecastBaseUrl}/reaches/${reachId}/streamflow`;
 
     try {
       const response: AxiosResponse<NOAAStreamflowResponse> = await axios.get(

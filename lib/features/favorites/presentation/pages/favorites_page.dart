@@ -2,6 +2,10 @@
 
 import 'dart:math' as math;
 
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart' hide AuthProvider;
+import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_slidable/flutter_slidable.dart';
 import 'package:provider/provider.dart';
@@ -674,18 +678,92 @@ class _FavoritesPageState extends State<FavoritesPage>
           );
         },
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _navigateToMap,
-        backgroundColor: colors.secondary,
-        icon: Icon(Icons.add, color: colors.onSecondary),
-        label: Text(
-          'Add River',
-          style: textTheme.labelLarge?.copyWith(
-            fontWeight: FontWeight.bold,
-            color: colors.onSecondary,
-          ),
-        ),
-      ),
+      floatingActionButton:
+          kDebugMode
+              ? Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  FloatingActionButton(
+                    heroTag: "debug_fcm",
+                    onPressed: debugFCMSetup,
+                    backgroundColor: Colors.orange,
+                    tooltip: 'Test FCM Token',
+                    child: Icon(Icons.bug_report, color: Colors.white),
+                  ),
+                  SizedBox(height: 16),
+                  FloatingActionButton.extended(
+                    heroTag: "add_river",
+                    onPressed: _navigateToMap,
+                    backgroundColor: colors.secondary,
+                    icon: Icon(Icons.add, color: colors.onSecondary),
+                    label: Text(
+                      'Add River',
+                      style: textTheme.labelLarge?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: colors.onSecondary,
+                      ),
+                    ),
+                  ),
+                ],
+              )
+              : FloatingActionButton.extended(
+                onPressed: _navigateToMap,
+                backgroundColor: colors.secondary,
+                icon: Icon(Icons.add, color: colors.onSecondary),
+                label: Text(
+                  'Add River',
+                  style: textTheme.labelLarge?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: colors.onSecondary,
+                  ),
+                ),
+              ),
     );
+  }
+
+  Future<void> debugFCMSetup() async {
+    try {
+      debugPrint('🔍 Testing FCM setup...');
+
+      // Check APNS token first
+      final apnsToken = await FirebaseMessaging.instance.getAPNSToken();
+      debugPrint(
+        '📱 APNS Token: ${apnsToken != null ? "✅ Available" : "❌ Not available"}',
+      );
+
+      if (apnsToken == null) {
+        debugPrint('⚠️ APNS token is null - checking AppDelegate setup');
+      }
+
+      // Try FCM token
+      final fcmToken = await FirebaseMessaging.instance.getToken();
+      debugPrint(
+        '📱 FCM Token: ${fcmToken != null ? "✅ Available" : "❌ Not available"}',
+      );
+
+      if (fcmToken != null) {
+        debugPrint(
+          '🔑 FCM Token (first 20 chars): ${fcmToken.substring(0, 20)}...',
+        );
+
+        // Test storing in Firestore
+        final user = FirebaseAuth.instance.currentUser;
+        if (user != null) {
+          await FirebaseFirestore.instance
+              .collection('users')
+              .doc(user.uid)
+              .set({
+                'fcmToken': fcmToken,
+                'notificationsEnabled': true,
+                'tokenUpdatedAt': FieldValue.serverTimestamp(),
+                'debugTest': true,
+              }, SetOptions(merge: true));
+
+          debugPrint('✅ FCM token stored in Firestore for testing');
+        }
+      }
+    } catch (e) {
+      debugPrint('❌ FCM Debug Error: $e');
+    }
   }
 }

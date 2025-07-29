@@ -2,6 +2,8 @@ import UIKit
 import Flutter
 import MapboxMaps
 import Firebase
+import FirebaseMessaging
+import UserNotifications
 
 @main
 @objc class AppDelegate: FlutterAppDelegate {
@@ -10,8 +12,11 @@ import Firebase
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
   ) -> Bool {
     
+    print("🚀 AppDelegate: Starting initialization...")
+  
     // Configure Firebase
     FirebaseApp.configure()
+    print("🔥 Firebase configured")
     
     let controller : FlutterViewController = window?.rootViewController as! FlutterViewController
     let tokenChannel = FlutterMethodChannel(name: "com.byuhydroinformaticslab.rivr.mapbox/token", binaryMessenger: controller.binaryMessenger)
@@ -30,12 +35,15 @@ import Firebase
     })
     
     // Configure push notifications
+    print("📱 Configuring push notifications...")
     if #available(iOS 10.0, *) {
       UNUserNotificationCenter.current().delegate = self
       let authOptions: UNAuthorizationOptions = [.alert, .badge, .sound]
       UNUserNotificationCenter.current().requestAuthorization(
         options: authOptions,
-        completionHandler: { _, _ in }
+        completionHandler: { granted, error in
+        print("📱 Notification permission granted: \(granted), error: \(String(describing: error))")
+        }
       )
     } else {
       let settings: UIUserNotificationSettings =
@@ -43,7 +51,10 @@ import Firebase
       application.registerUserNotificationSettings(settings)
     }
     
+    print("📱 Registering for remote notifications...")
     application.registerForRemoteNotifications()
+    print("📱 Registration call completed")
+
     
     GeneratedPluginRegistrant.register(with: self)
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)

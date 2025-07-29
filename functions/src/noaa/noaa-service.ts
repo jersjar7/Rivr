@@ -1,18 +1,18 @@
 // functions/src/noaa/noaa-service.ts
 // Cloud Functions NOAA service based on existing Rivr implementation
 
-import * as admin from "firebase-admin";
-import * as logger from "firebase-functions/logger";
-import axios, {AxiosResponse, isAxiosError} from "axios";
+import * as admin from 'firebase-admin';
+import * as logger from 'firebase-functions/logger';
+import axios, {AxiosResponse, isAxiosError} from 'axios';
 
 // Types based on existing Rivr data models
 export interface StreamflowData {
   reachId: string;
   currentFlow: number;
-  unit: "CFS" | "CMS";
+  unit: 'CFS' | 'CMS';
   validTime: string;
   retrievedAt: Date;
-  source: "NOAA_NWM";
+  source: 'NOAA_NWM';
   forecast?: StreamflowForecast[];
   returnPeriod?: ReturnPeriodData;
   flowCategory?: FlowCategory;
@@ -23,19 +23,19 @@ export interface StreamflowData {
 export interface StreamflowForecast {
   validTime: string;
   flow: number;
-  forecastType: "short_range" | "medium_range" | "long_range";
+  forecastType: 'short_range' | 'medium_range' | 'long_range';
   member?: string;
 }
 
 export interface ReturnPeriodData {
   reachId: string;
   flowValues: {[year: number]: number};
-  unit: "CFS" | "CMS";
+  unit: 'CFS' | 'CMS';
   retrievedAt: Date;
 }
 
 export type FlowCategory =
-  "Low" | "Normal" | "Moderate" | "Elevated" | "High" | "Very High" | "Extreme";
+  'Low' | 'Normal' | 'Moderate' | 'Elevated' | 'High' | 'Very High' | 'Extreme';
 
 // NOAA API response interfaces (based on existing Rivr implementation)
 interface NOAAStreamflowResponse {
@@ -77,15 +77,15 @@ interface ReturnPeriodResponse {
 interface CachedStreamflowData {
   reachId: string;
   currentFlow: number;
-  unit: "CFS" | "CMS";
+  unit: 'CFS' | 'CMS';
   validTime: string;
   retrievedAt: admin.firestore.Timestamp;
-  source: "NOAA_NWM";
+  source: 'NOAA_NWM';
   forecast?: StreamflowForecast[];
   returnPeriod?: {
     reachId: string;
     flowValues: {[year: number]: number};
-    unit: "CFS" | "CMS";
+    unit: 'CFS' | 'CMS';
     retrievedAt: admin.firestore.Timestamp;
   };
   flowCategory?: FlowCategory;
@@ -100,11 +100,11 @@ export class NOAAService {
   // Configuration based on existing Rivr environment
   private readonly config = {
     forecastBaseUrl: process.env.FORECAST_BASE_URL ||
-      "https://api.water.noaa.gov/nwps/v1",
+      'https://api.water.noaa.gov/nwps/v1',
     returnPeriodBaseUrl: process.env.RETURN_BASE_URL ||
-      "https://nwm-api-updt-9f6idmxh.uc.gateway.dev",
+      'https://nwm-api-updt-9f6idmxh.uc.gateway.dev',
     apiKey: process.env.API_KEY ||
-      "AIzaSyArCbLaEevrqrVPJDzu2OioM_kNmCBtsx8",
+      'AIzaSyArCbLaEevrqrVPJDzu2OioM_kNmCBtsx8',
     timeout: 30000,
     retryAttempts: 3,
     batchSize: 5, // Process reaches in batches
@@ -189,7 +189,7 @@ export class NOAAService {
 
       // Extract successful results
       batchResults.forEach((result, index) => {
-        if (result.status === "fulfilled" && result.value) {
+        if (result.status === 'fulfilled' && result.value) {
           results.push(result.value);
         } else {
           logger.warn(`Batch item ${batch[index]} failed or returned null`);
@@ -204,7 +204,7 @@ export class NOAAService {
 
     logger.info(
       `Successfully fetched data for ${results.length}/${reachIds.length} ` +
-      "reaches"
+      'reaches'
     );
     return results;
   }
@@ -227,10 +227,10 @@ export class NOAAService {
         url,
         {
           timeout: this.config.timeout,
-          params: includeForecast ? {series: "short_range"} : undefined,
+          params: includeForecast ? {series: 'short_range'} : undefined,
           headers: {
-            "Content-Type": "application/json",
-            "User-Agent": "Rivr-Thesis-Research/1.0",
+            'Content-Type': 'application/json',
+            'User-Agent': 'Rivr-Thesis-Research/1.0',
           },
         }
       );
@@ -279,10 +279,10 @@ export class NOAAService {
     const streamflowData: StreamflowData = {
       reachId,
       currentFlow: currentFlowData.flow,
-      unit: "CFS", // NOAA API returns CFS
+      unit: 'CFS', // NOAA API returns CFS
       validTime: currentFlowData.validTime,
       retrievedAt: new Date(),
-      source: "NOAA_NWM",
+      source: 'NOAA_NWM',
     };
 
     // Add forecast data if requested
@@ -299,7 +299,7 @@ export class NOAAService {
    * @return {Object} Latest flow and time data
    */
   private extractLatestFlow(
-    shortRange?: NOAAStreamflowResponse["shortRange"]
+    shortRange?: NOAAStreamflowResponse['shortRange']
   ): {flow: number; validTime: string} {
     // Try series data first (mean forecast)
     if (shortRange?.series?.data && shortRange.series.data.length > 0) {
@@ -310,7 +310,7 @@ export class NOAAService {
     // Fall back to member data
     for (let i = 1; i <= 6; i++) {
       const memberKey = `member${i}` as
-        keyof NOAAStreamflowResponse["shortRange"];
+        keyof NOAAStreamflowResponse['shortRange'];
       const memberData = (shortRange?.[memberKey] as {
         data: Array<{validTime: string; flow: number}>
       } | undefined)?.data;
@@ -320,7 +320,7 @@ export class NOAAService {
       }
     }
 
-    throw new Error("No flow data found in NOAA response");
+    throw new Error('No flow data found in NOAA response');
   }
 
   /**
@@ -339,7 +339,7 @@ export class NOAAService {
         forecasts.push({
           validTime: item.validTime,
           flow: item.flow,
-          forecastType: "short_range",
+          forecastType: 'short_range',
         });
       });
     }
@@ -350,7 +350,7 @@ export class NOAAService {
         forecasts.push({
           validTime: item.validTime,
           flow: item.flow,
-          forecastType: "medium_range",
+          forecastType: 'medium_range',
         });
       });
     }
@@ -359,7 +359,7 @@ export class NOAAService {
     if (response.longRange) {
       for (let i = 1; i <= 4; i++) {
         const memberKey = `member${i}` as
-          keyof NOAAStreamflowResponse["longRange"];
+          keyof NOAAStreamflowResponse['longRange'];
         const memberData = (response.longRange[memberKey] as {
           data: Array<{validTime: string; flow: number}>
         } | undefined)?.data;
@@ -368,7 +368,7 @@ export class NOAAService {
             forecasts.push({
               validTime: item.validTime,
               flow: item.flow,
-              forecastType: "long_range",
+              forecastType: 'long_range',
               member: memberKey,
             });
           });
@@ -395,19 +395,19 @@ export class NOAAService {
     const rp = returnPeriod.flowValues;
 
     if (flowInCMS < (rp[2] ?? Infinity)) {
-      return "Low";
+      return 'Low';
     } else if (flowInCMS < (rp[5] ?? Infinity)) {
-      return "Normal";
+      return 'Normal';
     } else if (flowInCMS < (rp[10] ?? Infinity)) {
-      return "Moderate";
+      return 'Moderate';
     } else if (flowInCMS < (rp[25] ?? Infinity)) {
-      return "Elevated";
+      return 'Elevated';
     } else if (flowInCMS < (rp[50] ?? Infinity)) {
-      return "High";
+      return 'High';
     } else if (flowInCMS < (rp[100] ?? Infinity)) {
-      return "Very High";
+      return 'Very High';
     } else {
-      return "Extreme";
+      return 'Extreme';
     }
   }
 
@@ -429,7 +429,7 @@ export class NOAAService {
    */
   private async getCachedData(reachId: string): Promise<StreamflowData | null> {
     try {
-      const doc = await this.db.collection("noaaFlowCache").doc(reachId).get();
+      const doc = await this.db.collection('noaaFlowCache').doc(reachId).get();
       if (doc.exists) {
         const data = doc.data() as CachedStreamflowData;
         return {
@@ -480,7 +480,7 @@ export class NOAAService {
         } : undefined,
       };
 
-      await this.db.collection("noaaFlowCache").doc(data.reachId).set(cacheDoc);
+      await this.db.collection('noaaFlowCache').doc(data.reachId).set(cacheDoc);
       console.log(`✅ Successfully cached data for ${data.reachId}`);
     } catch (error) {
       console.error(`❌ Error caching data for ${data.reachId}:`, error);
@@ -528,7 +528,7 @@ export class NOAAService {
     const url = `${this.config.returnPeriodBaseUrl}/return-period`;
 
     try {
-      console.log(`🌐 Fetching return periods for ${reachId} from: ${url}`);     
+      console.log(`🌐 Fetching return periods for ${reachId} from: ${url}`);
       // The API returns an ARRAY of objects, so we need to type it correctly
       const response: AxiosResponse<ReturnPeriodResponse[]> = await axios.get(
         url,
@@ -539,15 +539,15 @@ export class NOAAService {
             key: this.config.apiKey,
           },
           headers: {
-            "Content-Type": "application/json",
+            'Content-Type': 'application/json',
           },
         }
       );
 
       console.log(`📡 RP API status: ${response.status}`);
-      console.log(`📊 RP API length: ${response.data?.length || 0}`);     
+      console.log(`📊 RP API length: ${response.data?.length || 0}`);
       if (response.data && response.data.length > 0) {
-      console.log(`🔍 First item: ${JSON.stringify(response.data[0])}`);
+        console.log(`🔍 First item: ${JSON.stringify(response.data[0])}`);
       }
 
       if (response.status === 200 && response.data.length > 0) {
@@ -561,11 +561,11 @@ export class NOAAService {
           50: data.return_period_50,
           100: data.return_period_100,
         };
-        console.log(`✅ Successfully parsed: ${JSON.stringify(flowValues)}`);        
+        console.log(`✅ Successfully parsed: ${JSON.stringify(flowValues)}`);
         return {
           reachId,
           flowValues,
-          unit: "CMS", // Return period API returns CMS
+          unit: 'CMS', // Return period API returns CMS
           retrievedAt: new Date(),
         };
       }
@@ -593,8 +593,8 @@ export class NOAAService {
   async getUserMonitoredReaches(): Promise<string[]> {
     try {
       // Get all active user thresholds
-      const thresholds = await this.db.collectionGroup("thresholds")
-        .where("enabled", "==", true)
+      const thresholds = await this.db.collectionGroup('thresholds')
+        .where('enabled', '==', true)
         .get();
 
       const reachIds = new Set<string>();
@@ -607,7 +607,7 @@ export class NOAAService {
 
       return Array.from(reachIds);
     } catch (error) {
-      logger.error("Error getting monitored reaches:", error);
+      logger.error('Error getting monitored reaches:', error);
       return [];
     }
   }

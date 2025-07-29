@@ -3,6 +3,8 @@
 
 import 'dart:convert';
 import 'dart:io';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
@@ -51,6 +53,8 @@ class NotificationService {
 
       // Configure notification settings
       await _configureNotificationSettings();
+
+      await _ensureTokenIsStored();
 
       debugPrint('✅ Notification Service initialized successfully');
     } catch (e) {
@@ -462,24 +466,55 @@ class NotificationService {
     debugPrint('💡 You can add this navigation in your app');
   }
 
-  /// Update FCM token in database
+  /// Update FCM token in Firestore database
   Future<void> _updateTokenInDatabase(String token) async {
     try {
-      // TODO: Update the user's FCM token in Firestore
-      // This will be used by the Cloud Functions to send targeted notifications
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) {
+        debugPrint('❌ No authenticated user to update FCM token');
+        return;
+      }
 
-      debugPrint('💾 Would update FCM token in database: $token');
+      // Update token in users collection for cloud function
+      await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
+        'fcmToken': token,
+        'tokenUpdatedAt': FieldValue.serverTimestamp(),
+        'notificationsEnabled': true, // Default to enabled when token is set
+      }, SetOptions(merge: true));
 
-      // Example implementation:
-      // final user = FirebaseAuth.instance.currentUser;
-      // if (user != null) {
-      //   await FirebaseFirestore.instance
-      //       .collection('users')
-      //       .doc(user.uid)
-      //       .update({'fcmToken': token});
-      // }
+      debugPrint('✅ FCM token updated in Firestore for user: ${user.uid}');
     } catch (e) {
-      debugPrint('❌ Error updating FCM token: $e');
+      debugPrint('❌ Error updating FCM token in database: $e');
+    }
+  }
+
+  /// Force refresh and store FCM token
+  Future<void> refreshAndStoreFCMToken() async {
+    try {
+      // Delete the old token to force a refresh
+      await _firebaseMessaging.deleteToken();
+
+      // Get a new token
+      final newToken = await _firebaseMessaging.getToken();
+      if (newToken != null) {
+        _fcmToken = newToken;
+        await _updateTokenInDatabase(newToken);
+        debugPrint(
+          '🔄 FCM token refreshed and stored: ${newToken.substring(0, 20)}...',
+        );
+      }
+    } catch (e) {
+      debugPrint('❌ Error refreshing FCM token: $e');
+    }
+  }
+
+  /// Call this method after your notification service is initialized
+  /// Add this to the end of your initialize() method
+  Future<void> _ensureTokenIsStored() async {
+    if (_fcmToken != null) {
+      await _updateTokenInDatabase(_fcmToken!);
+    } else {
+      await refreshAndStoreFCMToken();
     }
   }
 

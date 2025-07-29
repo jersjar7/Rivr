@@ -1,5 +1,5 @@
 // functions/src/notifications/alert-cloud-function.ts
-// SUPER SIMPLE notification system - just one toggle, favorites only
+// Simplified notification system - scaled return period alerts only
 
 import {onSchedule} from "firebase-functions/v2/scheduler";
 import * as admin from "firebase-admin";
@@ -9,33 +9,33 @@ import {
   StreamflowForecast,
 } from "../noaa/noaa-service";
 
-// Firebase Admin is initialized in index.ts
-// Note: db and messaging are accessed inside functions
-// to avoid module-level initialization
-
 // Environment configuration
 const SCALE_FACTOR = parseFloat(
-  process.env.NOTIFICATION_SCALE_FACTOR || "1"
+  process.env.NOTIFICATION_SCALE_FACTOR || "25"
+  // Default to 25 for dev
 );
 const CHECK_FREQUENCY =
-  process.env.NOTIFICATION_CHECK_FREQUENCY_MINUTES || "360";
+  process.env.NOTIFICATION_CHECK_FREQUENCY_MINUTES || "1";
+  // Default to 1 min
 
 /**
  * Main Cloud Function: Check Flow Notifications
- * Super simple: Check favorite rivers for users with notifications enabled
+ * Checks favorite rivers for users with notifications enabled
+ * Sends alerts when forecasted flows exceed scaled return periods
  */
 export const checkFlowNotifications = onSchedule(
   {
     schedule: `every ${CHECK_FREQUENCY} minutes`,
     timeZone: "America/Denver",
   },
-  async (_event) => {
-    console.log(
-      `🌊 Starting notification check (scale factor: ${SCALE_FACTOR})...`
-    );
+  async () => {
+    console.log("🌊 Starting notification check...");
+    console.log(`📊 Scale Factor: ${SCALE_FACTOR} ` +
+      `(${SCALE_FACTOR === 25 ? "DEVELOPMENT" : "PRODUCTION"} mode)`);
+    console.log(`⏰ Check Frequency: ${CHECK_FREQUENCY} minutes`);
 
     try {
-      // Step 1: Get all users with notifications enabled
+      // Get all users with notifications enabled
       const enabledUsers = await getEnabledUsers();
       console.log(
         `👥 Found ${enabledUsers.length} users with notifications enabled`
@@ -49,18 +49,13 @@ export const checkFlowNotifications = onSchedule(
       let totalNotifications = 0;
       const noaaService = new NOAAService();
 
-      // Step 2: For each user, check their favorites
+      // Check each user's favorites
       for (const user of enabledUsers) {
-        const userNotifications = await checkUserFavorites(
-          user,
-          noaaService
-        );
+        const userNotifications = await checkUserFavorites(user, noaaService);
         totalNotifications += userNotifications;
       }
 
       console.log(`📱 Total notifications sent: ${totalNotifications}`);
-
-      // Function completes successfully - no return value needed
     } catch (error) {
       console.error("❌ Error in notification check:", error);
       throw error;
@@ -69,6 +64,7 @@ export const checkFlowNotifications = onSchedule(
 
 /**
  * Get all users who have notifications enabled and have FCM tokens
+ * @return {Promise} Promise that resolves to array of enabled users
  */
 async function getEnabledUsers(): Promise<Array<{
   userId: string;
@@ -110,60 +106,108 @@ async function checkUserFavorites(
   noaaService: NOAAService
 ): Promise<number> {
   try {
-    // Get user's favorites
-    const favoritesSnapshot = await admin.firestore()
-      .collection("favorites")
-      .where("userId", "==", user.userId)
+    console.log(`🔍 Checking favorites for user ${user.userId}`);
+
+    // Get favorites from cached system
+    const favoritesCache = await admin.firestore()
+      .collection("forecastData")
+      .doc("46083324")
       .get();
 
-    console.log(
-      `📋 User ${user.userId} has ${favoritesSnapshot.docs.length} favorites`
-    );
+    const favorites: Array<Record<string, unknown>> = [];
 
-    if (favoritesSnapshot.empty) {
+    if (favoritesCache.exists) {
+      const cacheData = favoritesCache.data();
+      try {
+        const apiData = JSON.parse(cacheData?.apiData || "{}");
+        if (apiData.favorites && Array.isArray(apiData.favorites)) {
+          const userFavorites = apiData.favorites.filter(
+            (fav: Record<string, unknown>) => fav.userId === user.userId
+          );
+          favorites.push(...userFavorites);
+        }
+      } catch (parseError) {
+        console.log(`⚠️ Error parsing cached favorites: ${parseError}`);
+      }
+    }
+
+    // Fallback: check individual favorites collection
+    if (favorites.length === 0) {
+      const favoritesSnapshot = await admin.firestore()
+        .collection("favorites")
+        .where("userId", "==", user.userId)
+        .get();
+
+      favorites.push(...favoritesSnapshot.docs.map((doc) => doc.data()));
+    }
+
+    console.log(`📋 User ${user.userId} has ${favorites.length} favorites`);
+
+    if (favorites.length === 0) {
       console.log(`👤 User ${user.userId} has no favorites`);
       return 0;
     }
 
     let notificationsSent = 0;
 
-    // Check each favorite reach
-    for (const favoriteDoc of favoritesSnapshot.docs) {
-      const favoriteData = favoriteDoc.data();
-      const reachId = favoriteData.reachId;
+    // Check each favorite station
+    for (const favorite of favorites) {
+      // Skip if stationId is not valid
+      if (!favorite.stationId ||
+          (typeof favorite.stationId !== "number" &&
+           typeof favorite.stationId !== "string")) {
+        console.log("⚠️ Invalid stationId for favorite: " +
+          `${JSON.stringify(favorite)}`);
+        continue;
+      }
 
-      console.log(`🔍 Checking reach: ${reachId}`);
+      const stationId = favorite.stationId as number;
+      const riverName = (favorite.name as string) ||
+        (favorite.originalApiName as string) || "Unknown River";
+
+      console.log(`🔍 Checking station: ${stationId} (${riverName})`);
 
       try {
         // Get current forecast data
         const streamflowData = await noaaService.fetchStreamflowData(
-          reachId,
-          true // Include forecast
+          stationId.toString(),
+          true // Include forecasts
         );
 
-        if (!streamflowData || !streamflowData.forecast) {
-          console.log(`⚠️ No forecast data for reach: ${reachId}`);
+        if (!streamflowData) {
+          console.log(`⚠️ No data available for station ${stationId}`);
           continue;
         }
 
-        // Check if any forecast crosses scaled return period
-        const shouldNotify = await checkForecastThreshold(
-          reachId,
+        // Check if forecast exceeds scaled return period threshold
+        const shouldSendNotification = await checkForecastThreshold(
+          stationId.toString(),
           streamflowData
         );
 
-        if (shouldNotify) {
-          await sendNotification(user, reachId, streamflowData);
-          notificationsSent++;
+        if (shouldSendNotification) {
+          const success = await sendNotification(
+            user,
+            stationId.toString(),
+            streamflowData,
+            riverName
+          );
+
+          if (success) {
+            notificationsSent++;
+            console.log(`✅ Notification sent for ${riverName}`);
+          }
         }
-      } catch (error) {
-        console.error(`Error checking reach ${reachId}:`, error);
+      } catch (stationError) {
+        console.error(`❌ Error checking station ${stationId}:`,
+          stationError);
       }
     }
 
     return notificationsSent;
   } catch (error) {
-    console.error(`Error checking favorites for user ${user.userId}:`, error);
+    console.error(`❌ Error checking favorites for user ${user.userId}:`,
+      error);
     return 0;
   }
 }
@@ -193,12 +237,14 @@ async function checkForecastThreshold(
     }
 
     // Calculate scaled threshold (divide by scale factor)
-    const baseThreshold = returnPeriodData[2] || returnPeriodData[5] || 1000;
+    const baseThreshold = returnPeriodData[2] ||
+      returnPeriodData[5] || 1000;
     const scaledThreshold = baseThreshold / SCALE_FACTOR;
 
     console.log(
       `🎯 Reach ${reachId}: base threshold=${baseThreshold}, ` +
-      `scaled=${scaledThreshold} (factor=${SCALE_FACTOR})`
+      `scaled=${scaledThreshold} (÷${SCALE_FACTOR} for ` +
+      `${SCALE_FACTOR === 25 ? "DEV" : "PROD"} testing)`
     );
 
     // Get maximum flow from short and medium range forecasts only
@@ -224,7 +270,6 @@ async function checkForecastThreshold(
  */
 function getMaxForecastFlow(forecasts: StreamflowForecast[]): number {
   try {
-    // Handle undefined or empty forecasts
     if (!forecasts || forecasts.length === 0) {
       console.log("⚠️ No forecasts provided");
       return 0;
@@ -278,7 +323,6 @@ async function getReturnPeriods(
 
         if (cacheAge < maxCacheAge) {
           console.log(`💾 Using cached return periods for ${reachId}`);
-          // Extract just the return period values
           return {
             2: cacheData[2] || cacheData.return_period_2 || 0,
             5: cacheData[5] || cacheData.return_period_5 || 0,
@@ -298,10 +342,11 @@ async function getReturnPeriods(
 
     if (returnPeriodData) {
       // Cache the data
-      await admin.firestore().collection("returnPeriodCache").doc(reachId).set({
-        ...returnPeriodData.flowValues,
-        cachedAt: admin.firestore.FieldValue.serverTimestamp(),
-      });
+      await admin.firestore().collection("returnPeriodCache").doc(reachId)
+        .set({
+          ...returnPeriodData.flowValues,
+          cachedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
 
       return returnPeriodData.flowValues;
     }
@@ -318,34 +363,36 @@ async function getReturnPeriods(
  * @param {Object} user - User object with userId and fcmToken
  * @param {string} reachId - The reach identifier
  * @param {StreamflowData} streamflowData - Streamflow data with forecasts
- * @return {Promise<void>} Promise that resolves when notification is sent
+ * @param {string} riverName - Name of the river
+ * @return {Promise<boolean>} True if notification sent successfully
  */
 async function sendNotification(
   user: {userId: string; fcmToken: string},
   reachId: string,
-  streamflowData: StreamflowData
-): Promise<void> {
+  streamflowData: StreamflowData,
+  riverName: string
+): Promise<boolean> {
   try {
-    // Get reach name (you might want to store this in your reaches collection)
-    const reachName = await getReachName(reachId);
-
     // Get max flow safely
     const maxFlow = streamflowData.forecast ?
       getMaxForecastFlow(streamflowData.forecast) : 0;
+
+    const notificationBody = `${riverName} forecast is crossing ` +
+      `elevated levels (${Math.round(maxFlow)} cfs)`;
 
     const message = {
       token: user.fcmToken,
       notification: {
         title: "🌊 High Flow Alert",
-        body: `${reachName} forecast is crossing elevated levels`,
+        body: notificationBody,
       },
       data: {
         type: "flow_alert",
         reachId: reachId,
-        reachName: reachName,
+        riverName: riverName,
         maxFlow: String(maxFlow),
         scaleFactor: String(SCALE_FACTOR),
-        deepLink: `rivr://reach/${reachId}`,
+        timestamp: new Date().toISOString(),
       },
       android: {
         notification: {
@@ -357,6 +404,10 @@ async function sendNotification(
       apns: {
         payload: {
           aps: {
+            alert: {
+              title: "🌊 High Flow Alert",
+              body: notificationBody,
+            },
             sound: "default",
             badge: 1,
           },
@@ -367,55 +418,14 @@ async function sendNotification(
     await admin.messaging().send(message);
 
     console.log(
-      `📱 Notification sent to user ${user.userId} for reach: ${reachName}`
+      `📱 Notification sent to user ${user.userId} for reach: ` +
+      `${riverName} (${Math.round(maxFlow)} cfs, scale ÷${SCALE_FACTOR})`
     );
 
-    // Log notification to database
-    await admin.firestore().collection("notificationLog").add({
-      userId: user.userId,
-      reachId: reachId,
-      reachName: reachName,
-      type: "flow_alert",
-      scaleFactor: SCALE_FACTOR,
-      maxFlow: maxFlow,
-      timestamp: admin.firestore.FieldValue.serverTimestamp(),
-      sent: true,
-    });
+    return true;
   } catch (error) {
-    console.error("Error sending notification:", error);
-
-    // Log failed notification
-    await admin.firestore().collection("notificationLog").add({
-      userId: user.userId,
-      reachId: reachId,
-      type: "flow_alert",
-      scaleFactor: SCALE_FACTOR,
-      timestamp: admin.firestore.FieldValue.serverTimestamp(),
-      sent: false,
-      error: error instanceof Error ? error.message : "Unknown error",
-    });
-  }
-}
-
-/**
- * Get reach name (implement based on your data structure)
- * @param {string} reachId - The reach identifier
- * @return {Promise<string>} Reach name or default name
- */
-async function getReachName(reachId: string): Promise<string> {
-  try {
-    const reachDoc = await admin
-      .firestore()
-      .collection("reaches")
-      .doc(reachId)
-      .get();
-    if (reachDoc.exists) {
-      return reachDoc.data()?.name || `Reach ${reachId}`;
-    }
-    return `Reach ${reachId}`;
-  } catch (error) {
-    console.error(`Error getting reach name for ${reachId}:`, error);
-    return `Reach ${reachId}`;
+    console.error(`Error sending notification for reach ${reachId}:`, error);
+    return false;
   }
 }
 

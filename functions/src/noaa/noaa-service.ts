@@ -65,7 +65,7 @@ interface NOAAStreamflowResponse {
 }
 
 interface ReturnPeriodResponse {
-  feature_id: number;  // Changed from 'comid' to 'feature_id'
+  feature_id: number;
   return_period_2: number;
   return_period_5: number;
   return_period_10: number;
@@ -113,7 +113,7 @@ export class NOAAService {
   private readonly db = admin.firestore();
 
   /**
-   * Main method for fetching flow data (single reach)
+   * Main method for fetching flow data (single reach) - NO CACHING VERSION
    * @param {string} reachId - The reach identifier
    * @param {boolean} includeForecast - Whether to include forecast data
    * @return {Promise<StreamflowData | null>} Streamflow data or null
@@ -125,14 +125,7 @@ export class NOAAService {
     try {
       logger.info(`Fetching streamflow data for reach: ${reachId}`);
 
-      // Check cache first
-      const cachedData = await this.getCachedData(reachId);
-      if (cachedData && this.isCacheValid(cachedData)) {
-        logger.info(`Using cached data for reach: ${reachId}`);
-        return cachedData;
-      }
-
-      // Fetch from NOAA API
+      // Fetch from NOAA API (skip cache entirely)
       const streamflowData = await this.fetchFromNOAA(
         reachId,
         includeForecast
@@ -156,18 +149,8 @@ export class NOAAService {
         // Continue without return period data
       }
 
-      // Add change detection
-      if (cachedData) {
-        streamflowData.previousFlow = cachedData.currentFlow;
-        streamflowData.changePercent = this.calculateChangePercent(
-          streamflowData.currentFlow,
-          cachedData.currentFlow
-        );
-      }
-
-      // Cache the data
-      await this.cacheStreamflowData(streamflowData);
-
+      // No caching, no change detection - just return fresh data
+      console.log(`✅ Successfully fetched fresh data for ${reachId}`);
       return streamflowData;
     } catch (error) {
       logger.error(`Error fetching streamflow data for ${reachId}:`, error);
@@ -488,7 +471,8 @@ export class NOAAService {
         expiresAt: admin.firestore.Timestamp.fromDate(
           new Date(Date.now() + 30 * 60 * 1000)
         ),
-        returnPeriod: data.returnPeriod ? {
+        // Fix: Check both returnPeriod existence AND retrievedAt existence
+        returnPeriod: data.returnPeriod && data.returnPeriod.retrievedAt ? {
           ...data.returnPeriod,
           retrievedAt: admin.firestore.Timestamp.fromDate(
             data.returnPeriod.retrievedAt
@@ -497,8 +481,9 @@ export class NOAAService {
       };
 
       await this.db.collection("noaaFlowCache").doc(data.reachId).set(cacheDoc);
+      console.log(`✅ Successfully cached data for ${data.reachId}`);
     } catch (error) {
-      logger.error(`Error caching data for ${data.reachId}:`, error);
+      console.error(`❌ Error caching data for ${data.reachId}:`, error);
     }
   }
 
@@ -543,6 +528,7 @@ export class NOAAService {
     const url = `${this.config.returnPeriodBaseUrl}/return-period`;
 
     try {
+      console.log(`🌐 Fetching return periods for ${reachId} from: ${url}`);     
       // The API returns an ARRAY of objects, so we need to type it correctly
       const response: AxiosResponse<ReturnPeriodResponse[]> = await axios.get(
         url,
@@ -558,32 +544,43 @@ export class NOAAService {
         }
       );
 
+      console.log(`📡 RP API status: ${response.status}`);
+      console.log(`📊 RP API length: ${response.data?.length || 0}`);     
+      if (response.data && response.data.length > 0) {
+      console.log(`🔍 First item: ${JSON.stringify(response.data[0])}`);
+      }
+
       if (response.status === 200 && response.data.length > 0) {
         // Access the first (and usually only) object in the array
         const data = response.data[0];
-        
+        const flowValues = {
+          2: data.return_period_2,
+          5: data.return_period_5,
+          10: data.return_period_10,
+          25: data.return_period_25,
+          50: data.return_period_50,
+          100: data.return_period_100,
+        };
+        console.log(`✅ Successfully parsed: ${JSON.stringify(flowValues)}`);        
         return {
           reachId,
-          flowValues: {
-            2: data.return_period_2,
-            5: data.return_period_5,
-            10: data.return_period_10,
-            25: data.return_period_25,
-            50: data.return_period_50,
-            100: data.return_period_100,
-          },
+          flowValues,
           unit: "CMS", // Return period API returns CMS
           retrievedAt: new Date(),
         };
       }
 
-      logger.warn(`No return period data found for reach ${reachId}`);
+      console.log(`⚠️ No return period data found for reach ${reachId}`);
       return null;
     } catch (error) {
       if (isAxiosError(error)) {
-        logger.error(`Return period API error for reach ${reachId}:`, error.message);
+        console.error(`❌ Return period API error for reach ${reachId}:`, error.message);
+        if (error.response) {
+          console.error(`📛 Response status: ${error.response.status}`);
+          console.error(`📛 Response data: ${JSON.stringify(error.response.data)}`);
+        }
       } else {
-        logger.error(`Network error fetching return periods for reach ${reachId}:`, error);
+        console.error(`🔌 Network error fetching return periods for reach ${reachId}:`, error);
       }
       return null;
     }

@@ -1,5 +1,5 @@
 // functions/src/types/return-period.ts
-import {FlowUnit} from "./flow-unit";
+import {FlowUnit} from './flow-unit';
 
 /**
  * Return period data structure matching the Rivr app

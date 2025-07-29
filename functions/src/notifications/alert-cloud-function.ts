@@ -1,21 +1,21 @@
 // functions/src/notifications/alert-cloud-function.ts
 // Simplified notification system - scaled return period alerts only
 
-import {onSchedule} from "firebase-functions/v2/scheduler";
-import * as admin from "firebase-admin";
+import {onSchedule} from 'firebase-functions/v2/scheduler';
+import * as admin from 'firebase-admin';
 import {
   NOAAService,
   StreamflowData,
   StreamflowForecast,
-} from "../noaa/noaa-service";
+} from '../noaa/noaa-service';
 
 // Environment configuration
 const SCALE_FACTOR = parseFloat(
-  process.env.NOTIFICATION_SCALE_FACTOR || "25"
+  process.env.NOTIFICATION_SCALE_FACTOR || '25'
   // Default to 25 for dev
 );
 const CHECK_FREQUENCY =
-  process.env.NOTIFICATION_CHECK_FREQUENCY_MINUTES || "1";
+  process.env.NOTIFICATION_CHECK_FREQUENCY_MINUTES || '1';
   // Default to 1 min
 
 /**
@@ -26,12 +26,12 @@ const CHECK_FREQUENCY =
 export const checkFlowNotifications = onSchedule(
   {
     schedule: `every ${CHECK_FREQUENCY} minutes`,
-    timeZone: "America/Denver",
+    timeZone: 'America/Denver',
   },
   async () => {
-    console.log("🌊 Starting notification check...");
+    console.log('🌊 Starting notification check...');
     console.log(`📊 Scale Factor: ${SCALE_FACTOR} ` +
-      `(${SCALE_FACTOR === 25 ? "DEVELOPMENT" : "PRODUCTION"} mode)`);
+      `(${SCALE_FACTOR === 25 ? 'DEVELOPMENT' : 'PRODUCTION'} mode)`);
     console.log(`⏰ Check Frequency: ${CHECK_FREQUENCY} minutes`);
 
     try {
@@ -42,7 +42,7 @@ export const checkFlowNotifications = onSchedule(
       );
 
       if (enabledUsers.length === 0) {
-        console.log("📱 No users with notifications enabled");
+        console.log('📱 No users with notifications enabled');
         return;
       }
 
@@ -57,7 +57,7 @@ export const checkFlowNotifications = onSchedule(
 
       console.log(`📱 Total notifications sent: ${totalNotifications}`);
     } catch (error) {
-      console.error("❌ Error in notification check:", error);
+      console.error('❌ Error in notification check:', error);
       throw error;
     }
   });
@@ -74,8 +74,8 @@ async function getEnabledUsers(): Promise<Array<{
     const users: Array<{userId: string; fcmToken: string}> = [];
 
     const usersSnapshot = await admin.firestore()
-      .collection("users")
-      .where("notificationsEnabled", "==", true)
+      .collection('users')
+      .where('notificationsEnabled', '==', true)
       .get();
 
     usersSnapshot.forEach((doc) => {
@@ -90,7 +90,7 @@ async function getEnabledUsers(): Promise<Array<{
 
     return users;
   } catch (error) {
-    console.error("Error getting enabled users:", error);
+    console.error('Error getting enabled users:', error);
     return [];
   }
 }
@@ -110,8 +110,8 @@ async function checkUserFavorites(
 
     // Get favorites from cached system
     const favoritesCache = await admin.firestore()
-      .collection("forecastData")
-      .doc("46083324")
+      .collection('forecastData')
+      .doc('46083324')
       .get();
 
     const favorites: Array<Record<string, unknown>> = [];
@@ -119,7 +119,7 @@ async function checkUserFavorites(
     if (favoritesCache.exists) {
       const cacheData = favoritesCache.data();
       try {
-        const apiData = JSON.parse(cacheData?.apiData || "{}");
+        const apiData = JSON.parse(cacheData?.apiData || '{}');
         if (apiData.favorites && Array.isArray(apiData.favorites)) {
           const userFavorites = apiData.favorites.filter(
             (fav: Record<string, unknown>) => fav.userId === user.userId
@@ -134,8 +134,8 @@ async function checkUserFavorites(
     // Fallback: check individual favorites collection
     if (favorites.length === 0) {
       const favoritesSnapshot = await admin.firestore()
-        .collection("favorites")
-        .where("userId", "==", user.userId)
+        .collection('favorites')
+        .where('userId', '==', user.userId)
         .get();
 
       favorites.push(...favoritesSnapshot.docs.map((doc) => doc.data()));
@@ -156,16 +156,16 @@ async function checkUserFavorites(
       const reachId = favorite.reachId || favorite.stationId;
       // Skip if reachId is not valid
       if (!reachId ||
-          (typeof reachId !== "number" &&
-           typeof reachId !== "string")) {
-        console.log("⚠️ Invalid reachId for favorite: " +
-          "${JSON.stringify(favorite)}");
+          (typeof reachId !== 'number' &&
+           typeof reachId !== 'string')) {
+        console.log('⚠️ Invalid reachId for favorite: ' +
+          '${JSON.stringify(favorite)}');
         continue;
       }
 
       const stationId = reachId as number;
       const riverName = (favorite.name as string) ||
-        (favorite.originalApiName as string) || "Unknown River";
+        (favorite.originalApiName as string) || 'Unknown River';
 
       console.log(`🔍 Checking station: ${stationId} (${riverName})`);
 
@@ -246,7 +246,7 @@ async function checkForecastThreshold(
     console.log(
       `🎯 Reach ${reachId}: base threshold=${baseThreshold}, ` +
       `scaled=${scaledThreshold} (÷${SCALE_FACTOR} for ` +
-      `${SCALE_FACTOR === 25 ? "DEV" : "PROD"} testing)`
+      `${SCALE_FACTOR === 25 ? 'DEV' : 'PROD'} testing)`
     );
 
     // Get maximum flow from short and medium range forecasts only
@@ -273,17 +273,17 @@ async function checkForecastThreshold(
 function getMaxForecastFlow(forecasts: StreamflowForecast[]): number {
   try {
     if (!forecasts || forecasts.length === 0) {
-      console.log("⚠️ No forecasts provided");
+      console.log('⚠️ No forecasts provided');
       return 0;
     }
 
     // Filter for short and medium range only
     const relevantForecasts = forecasts.filter((f) =>
-      f.forecastType === "short_range" || f.forecastType === "medium_range"
+      f.forecastType === 'short_range' || f.forecastType === 'medium_range'
     );
 
     if (relevantForecasts.length === 0) {
-      console.log("⚠️ No short/medium range forecasts found");
+      console.log('⚠️ No short/medium range forecasts found');
       return 0;
     }
 
@@ -297,7 +297,7 @@ function getMaxForecastFlow(forecasts: StreamflowForecast[]): number {
 
     return maxFlow;
   } catch (error) {
-    console.error("Error getting max forecast flow:", error);
+    console.error('Error getting max forecast flow:', error);
     return 0;
   }
 }
@@ -313,7 +313,7 @@ async function getReturnPeriods(
   try {
     // Check cache first
     const cacheDoc = await admin.firestore()
-      .collection("returnPeriodCache")
+      .collection('returnPeriodCache')
       .doc(reachId)
       .get();
 
@@ -344,7 +344,7 @@ async function getReturnPeriods(
 
     if (returnPeriodData) {
       // Cache the data
-      await admin.firestore().collection("returnPeriodCache").doc(reachId)
+      await admin.firestore().collection('returnPeriodCache').doc(reachId)
         .set({
           ...returnPeriodData.flowValues,
           cachedAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -385,11 +385,11 @@ async function sendNotification(
     const message = {
       token: user.fcmToken,
       notification: {
-        title: "🌊 High Flow Alert",
+        title: '🌊 High Flow Alert',
         body: notificationBody,
       },
       data: {
-        type: "flow_alert",
+        type: 'flow_alert',
         reachId: reachId,
         riverName: riverName,
         maxFlow: String(maxFlow),
@@ -398,19 +398,19 @@ async function sendNotification(
       },
       android: {
         notification: {
-          channelId: "flow_alerts",
-          priority: "high" as const,
-          color: "#FF6B6B",
+          channelId: 'flow_alerts',
+          priority: 'high' as const,
+          color: '#FF6B6B',
         },
       },
       apns: {
         payload: {
           aps: {
             alert: {
-              title: "🌊 High Flow Alert",
+              title: '🌊 High Flow Alert',
               body: notificationBody,
             },
-            sound: "default",
+            sound: 'default',
             badge: 1,
           },
         },

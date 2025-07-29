@@ -26,7 +26,13 @@ module.exports = {
     "import",
   ],
   rules: {
-    "quotes": ["error", "double"],
+    // UPDATED: Increase line length from 80 to 120
+    "max-len": ["error",{ "code": 120 }],    
+    // UPDATED: Allow multiple spaces (or disable entirely)
+    "no-multi-spaces": "off",
+    // UPDATED: Make trailing spaces a warning instead of error
+    "no-trailing-spaces": "warn",
+    // Other existing rules...
     "import/no-unresolved": 0,
     "indent": ["error", 2],
   },

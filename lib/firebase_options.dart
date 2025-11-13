@@ -50,7 +50,7 @@ class DefaultFirebaseOptions {
   }
 
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'AIzaSyABSp5c6oEVbTM1W_JIjds3u6dmaO1ejuw',
+    apiKey: '***REMOVED***',
     appId: '1:158435993111:android:7b26fd7c38d1fe45121e52',
     messagingSenderId: '158435993111',
     projectId: 'rivrflow-app',
@@ -58,7 +58,7 @@ class DefaultFirebaseOptions {
   );
 
   static const FirebaseOptions ios = FirebaseOptions(
-    apiKey: 'AIzaSyA24EApEHeGO06ksQh9R8H9tY8h0OUWhi0',
+    apiKey: '***REMOVED***',
     appId: '1:158435993111:ios:911892f1e3be456f121e52',
     messagingSenderId: '158435993111',
     projectId: 'rivrflow-app',
